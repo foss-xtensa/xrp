@@ -104,6 +104,7 @@ struct xvp_allocation {
 struct xvp {
 	struct device *dev;
 	const struct firmware *firmware;
+	struct miscdevice miscdev;
 
 	void __iomem *regs;
 	void __iomem *comm;
@@ -129,7 +130,7 @@ static int firmware_reboot = 1;
 module_param(firmware_reboot, int, 0644);
 MODULE_PARM_DESC(firmware_reboot, "Reboot firmware on command timeout.");
 
-static struct xvp *xvp;
+static unsigned xvp_nodeid;
 
 #define DRIVER_NAME "xvp"
 
@@ -498,7 +499,7 @@ static long xvp_ioctl_alloc(struct file *filp,
 
 	vaddr = vm_mmap(filp, 0, xvp_allocation->size,
 			PROT_READ | PROT_WRITE, MAP_SHARED,
-			xvp_allocation->start - xvp->pmem);
+			xvp_allocation->start - xvp_file->xvp->pmem);
 
 	xvp_ioctlx_alloc.phys_addr = xvp_allocation->start;
 	xvp_ioctlx_alloc.virt_addr = vaddr;
@@ -1326,7 +1327,8 @@ static const struct vm_operations_struct xvp_vm_ops = {
 static int xvp_mmap(struct file *filp, struct vm_area_struct *vma)
 {
 	int err;
-	unsigned long pfn = vma->vm_pgoff + (xvp->pmem >> PAGE_SHIFT);
+	struct xvp_file *xvp_file = filp->private_data;
+	unsigned long pfn = vma->vm_pgoff + (xvp_file->xvp->pmem >> PAGE_SHIFT);
 	struct xvp_allocation *xvp_allocation;
 
 	pr_debug("%s\n", __func__);
@@ -1344,6 +1346,8 @@ static int xvp_mmap(struct file *filp, struct vm_area_struct *vma)
 
 static int xvp_open(struct inode *inode, struct file *filp)
 {
+	struct xvp *xvp = container_of(filp->private_data,
+				       struct xvp, miscdev);
 	struct xvp_file *xvp_file =
 		devm_kzalloc(xvp->dev, sizeof(*xvp_file), GFP_KERNEL);
 
@@ -1510,18 +1514,13 @@ static const struct file_operations xvp_fops = {
 	.release = xvp_close,
 };
 
-static struct miscdevice xvp_miscdev = {
-	.minor = MISC_DYNAMIC_MINOR,
-	.name = "xvp",
-	.nodename = "xvp",
-	.fops = &xvp_fops,
-};
-
 static int xvp_probe(struct platform_device *pdev)
 {
+	struct xvp *xvp;
 	int ret;
 	struct resource *mem;
 	int irq;
+	char nodename[sizeof("xvp") + 3 * sizeof(int)] = "xvp";
 
 	xvp = devm_kzalloc(&pdev->dev, sizeof(*xvp), GFP_KERNEL);
 	if (!xvp) {
@@ -1586,7 +1585,17 @@ static int xvp_probe(struct platform_device *pdev)
 	if (ret < 0)
 		goto err_free;
 
-	ret = misc_register(&xvp_miscdev);
+	if (xvp_nodeid++)
+		sprintf(nodename, "xvp%u", xvp_nodeid - 1);
+
+	xvp->miscdev = (struct miscdevice){
+		.minor = MISC_DYNAMIC_MINOR,
+		.name = "xvp",
+		.nodename = devm_kstrdup(&pdev->dev, nodename, GFP_KERNEL),
+		.fops = &xvp_fops,
+	};
+
+	ret = misc_register(&xvp->miscdev);
 	if (ret < 0)
 		goto err_free;
 	return 0;
@@ -1602,9 +1611,10 @@ static int xvp_remove(struct platform_device *pdev)
 	struct xvp *xvp = platform_get_drvdata(pdev);
 
 	xvp_halt_dsp(xvp);
-	misc_deregister(&xvp_miscdev);
+	misc_deregister(&xvp->miscdev);
 	release_firmware(xvp->firmware);
 	kfree(xvp->free_list);
+	--xvp_nodeid;
 	return 0;
 }
 
