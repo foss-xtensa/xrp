@@ -1159,19 +1159,16 @@ static long xvp_ioctl_free(struct file *filp,
 	return -EINVAL;
 }
 
-static long xvp_complete_cmd_irq(struct xvp *xvp)
+static long xvp_complete_cmd_irq(struct completion *completion,
+				 bool (*cmd_complete)(void *p),
+				 void *p)
 {
 	long timeout = XVP_TIMEOUT_JIFFIES;
 
 	do {
-		u32 cmd;
-
-		timeout = wait_for_completion_interruptible_timeout(&xvp->completion,
+		timeout = wait_for_completion_interruptible_timeout(completion,
 								    timeout);
-		cmd = xvp_comm_read32(xvp, XVP_COMM_CMD);
-		rmb();
-
-		if (cmd == XVP_CMD_IDLE)
+		if (cmd_complete(p))
 			return 0;
 	} while (timeout > 0);
 
@@ -1180,20 +1177,27 @@ static long xvp_complete_cmd_irq(struct xvp *xvp)
 	return timeout;
 }
 
-static long xvp_complete_cmd_poll(struct xvp *xvp)
+static long xvp_complete_cmd_poll(bool (*cmd_complete)(void *p),
+				  void *p)
 {
 	unsigned long deadline = jiffies + XVP_TIMEOUT_JIFFIES;
 
 	do {
-		u32 cmd = xvp_comm_read32(xvp, XVP_COMM_CMD);
-
-		rmb();
-		if (cmd == XVP_CMD_IDLE)
+		if (cmd_complete(p))
 			return 0;
 		schedule();
 	} while (time_before(jiffies, deadline));
 
 	return -EBUSY;
+}
+
+static bool xvp_cmd_complete(void *p)
+{
+	struct xvp *xvp = p;
+	u32 cmd = xvp_comm_read32(xvp, XVP_COMM_CMD);
+
+	rmb();
+	return cmd == XVP_CMD_IDLE;
 }
 
 static long xvp_ioctl_submit_sync(struct file *filp,
@@ -1238,9 +1242,10 @@ static long xvp_ioctl_submit_sync(struct file *filp,
 	if (xvp->use_irq) {
 		wmb();
 		xvp_reg_write32(xvp, XVP_REG_IVP_IRQ(XVP_IVP_IRQ_NUM), 1);
-		ret = xvp_complete_cmd_irq(xvp);
+		ret = xvp_complete_cmd_irq(&xvp->completion,
+					   xvp_cmd_complete, xvp);
 	} else {
-		ret = xvp_complete_cmd_poll(xvp);
+		ret = xvp_complete_cmd_poll(xvp_cmd_complete, xvp);
 	}
 
 	if (ret == 0) {
