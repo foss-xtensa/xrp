@@ -1,3 +1,4 @@
+#define DEBUG
 /*
  * XVP - Linux device driver for APK.
  * $Id$
@@ -43,6 +44,7 @@
 #include <asm/cacheflush.h>
 #include <asm/mman.h>
 #include <asm/uaccess.h>
+#include "xrp_kernel_defs.h"
 #include "xvp_defs.h"
 
 #define FIRMWARE_NAME "xvp.elf"
@@ -63,6 +65,15 @@ MODULE_FIRMWARE(FIRMWARE_NAME);
 #define XVP_COMM_DATA (0x200)
 #define XVP_COMM_STATUS (0x300)
 #define XVP_COMM_SIZE (0x400)
+
+#define XRP_COMM_FLAG_VALID	(0x00000001)
+#define XRP_COMM_FLAGS		(0x100)
+#define XRP_COMM_IN_DATA_SIZE	(0x104)
+#define XRP_COMM_OUT_DATA_SIZE	(0x108)
+#define XRP_COMM_BUFFER_SIZE	(0x10c)
+#define XRP_COMM_IN_DATA	(0x110)
+#define XRP_COMM_OUT_DATA	(0x120)
+#define XRP_COMM_BUFFER_DATA	(0x130)
 
 #define XVP_SYNC_MODE_IDLE      0
 #define XVP_SYNC_MODE_POLL      1
@@ -508,6 +519,44 @@ static long xvp_ioctl_alloc(struct file *filp,
 
 	if (copy_to_user(p, &xvp_ioctlx_alloc, sizeof(*p))) {
 		vm_munmap(vaddr, xvp_ioctlx_alloc.size);
+		return -EFAULT;
+	}
+	return 0;
+}
+
+static long xrp_ioctl_alloc(struct file *filp,
+			    struct xrp_ioctl_alloc __user *p)
+{
+	struct xvp_file *xvp_file = filp->private_data;
+	struct xvp_allocation *xvp_allocation;
+	unsigned long vaddr;
+	struct xrp_ioctl_alloc xrp_ioctl_alloc;
+	long err;
+
+	pr_debug("%s: %p\n", __func__, p);
+	if (copy_from_user(&xrp_ioctl_alloc, p, sizeof(*p)))
+		return -EFAULT;
+
+	pr_debug("%s: size = %d, align = %x\n", __func__,
+		 xrp_ioctl_alloc.size, xrp_ioctl_alloc.align);
+
+	err = xvp_allocate(xvp_file, xrp_ioctl_alloc.size,
+			   xrp_ioctl_alloc.align,
+			   0,
+			   &xvp_allocation);
+	if (err)
+		return err;
+
+	xvp_allocation_queue(xvp_file, xvp_allocation);
+
+	vaddr = vm_mmap(filp, 0, xvp_allocation->size,
+			PROT_READ | PROT_WRITE, MAP_SHARED,
+			xvp_allocation->start - xvp_file->xvp->pmem);
+
+	xrp_ioctl_alloc.addr = vaddr;
+
+	if (copy_to_user(p, &xrp_ioctl_alloc, sizeof(*p))) {
+		vm_munmap(vaddr, xrp_ioctl_alloc.size);
 		return -EFAULT;
 	}
 	return 0;
@@ -1159,6 +1208,40 @@ static long xvp_ioctl_free(struct file *filp,
 	return -EINVAL;
 }
 
+static long xrp_ioctl_free(struct file *filp,
+			   struct xrp_ioctl_alloc __user *p)
+{
+	struct mm_struct *mm = current->mm;
+	struct xrp_ioctl_alloc xrp_ioctl_alloc;
+	struct vm_area_struct *vma;
+	unsigned long start;
+
+	pr_debug("%s: %p\n", __func__, p);
+	if (copy_from_user(&xrp_ioctl_alloc, p, sizeof(*p)))
+		return -EFAULT;
+
+	start = xrp_ioctl_alloc.addr;
+	pr_debug("%s: virt_addr = 0x%08lx\n", __func__, start);
+
+	down_read(&mm->mmap_sem);
+	vma = find_vma(mm, start);
+
+	if (vma && vma->vm_file == filp &&
+	    vma->vm_start <= start && start < vma->vm_end) {
+		size_t size;
+
+		start = vma->vm_start;
+		size = vma->vm_end - vma->vm_start;
+		up_read(&mm->mmap_sem);
+		pr_debug("%s: 0x%lx x %zu\n", __func__, start, size);
+		return vm_munmap(start, size);
+	}
+	pr_debug("%s: no vma/bad vma for vaddr = 0x%08lx\n", __func__, start);
+	up_read(&mm->mmap_sem);
+
+	return -EINVAL;
+}
+
 static long xvp_complete_cmd_irq(struct completion *completion,
 				 bool (*cmd_complete)(void *p),
 				 void *p)
@@ -1272,6 +1355,78 @@ static long xvp_ioctl_submit_sync(struct file *filp,
 	return ret;
 }
 
+static bool xrp_cmd_complete(void *p)
+{
+	struct xvp *xvp = p;
+	u32 flags = xvp_comm_read32(xvp, XRP_COMM_FLAGS);
+
+	rmb();
+	return (flags & XRP_COMM_FLAG_VALID) == 0;
+}
+
+static long xrp_ioctl_submit_sync(struct file *filp,
+				  struct xrp_ioctl_queue __user *p)
+{
+	struct xvp_file *xvp_file = filp->private_data;
+	struct xvp *xvp = xvp_file->xvp;
+	struct xrp_ioctl_queue xrp_ioctl_queue;
+	unsigned long in_data_phys, out_data_phys;
+	long ret = -EBUSY;
+
+	if (copy_from_user(&xrp_ioctl_queue, p, sizeof(*p)))
+		return -EFAULT;
+
+	if (xvp_share_block(filp, xrp_ioctl_queue.in_data_addr, &in_data_phys,
+			    xrp_ioctl_queue.in_data_size) < 0 ||
+	    xvp_share_block(filp, xrp_ioctl_queue.out_data_addr, &out_data_phys,
+			    xrp_ioctl_queue.out_data_size) < 0) {
+		pr_debug("%s: in_data or out_data could not be shared\n",
+			 __func__);
+		return -EINVAL;
+	}
+
+	mutex_lock(&xvp->comm_lock);
+
+	/* write to registers */
+	xvp_comm_write32(xvp, XRP_COMM_IN_DATA_SIZE, xrp_ioctl_queue.in_data_size);
+	xvp_comm_write32(xvp, XRP_COMM_OUT_DATA_SIZE, xrp_ioctl_queue.out_data_size);
+	xvp_comm_write32(xvp, XRP_COMM_BUFFER_SIZE, xrp_ioctl_queue.buffer_size);
+	xvp_comm_write32(xvp, XRP_COMM_IN_DATA, in_data_phys);
+	xvp_comm_write32(xvp, XRP_COMM_OUT_DATA, out_data_phys);
+	wmb();
+	xvp_comm_write32(xvp, XRP_COMM_FLAGS,
+			 xrp_ioctl_queue.flags | XRP_COMM_FLAG_VALID);
+
+	if (xvp->use_irq) {
+		wmb();
+		xvp_reg_write32(xvp, XVP_REG_IVP_IRQ(XVP_IVP_IRQ_NUM), 1);
+		ret = xvp_complete_cmd_irq(&xvp->completion,
+					   xrp_cmd_complete, xvp);
+	} else {
+		ret = xvp_complete_cmd_poll(xrp_cmd_complete, xvp);
+	}
+
+	if (ret == 0) {
+		if (xvp_share_block(filp, xrp_ioctl_queue.out_data_addr, NULL,
+				    xrp_ioctl_queue.out_data_size) < 0) {
+			pr_debug("%s: out_data could not be shared back\n",
+				 __func__);
+			ret = -EINVAL;
+		}
+	} else if (ret == -EBUSY && firmware_reboot) {
+		int rc;
+
+		pr_debug("%s: restarting firmware...\n", __func__);
+		rc = xvp_boot_firmware(xvp);
+		if (rc < 0)
+			ret = rc;
+	}
+
+	mutex_unlock(&xvp->comm_lock);
+
+	return ret;
+}
+
 static long xvp_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 {
 	struct vm_area_struct *vma;
@@ -1306,6 +1461,21 @@ static long xvp_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 	case XVP_IOCTLS_SUBMIT_SYNC:
 		retval = xvp_ioctl_submit_sync(filp,
 					       (struct xvp_ioctls_submit __user *)arg);
+		break;
+
+	case XRP_IOCTL_ALLOC:
+		retval = xrp_ioctl_alloc(filp,
+					 (struct xrp_ioctl_alloc __user *)arg);
+		break;
+
+	case XRP_IOCTL_FREE:
+		retval = xrp_ioctl_free(filp,
+					(struct xrp_ioctl_alloc __user *)arg);
+		break;
+
+	case XRP_IOCTL_QUEUE:
+		retval = xrp_ioctl_submit_sync(filp,
+					       (struct xrp_ioctl_queue __user *)arg);
 		break;
 
 	default:
@@ -1689,6 +1859,7 @@ static int xvp_remove(struct platform_device *pdev)
 #ifdef CONFIG_OF
 static const struct of_device_id xvp_match[] = {
 	{ .compatible = "cdns,xvp", },
+	{ .compatible = "cdns,xrp", },
 	{},
 };
 MODULE_DEVICE_TABLE(of, xvp_match);
