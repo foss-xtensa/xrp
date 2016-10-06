@@ -20,7 +20,7 @@ int main()
 	idx = xrp_add_buffer_to_group(group, buf, XRP_READ_WRITE, &status);
 	printf("add_buffer_to_group: %d\n", idx);
 
-	xrp_queue_command(queue, NULL, 0, NULL, 0, group, &event, &status);
+	xrp_enqueue_command(queue, NULL, 0, NULL, 0, group, &event, &status);
 	xrp_release_buffer_group(group, &status);
 	xrp_release_buffer(buf, &status);
 	xrp_release_queue(queue, &status);

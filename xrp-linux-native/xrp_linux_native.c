@@ -418,12 +418,12 @@ void xrp_run_command_sync(struct xrp_queue *queue,
 {
 }
 
-void xrp_queue_command(struct xrp_queue *queue,
-		       const void *in_data, size_t in_data_size,
-		       void *out_data, size_t out_data_size,
-		       struct xrp_buffer_group *buffer_group,
-		       struct xrp_event **evt,
-		       enum xrp_status *status)
+void xrp_enqueue_command(struct xrp_queue *queue,
+			 const void *in_data, size_t in_data_size,
+			 void *out_data, size_t out_data_size,
+			 struct xrp_buffer_group *buffer_group,
+			 struct xrp_event **evt,
+			 enum xrp_status *status)
 {
 	struct xrp_event *event = NULL;
 	struct xrp_ioctl_buffer ioctl_buffer[buffer_group->n_buffers];/* TODO */
