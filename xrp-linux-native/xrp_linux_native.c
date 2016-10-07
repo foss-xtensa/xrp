@@ -416,6 +416,9 @@ void xrp_run_command_sync(struct xrp_queue *queue,
 			  struct xrp_buffer_group *buffer_group,
 			  enum xrp_status *status)
 {
+	xrp_enqueue_command(queue, in_data, in_data_size,
+			    out_data, out_data_size,
+			    buffer_group, NULL, status);
 }
 
 void xrp_enqueue_command(struct xrp_queue *queue,
