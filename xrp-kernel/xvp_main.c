@@ -1,4 +1,3 @@
-#define DEBUG
 /*
  * XVP - Linux device driver for APK.
  * $Id$
@@ -46,6 +45,7 @@
 #include <asm/uaccess.h>
 #include "xrp_kernel_defs.h"
 #include "xvp_defs.h"
+#include "xrp_kernel_dsp_interface.h"
 
 #define FIRMWARE_NAME "xvp.elf"
 MODULE_FIRMWARE(FIRMWARE_NAME);
@@ -66,25 +66,18 @@ MODULE_FIRMWARE(FIRMWARE_NAME);
 #define XVP_COMM_STATUS (0x300)
 #define XVP_COMM_SIZE (0x400)
 
-#define XRP_COMM_FLAG_VALID	(0x00000001)
-#define XRP_COMM_FLAGS		(0x100)
-#define XRP_COMM_IN_DATA_SIZE	(0x104)
-#define XRP_COMM_OUT_DATA_SIZE	(0x108)
-#define XRP_COMM_BUFFER_SIZE	(0x10c)
-#define XRP_COMM_IN_DATA	(0x110)
-#define XRP_COMM_OUT_DATA	(0x120)
-#define XRP_COMM_BUFFER_DATA	(0x130)
-
-#define XVP_SYNC_MODE_IDLE      0
-#define XVP_SYNC_MODE_POLL      1
-#define XVP_SYNC_MODE_IRQ       2
-
-#define XVP_SYNC(mode, host_irq_no, ivp_irq_no) \
-	(((mode) ? XVP_SYNC_MODE_IRQ : XVP_SYNC_MODE_POLL) | \
+#define XRP_DSP_SYNC(mode, host_irq_no, ivp_irq_no) \
+	(((mode) ? XRP_DSP_SYNC_MODE_IRQ : XRP_DSP_SYNC_MODE_POLL) | \
 	 (((host_irq_no) & 0xff) << 8) | \
 	 (((ivp_irq_no) & 0xff) << 16))
 
 #define XVP_CMD_IDLE (0)
+
+enum xrp_access_flags {
+	XRP_READ		= 0x1,
+	XRP_WRITE		= 0x2,
+	XRP_READ_WRITE		= 0x3,
+};
 
 enum xvp_comm {
 	SYNC_POST_SYNC = 128,
@@ -94,7 +87,6 @@ struct xvp;
 struct xvp_file;
 
 struct xvp_alien_mapping {
-	struct xvp_alien_mapping *next;
 	unsigned long vaddr;
 	unsigned long size;
 	phys_addr_t paddr;
@@ -112,6 +104,19 @@ struct xvp_allocation {
 	atomic_t ref;
 	struct xvp_allocation *next;
 	struct xvp_file *xvp_file;
+};
+
+struct xrp_mapping {
+	enum {
+		XRP_MAPPING_NONE,
+		XRP_MAPPING_NATIVE,
+		XRP_MAPPING_ALIEN,
+		XRP_MAPPING_KERNEL,
+	} type;
+	union {
+		struct xvp_allocation *xvp_allocation;
+		struct xvp_alien_mapping *xvp_alien_mapping;
+	};
 };
 
 struct xvp {
@@ -135,8 +140,6 @@ struct xvp_file {
 	struct xvp *xvp;
 	spinlock_t busy_list_lock;
 	struct xvp_allocation *busy_list;
-	struct mutex alien_list_lock;
-	struct xvp_alien_mapping *alien_list;
 };
 
 static int firmware_reboot = 1;
@@ -169,28 +172,79 @@ static inline u32 xvp_comm_read32(struct xvp *xvp, unsigned addr)
 	return __raw_readl(xvp->comm + addr);
 }
 
+static inline void xrp_comm_write32(volatile void __iomem *addr, u32 v)
+{
+	__raw_writel(v, addr);
+}
+
+static inline u32 xrp_comm_read32(volatile void __iomem *addr)
+{
+	return __raw_readl(addr);
+}
+
+static inline void xrp_comm_write(volatile void __iomem *addr, const void *p,
+				  size_t sz)
+{
+	size_t sz32 = sz & ~3;
+	u32 v;
+
+	while (sz32) {
+		memcpy(&v, p, sizeof(v));
+		__raw_writel(v, addr);
+		p += 4;
+		addr += 4;
+		sz32 -= 4;
+	}
+	sz &= 3;
+	if (sz) {
+		v = 0;
+		memcpy(&v, p, sz);
+		__raw_writel(v, addr);
+	}
+}
+
+static inline void xrp_comm_read(volatile void __iomem *addr, void *p,
+				  size_t sz)
+{
+	size_t sz32 = sz & ~3;
+	u32 v;
+
+	while (sz32) {
+		v = __raw_readl(addr);
+		memcpy(p, &v, sizeof(v));
+		p += 4;
+		addr += 4;
+		sz32 -= 4;
+	}
+	sz &= 3;
+	if (sz) {
+		v = __raw_readl(addr);
+		memcpy(p, &v, sz);
+	}
+}
 
 static int xvp_synchronize(struct xvp *xvp)
 {
 	unsigned long deadline = jiffies + XVP_TIMEOUT_JIFFIES;
+	struct xrp_dsp_sync __iomem *shared_sync = xvp->comm;
 
-	xvp_comm_write32(xvp, XVP_COMM_INIT_SYNC_LOC(0), 0);
+	xrp_comm_write32(&shared_sync->ping, 0);
 	mb();
-	xvp_comm_write32(xvp, XVP_COMM_INIT_SYNC_LOC(1),
-			 XVP_SYNC(xvp->use_irq,
-				  XVP_HOST_IRQ_NUM,
-				  XVP_IVP_IRQ_NUM));
+	xrp_comm_write32(&shared_sync->pong,
+			 XRP_DSP_SYNC(xvp->use_irq,
+				      XVP_HOST_IRQ_NUM,
+				      XVP_IVP_IRQ_NUM));
 	mb();
 
 	if (xvp->use_irq)
 		xvp_reg_write32(xvp, XVP_REG_IVP_IRQ(XVP_IVP_IRQ_NUM), 1);
 
 	do {
-		u32 v = xvp_comm_read32(xvp, XVP_COMM_INIT_SYNC_LOC(1));
+		u32 v = xrp_comm_read32(&shared_sync->pong);
 
 		mb();
 		if (v == 0) {
-			xvp_comm_write32(xvp, XVP_COMM_INIT_SYNC_LOC(0),
+			xrp_comm_write32(&shared_sync->ping,
 					 SYNC_POST_SYNC);
 			mb();
 			if (xvp->use_irq) {
@@ -207,7 +261,7 @@ static int xvp_synchronize(struct xvp *xvp)
 		schedule();
 	} while (time_before(jiffies, deadline));
 
-	xvp_comm_write32(xvp, XVP_COMM_INIT_SYNC_LOC(1), 0);
+	xrp_comm_write32(&shared_sync->pong, 0);
 
 	return -ENODEV;
 }
@@ -243,16 +297,6 @@ static inline void xvp_file_lock(struct xvp_file *xvp_file)
 static inline void xvp_file_unlock(struct xvp_file *xvp_file)
 {
 	spin_unlock(&xvp_file->busy_list_lock);
-}
-
-static inline void xvp_alien_lock(struct xvp_file *xvp_file)
-{
-	mutex_lock(&xvp_file->alien_list_lock);
-}
-
-static inline void xvp_alien_unlock(struct xvp_file *xvp_file)
-{
-	mutex_unlock(&xvp_file->alien_list_lock);
 }
 
 static inline void xvp_allocation_get(struct xvp_allocation *xvp_allocation)
@@ -456,74 +500,6 @@ static struct xvp_allocation *xvp_allocation_dequeue(struct xvp_file *xvp_file,
 	return cur;
 }
 
-static void xvp_alien_mapping_add(struct xvp_file *xvp_file,
-				  struct xvp_alien_mapping *alien_mapping)
-{
-	xvp_alien_lock(xvp_file);
-	alien_mapping->next = xvp_file->alien_list;
-	xvp_file->alien_list = alien_mapping;
-	xvp_alien_unlock(xvp_file);
-}
-
-static struct xvp_alien_mapping *xvp_alien_mapping_find(struct xvp_file *xvp_file,
-							unsigned long vaddr,
-							unsigned long size)
-{
-	struct xvp_alien_mapping *cur;
-
-	xvp_alien_lock(xvp_file);
-	for (cur = xvp_file->alien_list; cur; cur = cur->next) {
-		if (vaddr >= cur->vaddr &&
-		    vaddr + size <= cur->vaddr + cur->size)
-			break;
-		if (vaddr < cur->vaddr + cur->size &&
-		    vaddr + size > cur->vaddr)
-			pr_debug("%s: overlapping alien mappings 0x%08lx x 0x%08lx and 0x%08lx x 0x%08lx\n",
-				 __func__, vaddr, size, cur->vaddr, cur->size);
-	}
-	xvp_alien_unlock(xvp_file);
-	return cur;
-}
-
-static long xvp_ioctl_alloc(struct file *filp,
-			    struct xvp_ioctlx_alloc __user *p)
-{
-	struct xvp_file *xvp_file = filp->private_data;
-	struct xvp_allocation *xvp_allocation;
-	unsigned long vaddr;
-	struct xvp_ioctlx_alloc xvp_ioctlx_alloc;
-	long err;
-
-	pr_debug("%s: %p\n", __func__, p);
-	if (copy_from_user(&xvp_ioctlx_alloc, p, sizeof(*p)))
-		return -EFAULT;
-
-	pr_debug("%s: size = %d, align = %x, type = %d\n", __func__,
-		 xvp_ioctlx_alloc.size, xvp_ioctlx_alloc.align, xvp_ioctlx_alloc.type);
-
-	err = xvp_allocate(xvp_file, xvp_ioctlx_alloc.size,
-			   xvp_ioctlx_alloc.align,
-			   xvp_ioctlx_alloc.type,
-			   &xvp_allocation);
-	if (err)
-		return err;
-
-	xvp_allocation_queue(xvp_file, xvp_allocation);
-
-	vaddr = vm_mmap(filp, 0, xvp_allocation->size,
-			PROT_READ | PROT_WRITE, MAP_SHARED,
-			xvp_allocation->start - xvp_file->xvp->pmem);
-
-	xvp_ioctlx_alloc.phys_addr = xvp_allocation->start;
-	xvp_ioctlx_alloc.virt_addr = vaddr;
-
-	if (copy_to_user(p, &xvp_ioctlx_alloc, sizeof(*p))) {
-		vm_munmap(vaddr, xvp_ioctlx_alloc.size);
-		return -EFAULT;
-	}
-	return 0;
-}
-
 static long xrp_ioctl_alloc(struct file *filp,
 			    struct xrp_ioctl_alloc __user *p)
 {
@@ -563,32 +539,36 @@ static long xrp_ioctl_alloc(struct file *filp,
 }
 
 #if defined(__XTENSA__)
-static void xvp_clean_cache(void *vaddr, phys_addr_t paddr, unsigned long sz)
+static inline void xvp_clean_cache(void *vaddr, phys_addr_t paddr,
+				   unsigned long sz)
 {
 	__flush_dcache_range((unsigned long)vaddr, sz);
 }
-static void xvp_flush_cache(void *vaddr, phys_addr_t paddr, unsigned long sz)
+static inline void xvp_flush_cache(void *vaddr, phys_addr_t paddr,
+				   unsigned long sz)
 {
 	__flush_dcache_range((unsigned long)vaddr, sz);
 	__invalidate_dcache_range((unsigned long)vaddr, sz);
 }
-static void xvp_invalidate_cache(void *vaddr, phys_addr_t paddr,
+static inline void xvp_invalidate_cache(void *vaddr, phys_addr_t paddr,
 				 unsigned long sz)
 {
 	__invalidate_dcache_range((unsigned long)vaddr, sz);
 }
 #elif defined(__arm__)
-static void xvp_clean_cache(void *vaddr, phys_addr_t paddr, unsigned long sz)
+static inline void xvp_clean_cache(void *vaddr, phys_addr_t paddr,
+				   unsigned long sz)
 {
 	__cpuc_flush_dcache_area(vaddr, sz);
 	outer_clean_range(paddr, paddr + sz);
 }
-static void xvp_flush_cache(void *vaddr, phys_addr_t paddr, unsigned long sz)
+static inline void xvp_flush_cache(void *vaddr, phys_addr_t paddr,
+				   unsigned long sz)
 {
 	__cpuc_flush_dcache_area(vaddr, sz);
 	outer_flush_range(paddr, paddr + sz);
 }
-static void xvp_invalidate_cache(void *vaddr, phys_addr_t paddr,
+static inline void xvp_invalidate_cache(void *vaddr, phys_addr_t paddr,
 				 unsigned long sz)
 {
 	__cpuc_flush_dcache_area(vaddr, sz);
@@ -745,12 +725,12 @@ out:
 }
 
 static long xvp_copy_virt_to_phys(struct xvp_file *xvp_file,
-				  unsigned long *vaddr, unsigned long size,
+				  unsigned long vaddr, unsigned long size,
 				  unsigned long *paddr,
 				  struct xvp_alien_mapping **mapping)
 {
 	unsigned long phys;
-	unsigned long offset = *vaddr & (PAGE_SIZE - 1);
+	unsigned long offset = vaddr & (PAGE_SIZE - 1);
 	void *allocation = kmalloc(size + (offset ? PAGE_SIZE : 0),
 				   GFP_KERNEL);
 	void *p;
@@ -763,7 +743,7 @@ static long xvp_copy_virt_to_phys(struct xvp_file *xvp_file,
 	if (p < allocation)
 		p += PAGE_SIZE;
 
-	if (copy_from_user(p, (void *)*vaddr, size)) {
+	if (copy_from_user(p, (void __user *)vaddr, size)) {
 		kfree(p);
 		return -EFAULT;
 	}
@@ -771,7 +751,7 @@ static long xvp_copy_virt_to_phys(struct xvp_file *xvp_file,
 	phys = __pa(p);
 	*paddr = phys;
 	alien_mapping = xvp_alien_mapping_create((struct xvp_alien_mapping){
-						 .vaddr = *vaddr,
+						 .vaddr = vaddr,
 						 .size = size,
 						 .paddr = *paddr,
 						 .allocation = allocation,
@@ -783,80 +763,8 @@ static long xvp_copy_virt_to_phys(struct xvp_file *xvp_file,
 	}
 
 	*mapping = alien_mapping;
-	*vaddr = (unsigned long)p;
 	pr_debug("%s: copying to pa: 0x%08lx\n", __func__, phys);
 
-	return 0;
-}
-
-/*
- * Update alien mapping, and possibly the mapping record.
- *
- * new_mapping may be freed when this function returns.
- *
- * We make kernel shadow copy for non-linear 3rd-party regions. Data need to
- * be copied into or out of that shadow on every share and invalidate IOCTL.
- *
- * Mapping could change type (e.g. physically linear user memory could become
- * non-linear) or physical address. When that happens update mapping record.
- */
-static long xvp_alien_mapping_update(struct xvp_file *xvp_file,
-				     struct xvp_alien_mapping *old_mapping,
-				     struct xvp_alien_mapping *new_mapping,
-				     bool to_device)
-{
-	if (old_mapping->type == ALIEN_COPY) {
-		if (to_device) {
-			if (copy_from_user(__va(old_mapping->paddr),
-					   (void *)old_mapping->vaddr,
-					   old_mapping->size))
-				return -EFAULT;
-		} else {
-			if (copy_to_user((void *)old_mapping->vaddr,
-					 __va(old_mapping->paddr),
-					 old_mapping->size))
-				return -EFAULT;
-		}
-		return 0;
-	}
-
-	if (old_mapping->type != new_mapping->type) {
-		pr_debug("%s: mapping type changed: %d -> %d\n",
-			 __func__, old_mapping->type, new_mapping->type);
-		xvp_alien_mapping_add(xvp_file, new_mapping);
-		return 0;
-	}
-
-	switch (new_mapping->type) {
-	case ALIEN_GUP:
-		if (old_mapping->paddr != new_mapping->paddr) {
-			pr_debug("%s: ALIEN_GUP: physical address changed\n",
-				 __func__);
-			/*
-			 * We need both pages of the old and the new mapping
-			 * to stay locked until they're no longer used.
-			 * Record new mapping that overrides the old one.
-			 */
-			xvp_alien_mapping_add(xvp_file, new_mapping);
-		} else {
-			xvp_alien_mapping_destroy(new_mapping);
-		}
-		break;
-	case ALIEN_PFN_MAP:
-		if (old_mapping->paddr != new_mapping->paddr) {
-			pr_debug("%s: ALIEN_PFN_MAP: physical address changed\n",
-				 __func__);
-			/* Nothing needs to be done for the PFN mapping when
-			 * it's no longer needed. Just update physical address
-			 * of the old mapping.
-			 */
-			old_mapping->paddr = new_mapping->paddr;
-		}
-		xvp_alien_mapping_destroy(new_mapping);
-		break;
-	default:
-		break;
-	}
 	return 0;
 }
 
@@ -892,114 +800,93 @@ static unsigned xvp_get_region_vma_count(unsigned long virt,
  * Areas allocated from the driver can always be shared in both directions.
  * Contiguous 3rd party allocations need to be shared to IVP before they can
  * be shared back.
- * Non-contiguous 3rd party allocations can only be shared from host to IVP
- * currently.
- *
- * When sharing from IVP paddr is NULL.
  */
-static long __xvp_share_block(struct file *filp,
-			      unsigned long virt, unsigned long *paddr,
-			      unsigned long size)
+
+static long __xrp_share_block(struct file *filp,
+			      unsigned long virt, unsigned long size,
+			      unsigned long flags, unsigned long *paddr,
+			      struct xrp_mapping *mapping)
 {
-	struct xvp_file *xvp_file = filp->private_data;
-	struct mm_struct *mm = current->mm;
 	unsigned long phys = ~0ul;
-	struct vm_area_struct *vma = find_vma(mm, virt);
-	long rc;
 
-	if (!vma) {
-		pr_debug("%s: no vma for vaddr/size = 0x%08lx/0x%08lx\n",
-			 __func__, virt, size);
-		return -EINVAL;
-	}
-	/*
-	 * Region requested for sharing should be within single VMA.
-	 * That's true for the majority of cases, but sometimes (e.g.
-	 * sharing buffer in the beginning of .bss which shares a
-	 * file-mapped page with .data, followed by anonymous page)
-	 * region will cross multiple VMAs. Support it in the simplest
-	 * way possible: start with get_user_pages and use shadow copy
-	 * if that fails.
-	 */
-	switch (xvp_get_region_vma_count(virt, size, vma)) {
-	case 0:
-		pr_debug("%s: bad vma for vaddr/size = 0x%08lx/0x%08lx\n",
-			 __func__, virt, size);
-		pr_debug("%s: vma->vm_start = 0x%08lx, vma->vm_end = 0x%08lx\n",
-			 __func__, vma->vm_start, vma->vm_end);
-		return -EINVAL;
-	case 1:
-		break;
-	default:
-		pr_debug("%s: multiple vmas cover vaddr/size = 0x%08lx/0x%08lx\n",
-			 __func__, virt, size);
-		vma = NULL;
-		break;
-	}
-	/*
-	 * And it need to be allocated from the same file descriptor.
-	 */
-	if (vma && vma->vm_file == filp) {
-		struct xvp_allocation *xvp_allocation =
-			vma->vm_private_data;
-
-		phys = xvp_allocation->start +
-			virt - vma->vm_start;
+	if (virt >= TASK_SIZE) {
+		mapping->type = XRP_MAPPING_KERNEL;
+		phys = __pa(virt);
+		pr_debug("%s: sharing kernel-only buffer: 0x%08lx\n", __func__, phys);
 	} else {
-		struct xvp_alien_mapping *old_mapping;
-		struct xvp_alien_mapping *new_mapping = NULL;
+		struct xvp_file *xvp_file = filp->private_data;
+		struct mm_struct *mm = current->mm;
+		struct vm_area_struct *vma = find_vma(mm, virt);
 
-		/* Otherwise this is alien allocation. */
-		pr_debug("%s: non-XVP allocation at 0x%08lx\n",
-			 __func__, virt);
-
-		/*
-		 * We may have shared it already, try to find a
-		 * record.
-		 */
-		old_mapping = xvp_alien_mapping_find(xvp_file, virt, size);
-
-		/*
-		 * If it hasn't been shared and we're sharing towards
-		 * the CPU, that's an error: IVP had to have a physical
-		 * address to write to.
-		 */
-		if (!old_mapping && !paddr) {
-			pr_debug("%s: not previously locked\n", __func__);
+		if (!vma) {
+			pr_debug("%s: no vma for vaddr/size = 0x%08lx/0x%08lx\n",
+				 __func__, virt, size);
 			return -EINVAL;
 		}
 		/*
-		 * If it hasn't been shared (old_mapping == NULL),
-		 * share it for the first time. We know that we share
-		 * towards IVP.
-		 *
-		 * If it has already been shared (old_mapping != NULL),
-		 * and we care about virtual-to-physical mapping (it's
-		 * not a shadow copy) share it again and see if the
-		 * virtual-to-physical mapping has changed.
+		 * Region requested for sharing should be within single VMA.
+		 * That's true for the majority of cases, but sometimes (e.g.
+		 * sharing buffer in the beginning of .bss which shares a
+		 * file-mapped page with .data, followed by anonymous page)
+		 * region will cross multiple VMAs. Support it in the simplest
+		 * way possible: start with get_user_pages and use shadow copy
+		 * if that fails.
 		 */
-		if (!old_mapping || old_mapping->type != ALIEN_COPY) {
+		switch (xvp_get_region_vma_count(virt, size, vma)) {
+		case 0:
+			pr_debug("%s: bad vma for vaddr/size = 0x%08lx/0x%08lx\n",
+				 __func__, virt, size);
+			pr_debug("%s: vma->vm_start = 0x%08lx, vma->vm_end = 0x%08lx\n",
+				 __func__, vma->vm_start, vma->vm_end);
+			return -EINVAL;
+		case 1:
+			break;
+		default:
+			pr_debug("%s: multiple vmas cover vaddr/size = 0x%08lx/0x%08lx\n",
+				 __func__, virt, size);
+			vma = NULL;
+			break;
+		}
+		/*
+		 * And it need to be allocated from the same file descriptor.
+		 */
+		if (vma && vma->vm_file == filp) {
+			struct xvp_allocation *xvp_allocation =
+				vma->vm_private_data;
+
+			mapping->type = XRP_MAPPING_NATIVE;
+			mapping->xvp_allocation = xvp_allocation;
+			xvp_allocation_get(mapping->xvp_allocation);
+			phys = xvp_allocation->start +
+				virt - vma->vm_start;
+		} else {
+			struct xvp_alien_mapping *alien_mapping = NULL;
+			long rc;
+
+			/* Otherwise this is alien allocation. */
+			pr_debug("%s: non-XVP allocation at 0x%08lx\n",
+				 __func__, virt);
+
 			if (vma && vma->vm_flags & (VM_IO | VM_PFNMAP)) {
 				rc = xvp_pfn_map_virt_to_phys(xvp_file, vma,
 							      virt, size,
 							      &phys,
-							      &new_mapping);
+							      &alien_mapping);
 			} else {
 				up_read(&mm->mmap_sem);
 				rc = xvp_gup_virt_to_phys(xvp_file, virt,
 							  size, &phys,
-							  &new_mapping);
+							  &alien_mapping);
 				down_read(&mm->mmap_sem);
 			}
 
 			/*
-			 * If we couldn't share and we share towards
-			 * IVP, try to make a shadow copy.
+			 * If we couldn't share try to make a shadow copy.
 			 */
-			if (rc < 0 && paddr)
-				rc = xvp_copy_virt_to_phys(xvp_file, &virt,
+			if (rc < 0)
+				rc = xvp_copy_virt_to_phys(xvp_file, virt,
 							   size, &phys,
-							   &new_mapping);
+							   &alien_mapping);
 
 			/* We couldn't share it. Fail the request. */
 			if (rc < 0) {
@@ -1007,205 +894,64 @@ static long __xvp_share_block(struct file *filp,
 					 __func__);
 				return -EINVAL;
 			}
-			/* At this point new_mapping != NULL */
-		} else {
-			/*
-			 * Once we've switched to a shadow copy,
-			 * maintain it.
-			 */
-			new_mapping = old_mapping;
-		}
 
-		/* If there's been a share record... */
-		if (old_mapping) {
-			phys = new_mapping->paddr +
-				virt - new_mapping->vaddr;
+			phys = alien_mapping->paddr +
+				virt - alien_mapping->vaddr;
 
-			/* ...update it with the new mapping... */
-			rc = xvp_alien_mapping_update(xvp_file,
-						      old_mapping,
-						      new_mapping,
-						      paddr != NULL);
-			if (rc < 0)
-				return rc;
-
-			pr_debug("%s: found mapping, paddr: 0x%08lx\n",
-				 __func__, phys);
-		} else {
-			/* ...otherwise record the mapping. */
-			xvp_alien_mapping_add(xvp_file, new_mapping);
+			mapping->type = XRP_MAPPING_ALIEN;
+			mapping->xvp_alien_mapping = alien_mapping;
 		}
 	}
-	if (paddr) {
+	*paddr = phys;
+	pr_debug("%s: mapping = %p, mapping->type = %d\n",
+		 __func__, mapping, mapping->type);
+
+	if (flags & XRP_WRITE) {
+		xvp_flush_cache((void *)virt, phys, size);
+	} else if (flags & XRP_READ) {
 		xvp_clean_cache((void *)virt, phys, size);
-		*paddr = phys;
-	} else {
-		xvp_invalidate_cache((void *)virt, phys, size);
 	}
 	return 0;
 }
 
-static long xvp_share_block(struct file *filp,
-			    unsigned long virt, unsigned long *paddr,
-			    unsigned long size)
+/*
+ *
+ */
+static long __xrp_unshare_block(struct file *filp, struct xrp_mapping *mapping,
+				unsigned long flags)
 {
-	struct mm_struct *mm = current->mm;
-	long rc;
+	long ret = 0;
 
-	down_read(&mm->mmap_sem);
-	rc = __xvp_share_block(filp, virt, paddr, size);
-	up_read(&mm->mmap_sem);
-	return rc;
-}
+	switch (mapping->type) {
+	case XRP_MAPPING_NATIVE:
+		xvp_allocation_put(mapping->xvp_allocation);
+		break;
 
-static long xvp_share_blocks(struct file *filp, unsigned n,
-			     unsigned long *vaddr, unsigned long *paddr,
-			     unsigned long *size)
-{
-	struct mm_struct *mm = current->mm;
-	unsigned i;
-	long rc = 0;
+	case XRP_MAPPING_ALIEN:
+		if ((flags & XRP_WRITE) &&
+		    mapping->xvp_alien_mapping->type == ALIEN_COPY) {
+			struct xvp_alien_mapping *alien_mapping =
+				mapping->xvp_alien_mapping;
 
-	down_read(&mm->mmap_sem);
-	for (i = 0; i < n; ++i) {
-		rc = __xvp_share_block(filp, vaddr[i],
-				       paddr ? paddr + i : NULL,
-				       size[i]);
-		if (rc < 0)
-			break;
-	}
-	up_read(&mm->mmap_sem);
-	return rc;
-}
-
-static long xvp_share_with_core(struct file *filp, unsigned n,
-				__u32 __user *user_addr, unsigned long *addr,
-				unsigned long *size)
-{
-	long ret = xvp_share_blocks(filp, n, addr, addr, size);
-
-	if (ret == 0 &&
-	    copy_to_user(user_addr, addr, n * sizeof(u32)))
-		ret = -EFAULT;
-	return ret;
-}
-
-static long xvp_share_from_core(struct file *filp, unsigned n,
-				__u32 __user *user_addr, unsigned long *addr,
-				unsigned long *size)
-{
-	return xvp_share_blocks(filp, n, addr, NULL, size);
-}
-
-static long xvp_process_buffers(struct file *filp,
-				unsigned num_buffers,
-				__u32 __user *user_addr,
-				__u32 __user *user_size,
-				long (*f)(struct file *filp,
-					  unsigned n,
-					  __u32 __user *user_addr,
-					  unsigned long *addr,
-					  unsigned long *size))
-{
-	unsigned long *addr;
-	unsigned long *size;
-	unsigned n = num_buffers;
-	unsigned off;
-	long ret;
-
-	if (n > PAGE_SIZE / sizeof(unsigned long))
-		n = PAGE_SIZE / sizeof(unsigned long);
-
-	addr = kmalloc(n * sizeof(unsigned long), GFP_KERNEL);
-	size = kmalloc(n * sizeof(unsigned long), GFP_KERNEL);
-	if (!addr || !size) {
-		ret = -ENOMEM;
-		goto err;
-	}
-	for (off = 0; off < num_buffers; off += n) {
-		unsigned count = min(n, num_buffers - off);
-
-		if (copy_from_user(addr, user_addr + off, count * sizeof(u32)) ||
-		    copy_from_user(size, user_size + off, count * sizeof(u32))) {
-			ret = -EFAULT;
-			goto err;
+			pr_debug("%s: synchronizing alien copy @pa = %pap back to %p\n",
+				 __func__, &alien_mapping->paddr,
+				 (void __user *)alien_mapping->vaddr);
+			if (copy_to_user((void __user *)alien_mapping->vaddr,
+					 __va(alien_mapping->paddr),
+					 alien_mapping->size))
+				ret = -EINVAL;
 		}
-		ret = f(filp, count, user_addr + off, addr, size);
-		if (ret)
-			goto err;
+		xvp_alien_mapping_destroy(mapping->xvp_alien_mapping);
+		break;
+
+	case XRP_MAPPING_KERNEL:
+		break;
+
+	default:
+		break;
 	}
-err:
-	kfree(addr);
-	kfree(size);
+
 	return ret;
-}
-
-static long xvp_ioctl_virt_to_phys(struct file *filp,
-				   struct xvp_ioctlq_get_paddr __user *p)
-{
-	struct xvp_ioctlq_get_paddr xvp_ioctlq_get_paddr;
-
-	pr_debug("%s: %p\n", __func__, p);
-
-	if (copy_from_user(&xvp_ioctlq_get_paddr, p, sizeof(*p)))
-		return -EFAULT;
-
-	return xvp_process_buffers(filp,
-				   xvp_ioctlq_get_paddr.num_addr,
-				   (__u32 __user *)xvp_ioctlq_get_paddr.addrs,
-				   (__u32 __user *)xvp_ioctlq_get_paddr.sizes,
-				   xvp_share_with_core);
-}
-
-static long xvp_ioctl_invalidate_cache(struct file *filp,
-				       struct xvp_ioctl_invalidate_cache __user *p)
-{
-	struct xvp_ioctl_invalidate_cache xvp_ioctl_invalidate_cache;
-
-	pr_debug("%s: %p\n", __func__, p);
-
-	if (copy_from_user(&xvp_ioctl_invalidate_cache, p, sizeof(*p)))
-		return -EFAULT;
-
-	return xvp_process_buffers(filp,
-				   xvp_ioctl_invalidate_cache.num_addr,
-				   (__u32 __user *)xvp_ioctl_invalidate_cache.addrs,
-				   (__u32 __user *)xvp_ioctl_invalidate_cache.sizes,
-				   xvp_share_from_core);
-}
-
-static long xvp_ioctl_free(struct file *filp,
-			   struct xvp_ioctlx_alloc __user *p)
-{
-	struct mm_struct *mm = current->mm;
-	struct xvp_ioctlx_alloc xvp_ioctlx_alloc;
-	struct vm_area_struct *vma;
-	unsigned long start;
-
-	pr_debug("%s: %p\n", __func__, p);
-	if (copy_from_user(&xvp_ioctlx_alloc, p, sizeof(*p)))
-		return -EFAULT;
-
-	start = xvp_ioctlx_alloc.virt_addr;
-	pr_debug("%s: virt_addr = 0x%08lx\n", __func__, start);
-
-	down_read(&mm->mmap_sem);
-	vma = find_vma(mm, start);
-
-	if (vma && vma->vm_file == filp &&
-	    vma->vm_start <= start && start < vma->vm_end) {
-		size_t size;
-
-		start = vma->vm_start;
-		size = vma->vm_end - vma->vm_start;
-		up_read(&mm->mmap_sem);
-		pr_debug("%s: 0x%lx x %zu\n", __func__, start, size);
-		return vm_munmap(start, size);
-	}
-	pr_debug("%s: no vma/bad vma for vaddr = 0x%08lx\n", __func__, start);
-	up_read(&mm->mmap_sem);
-
-	return -EINVAL;
 }
 
 static long xrp_ioctl_free(struct file *filp,
@@ -1274,128 +1020,197 @@ static long xvp_complete_cmd_poll(bool (*cmd_complete)(void *p),
 	return -EBUSY;
 }
 
-static bool xvp_cmd_complete(void *p)
-{
-	struct xvp *xvp = p;
-	u32 cmd = xvp_comm_read32(xvp, XVP_COMM_CMD);
-
-	rmb();
-	return cmd == XVP_CMD_IDLE;
-}
-
-static long xvp_ioctl_submit_sync(struct file *filp,
-				  struct xvp_ioctls_submit __user *p)
-{
-	struct xvp_file *xvp_file = filp->private_data;
-	struct xvp *xvp = xvp_file->xvp;
-	struct xvp_ioctls_submit xvp_ioctls_submit;
-	unsigned long addr;
-	void *buffer = NULL;
-	long ret = -EBUSY;
-
-	if (copy_from_user(&xvp_ioctls_submit, p, sizeof(*p)))
-		return -EFAULT;
-
-	if (xvp_share_block(filp, xvp_ioctls_submit.addr, &addr,
-			    xvp_ioctls_submit.size) < 0) {
-		pr_debug("%s: passing non-shared data, making local copy\n",
-			 __func__);
-		buffer = kmalloc(xvp_ioctls_submit.size, GFP_KERNEL);
-		if (!buffer)
-			return -ENOMEM;
-
-		addr = __pa(buffer);
-
-		if (copy_from_user(buffer, (void *)xvp_ioctls_submit.addr,
-				   xvp_ioctls_submit.size)) {
-			kfree(buffer);
-			return -EFAULT;
-		}
-		xvp_clean_cache(buffer, addr, xvp_ioctls_submit.size);
-	}
-
-	mutex_lock(&xvp->comm_lock);
-
-	/* write to registers */
-	xvp_comm_write32(xvp, XVP_COMM_DATA, addr);
-	xvp_comm_write32(xvp, XVP_COMM_SIZE, xvp_ioctls_submit.size);
-	wmb();
-	xvp_comm_write32(xvp, XVP_COMM_CMD, xvp_ioctls_submit.cmd);
-
-	if (xvp->use_irq) {
-		wmb();
-		xvp_reg_write32(xvp, XVP_REG_IVP_IRQ(XVP_IVP_IRQ_NUM), 1);
-		ret = xvp_complete_cmd_irq(&xvp->completion,
-					   xvp_cmd_complete, xvp);
-	} else {
-		ret = xvp_complete_cmd_poll(xvp_cmd_complete, xvp);
-	}
-
-	if (ret == 0) {
-		u32 status = xvp_comm_read32(xvp, XVP_COMM_STATUS);
-
-		if (put_user(status, &p->status))
-			ret = -EFAULT;
-		xvp_flush_cache((void *)xvp_ioctls_submit.addr, addr,
-				xvp_ioctls_submit.size);
-	} else if (ret == -EBUSY && firmware_reboot) {
-		int rc;
-
-		pr_debug("%s: restarting firmware...\n", __func__);
-		rc = xvp_boot_firmware(xvp);
-		if (rc < 0)
-			ret = rc;
-	}
-
-	mutex_unlock(&xvp->comm_lock);
-
-	if (buffer)
-		kfree(buffer);
-
-	return ret;
-}
-
 static bool xrp_cmd_complete(void *p)
 {
 	struct xvp *xvp = p;
-	u32 flags = xvp_comm_read32(xvp, XRP_COMM_FLAGS);
+	struct xrp_dsp_cmd __iomem *cmd = xvp->comm;
+	u32 flags = xrp_comm_read32(&cmd->flags);
 
 	rmb();
-	return (flags & XRP_COMM_FLAG_VALID) == 0;
+	return (flags & (XRP_DSP_CMD_FLAG_REQUEST_VALID |
+			 XRP_DSP_CMD_FLAG_RESPONSE_VALID)) ==
+		(XRP_DSP_CMD_FLAG_REQUEST_VALID |
+		 XRP_DSP_CMD_FLAG_RESPONSE_VALID);
 }
 
 static long xrp_ioctl_submit_sync(struct file *filp,
 				  struct xrp_ioctl_queue __user *p)
 {
+	struct mm_struct *mm = current->mm;
 	struct xvp_file *xvp_file = filp->private_data;
 	struct xvp *xvp = xvp_file->xvp;
-	struct xrp_ioctl_queue xrp_ioctl_queue;
-	unsigned long in_data_phys, out_data_phys;
-	long ret = -EBUSY;
+	struct xrp_dsp_cmd __iomem *cmd = xvp->comm;
 
-	if (copy_from_user(&xrp_ioctl_queue, p, sizeof(*p)))
+	struct xrp_ioctl_queue ioctl_queue;
+	unsigned long in_data_phys = 0, out_data_phys = 0;
+	struct xrp_mapping in_data_mapping = {0};
+	struct xrp_mapping out_data_mapping = {0};
+	u8 in_data[XRP_DSP_CMD_INLINE_DATA_SIZE];
+	u8 out_data[XRP_DSP_CMD_INLINE_DATA_SIZE];
+
+	size_t n_buffers;
+	struct xrp_ioctl_buffer __user *buffer;
+	struct xrp_dsp_buffer buffer_data[XRP_DSP_CMD_INLINE_BUFFER_COUNT];
+	struct xrp_dsp_buffer *dsp_buffer = buffer_data;
+	unsigned long dsp_buffer_phys = 0;
+	struct xrp_mapping *buffer_mapping = NULL;
+	struct xrp_mapping dsp_buffer_mapping = {0};
+
+	long ret = 0;
+	int i;
+
+	if (copy_from_user(&ioctl_queue, p, sizeof(*p)))
 		return -EFAULT;
 
-	if (xvp_share_block(filp, xrp_ioctl_queue.in_data_addr, &in_data_phys,
-			    xrp_ioctl_queue.in_data_size) < 0 ||
-	    xvp_share_block(filp, xrp_ioctl_queue.out_data_addr, &out_data_phys,
-			    xrp_ioctl_queue.out_data_size) < 0) {
-		pr_debug("%s: in_data or out_data could not be shared\n",
-			 __func__);
-		return -EINVAL;
+	n_buffers = ioctl_queue.buffer_size / sizeof(struct xrp_ioctl_buffer);
+
+	if (n_buffers) {
+		buffer_mapping = kzalloc(n_buffers * sizeof(*buffer_mapping),
+					 GFP_KERNEL);
+		if (n_buffers > XRP_DSP_CMD_INLINE_BUFFER_COUNT) {
+			dsp_buffer = kmalloc(n_buffers * sizeof(*dsp_buffer),
+					     GFP_KERNEL);
+			if (!dsp_buffer) {
+				kfree(buffer_mapping);
+				return -ENOMEM;
+			}
+		}
+	}
+
+	down_read(&mm->mmap_sem);
+
+	if (ioctl_queue.in_data_size > XRP_DSP_CMD_INLINE_DATA_SIZE) {
+		ret = __xrp_share_block(filp, ioctl_queue.in_data_addr,
+					ioctl_queue.in_data_size,
+					XRP_READ, &in_data_phys,
+					&in_data_mapping);
+		if(ret < 0) {
+			pr_debug("%s: in_data could not be shared\n",
+				 __func__);
+			goto share_err;
+		}
+	} else {
+		if (copy_from_user(in_data,
+				   (void __user *)(unsigned long)ioctl_queue.in_data_addr,
+				   ioctl_queue.in_data_size)) {
+			pr_debug("%s: in_data could not be copied\n",
+				 __func__);
+			ret = -EFAULT;
+			goto share_err;
+		}
+	}
+
+	if (ioctl_queue.out_data_size > XRP_DSP_CMD_INLINE_DATA_SIZE) {
+		ret = __xrp_share_block(filp, ioctl_queue.out_data_addr,
+					ioctl_queue.out_data_size,
+					XRP_WRITE, &out_data_phys,
+					&out_data_mapping);
+		if (ret < 0) {
+			pr_debug("%s: out_data could not be shared\n",
+				 __func__);
+			goto share_err;
+		}
+	}
+
+	buffer = (void __user *)(unsigned long)ioctl_queue.buffer_addr;
+
+	for (i = 0; i < n_buffers; ++i) {
+		struct xrp_ioctl_buffer ioctl_buffer;
+		unsigned long buffer_phys;
+
+		if (copy_from_user(&ioctl_buffer, buffer + i,
+				   sizeof(ioctl_buffer))) {
+			ret = -EFAULT;
+			goto share_err;
+		}
+		ret = __xrp_share_block(filp, ioctl_buffer.addr,
+					ioctl_buffer.size,
+					ioctl_buffer.flags,
+					&buffer_phys,
+					buffer_mapping + i);
+		if (ret < 0) {
+			pr_debug("%s: buffer %d could not be shared\n",
+				 __func__, i);
+			goto share_err;
+		}
+
+		dsp_buffer[i] = (struct xrp_dsp_buffer){
+			.flags = ioctl_buffer.flags,
+			.size = ioctl_buffer.size,
+			.addr = buffer_phys,
+		};
+	}
+
+	if (n_buffers > XRP_DSP_CMD_INLINE_BUFFER_COUNT) {
+		ret = __xrp_share_block(filp, (unsigned long)dsp_buffer,
+					n_buffers * sizeof(*dsp_buffer),
+					XRP_READ | XRP_WRITE, &dsp_buffer_phys,
+					&dsp_buffer_mapping);
+		if(ret < 0) {
+			pr_debug("%s: buffer descriptors could not be shared\n",
+				 __func__);
+			goto share_err;
+		}
+	}
+share_err:
+	if (ret < 0) {
+		if (ioctl_queue.in_data_size > XRP_DSP_CMD_INLINE_DATA_SIZE)
+			__xrp_unshare_block(filp, &in_data_mapping, 0);
+		if (ioctl_queue.out_data_size > XRP_DSP_CMD_INLINE_DATA_SIZE)
+			__xrp_unshare_block(filp, &out_data_mapping, 0);
+		for (i = 0; i < n_buffers; ++i)
+			__xrp_unshare_block(filp, buffer_mapping + i, 0);
+		if (n_buffers > XRP_DSP_CMD_INLINE_BUFFER_COUNT)
+			__xrp_unshare_block(filp, &dsp_buffer_mapping, 0);
+	}
+	up_read(&mm->mmap_sem);
+
+	if (ret < 0) {
+		if (n_buffers) {
+			kfree(buffer_mapping);
+			if (n_buffers > XRP_DSP_CMD_INLINE_BUFFER_COUNT) {
+				kfree(dsp_buffer);
+			}
+		}
+		return ret;
 	}
 
 	mutex_lock(&xvp->comm_lock);
 
 	/* write to registers */
-	xvp_comm_write32(xvp, XRP_COMM_IN_DATA_SIZE, xrp_ioctl_queue.in_data_size);
-	xvp_comm_write32(xvp, XRP_COMM_OUT_DATA_SIZE, xrp_ioctl_queue.out_data_size);
-	xvp_comm_write32(xvp, XRP_COMM_BUFFER_SIZE, xrp_ioctl_queue.buffer_size);
-	xvp_comm_write32(xvp, XRP_COMM_IN_DATA, in_data_phys);
-	xvp_comm_write32(xvp, XRP_COMM_OUT_DATA, out_data_phys);
+	xrp_comm_write32(&cmd->in_data_size, ioctl_queue.in_data_size);
+	xrp_comm_write32(&cmd->out_data_size, ioctl_queue.out_data_size);
+	xrp_comm_write32(&cmd->buffer_size, n_buffers * sizeof(struct xrp_dsp_buffer));
+
+	if (ioctl_queue.in_data_size > XRP_DSP_CMD_INLINE_DATA_SIZE)
+		xrp_comm_write32(&cmd->in_data_addr, in_data_phys);
+	else
+		xrp_comm_write(&cmd->in_data, in_data,
+			       ioctl_queue.in_data_size);
+
+	if (ioctl_queue.out_data_size > XRP_DSP_CMD_INLINE_DATA_SIZE)
+		xrp_comm_write32(&cmd->out_data_addr, out_data_phys);
+
+	if (n_buffers > XRP_DSP_CMD_INLINE_BUFFER_COUNT)
+		xrp_comm_write32(&cmd->buffer_addr, dsp_buffer_phys);
+	else
+		xrp_comm_write(&cmd->buffer_data, dsp_buffer,
+			       n_buffers * sizeof(struct xrp_dsp_buffer));
+
+#ifdef DEBUG
+	{
+		struct xrp_dsp_cmd dsp_cmd;
+		xrp_comm_read(cmd, &dsp_cmd, sizeof(dsp_cmd));
+		pr_debug("%s: cmd for DSP: %*ph\n",
+			 __func__, sizeof(dsp_cmd), &dsp_cmd);
+	}
+#endif
+
 	wmb();
-	xvp_comm_write32(xvp, XRP_COMM_FLAGS,
-			 xrp_ioctl_queue.flags | XRP_COMM_FLAG_VALID);
+	/* update flags */
+	xrp_comm_write32(&cmd->flags,
+			 (ioctl_queue.flags & ~XRP_DSP_CMD_FLAG_RESPONSE_VALID) |
+			 XRP_DSP_CMD_FLAG_REQUEST_VALID);
 
 	if (xvp->use_irq) {
 		wmb();
@@ -1406,13 +1221,14 @@ static long xrp_ioctl_submit_sync(struct file *filp,
 		ret = xvp_complete_cmd_poll(xrp_cmd_complete, xvp);
 	}
 
+	/* copy back inline data */
 	if (ret == 0) {
-		if (xvp_share_block(filp, xrp_ioctl_queue.out_data_addr, NULL,
-				    xrp_ioctl_queue.out_data_size) < 0) {
-			pr_debug("%s: out_data could not be shared back\n",
-				 __func__);
-			ret = -EINVAL;
-		}
+		if (ioctl_queue.out_data_size <= XRP_DSP_CMD_INLINE_DATA_SIZE)
+			xrp_comm_read(&cmd->out_data, out_data,
+				      ioctl_queue.out_data_size);
+		if (n_buffers <= XRP_DSP_CMD_INLINE_BUFFER_COUNT)
+			xrp_comm_read(&cmd->buffer_data, dsp_buffer,
+				      n_buffers * sizeof(struct xrp_dsp_buffer));
 	} else if (ret == -EBUSY && firmware_reboot) {
 		int rc;
 
@@ -1423,6 +1239,46 @@ static long xrp_ioctl_submit_sync(struct file *filp,
 	}
 
 	mutex_unlock(&xvp->comm_lock);
+
+	if (ioctl_queue.in_data_size > XRP_DSP_CMD_INLINE_DATA_SIZE)
+		__xrp_unshare_block(filp, &in_data_mapping, XRP_READ);
+	if (ioctl_queue.out_data_size > XRP_DSP_CMD_INLINE_DATA_SIZE) {
+		long rc = __xrp_unshare_block(filp, &out_data_mapping, XRP_WRITE);
+
+		if (rc < 0) {
+			pr_debug("%s: out_data could not be unshared\n",
+				 __func__);
+			ret = rc;
+		}
+	} else if (ret == 0) {
+		if (copy_to_user((void __user *)(unsigned long)ioctl_queue.out_data_addr,
+				 out_data,
+				 ioctl_queue.out_data_size)) {
+			pr_debug("%s: out_data could not be copied\n",
+				 __func__);
+			ret = -EFAULT;
+		}
+	}
+	if (n_buffers > XRP_DSP_CMD_INLINE_BUFFER_COUNT)
+		__xrp_unshare_block(filp, &dsp_buffer_mapping,
+				    XRP_READ | XRP_WRITE);
+
+	for (i = 0; i < n_buffers; ++i) {
+		long rc = __xrp_unshare_block(filp, buffer_mapping + i,
+					      dsp_buffer[i].flags);
+		if (rc < 0) {
+			pr_debug("%s: buffer %d could not be unshared\n",
+				 __func__, i);
+			ret = rc;
+		}
+	}
+
+	if (n_buffers) {
+		kfree(buffer_mapping);
+		if (n_buffers > XRP_DSP_CMD_INLINE_BUFFER_COUNT) {
+			kfree(dsp_buffer);
+		}
+	}
 
 	return ret;
 }
@@ -1438,31 +1294,6 @@ static long xvp_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 	retval = 0;
 
 	switch(cmd){
-	case XVP_IOCTLQ_GET_PADDR:
-		retval = xvp_ioctl_virt_to_phys(filp,
-						(struct xvp_ioctlq_get_paddr __user *)arg);
-		break;
-
-	case XVP_IOCTL_INVALIDATE_CACHE:
-		retval = xvp_ioctl_invalidate_cache(filp,
-						    (struct xvp_ioctl_invalidate_cache __user *)arg);
-		break;
-
-	case XVP_IOCTLX_ALLOC:
-		retval = xvp_ioctl_alloc(filp,
-					 (struct xvp_ioctlx_alloc __user *)arg);
-		break;
-
-	case XVP_IOCTLS_FREE:
-		retval = xvp_ioctl_free(filp,
-					(struct xvp_ioctlx_alloc __user *)arg);
-		break;
-
-	case XVP_IOCTLS_SUBMIT_SYNC:
-		retval = xvp_ioctl_submit_sync(filp,
-					       (struct xvp_ioctls_submit __user *)arg);
-		break;
-
 	case XRP_IOCTL_ALLOC:
 		retval = xrp_ioctl_alloc(filp,
 					 (struct xrp_ioctl_alloc __user *)arg);
@@ -1534,7 +1365,6 @@ static int xvp_open(struct inode *inode, struct file *filp)
 
 	xvp_file->xvp = xvp;
 	spin_lock_init(&xvp_file->busy_list_lock);
-	mutex_init(&xvp_file->alien_list_lock);
 	filp->private_data = xvp_file;
 	return 0;
 }
@@ -1544,17 +1374,6 @@ static int xvp_close(struct inode *inode, struct file *filp)
 	struct xvp_file *xvp_file = filp->private_data;
 
 	pr_debug("%s\n", __func__);
-
-	xvp_alien_lock(xvp_file);
-
-	while (xvp_file->alien_list) {
-		struct xvp_alien_mapping *cur = xvp_file->alien_list;
-
-		pr_debug("%s: 0x%08lx x %ld\n", __func__, cur->vaddr, cur->size);
-		xvp_file->alien_list = cur->next;
-		xvp_alien_mapping_destroy(cur);
-	}
-	xvp_alien_unlock(xvp_file);
 
 	devm_kfree(xvp_file->xvp->dev, xvp_file);
 	return 0;
@@ -1758,7 +1577,7 @@ static int xvp_probe(struct platform_device *pdev)
 	int ret;
 	struct resource *mem;
 	int irq;
-	char nodename[sizeof("xvp") + 3 * sizeof(int)] = "xvp";
+	char nodename[sizeof("xvp") + 3 * sizeof(int)];
 
 	xvp = devm_kzalloc(&pdev->dev, sizeof(*xvp), GFP_KERNEL);
 	if (!xvp) {
@@ -1823,8 +1642,7 @@ static int xvp_probe(struct platform_device *pdev)
 	if (ret < 0)
 		goto err_free;
 
-	if (xvp_nodeid++)
-		sprintf(nodename, "xvp%u", xvp_nodeid - 1);
+	sprintf(nodename, "xvp%u", xvp_nodeid++);
 
 	xvp->miscdev = (struct miscdevice){
 		.minor = MISC_DYNAMIC_MINOR,
