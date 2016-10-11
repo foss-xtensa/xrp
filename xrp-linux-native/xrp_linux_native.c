@@ -429,11 +429,12 @@ void xrp_enqueue_command(struct xrp_queue *queue,
 			 enum xrp_status *status)
 {
 	struct xrp_event *event = NULL;
-	struct xrp_ioctl_buffer ioctl_buffer[buffer_group->n_buffers];/* TODO */
+	size_t n_buffers = buffer_group ? buffer_group->n_buffers : 0;
+	struct xrp_ioctl_buffer ioctl_buffer[n_buffers];/* TODO */
 	struct xrp_ioctl_queue ioctl_queue = {
 		.in_data_size = in_data_size,
 		.out_data_size = out_data_size,
-		.buffer_size = buffer_group->n_buffers *
+		.buffer_size = n_buffers *
 			sizeof(struct xrp_ioctl_buffer),
 		.in_data_addr = (__u64)in_data,
 		.out_data_addr = (__u64)out_data,
@@ -442,7 +443,7 @@ void xrp_enqueue_command(struct xrp_queue *queue,
 	int ret;
 	size_t i;
 
-	for (i = 0; i < buffer_group->n_buffers; ++i) {
+	for (i = 0; i < n_buffers; ++i) {
 		if (buffer_group->buffer[i].buffer->map_count > 0) {
 			set_status(status, XRP_STATUS_FAILURE);
 			return;
