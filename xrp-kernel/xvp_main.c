@@ -27,8 +27,10 @@
 
 #include <linux/completion.h>
 #include <linux/delay.h>
+#include <linux/dma-mapping.h>
 #include <linux/firmware.h>
 #include <linux/fs.h>
+#include <linux/highmem.h>
 #include <linux/interrupt.h>
 #include <linux/io.h>
 #include <linux/kernel.h>
@@ -1400,6 +1402,71 @@ static void xvp_release_dsp(struct xvp *xvp)
 	xvp_reg_write32(xvp, XVP_REG_RUNSTALL, 0);
 }
 
+static int xvp_load_segment_to_sysmem(struct xvp *xvp, Elf32_Phdr *phdr)
+{
+	phys_addr_t pa = (u32)phdr->p_paddr;
+	struct page *page = pfn_to_page(__phys_to_pfn(pa));
+	size_t page_offs = pa & ~PAGE_MASK;
+	size_t offs;
+
+	for (offs = 0; offs < phdr->p_memsz; ++page) {
+		void *p = kmap(page);
+		size_t sz = PAGE_SIZE - page_offs;
+
+		if (!p)
+			return -ENOMEM;
+
+		page_offs &= ~PAGE_MASK;
+
+		if (offs < phdr->p_filesz) {
+			size_t copy_sz = sz;
+
+			if (phdr->p_filesz - offs < copy_sz)
+				copy_sz = phdr->p_filesz - offs;
+
+			copy_sz = ALIGN(copy_sz, 4);
+			memcpy(p + page_offs,
+			       (void *)xvp->firmware->data +
+			       phdr->p_offset + offs,
+			       copy_sz);
+			page_offs += copy_sz;
+			offs += copy_sz;
+			sz -= copy_sz;
+		}
+
+		if (offs < phdr->p_memsz && sz) {
+			if (phdr->p_memsz - offs < sz)
+				sz = phdr->p_memsz - offs;
+
+			sz = ALIGN(sz, 4);
+			memset(p + page_offs, 0, sz);
+			page_offs += sz;
+			offs += sz;
+		}
+		kunmap(page);
+	}
+	dma_sync_single_for_device(xvp->dev, pa, phdr->p_memsz, DMA_TO_DEVICE);
+	return 0;
+}
+
+static int xvp_load_segment_to_iomem(struct xvp *xvp, Elf32_Phdr *phdr)
+{
+	void __iomem *p = ioremap(phdr->p_paddr, phdr->p_memsz);
+
+	if (!p) {
+		dev_err(xvp->dev,
+			"couldn't ioremap 0x%08x x 0x%08x\n",
+			(u32)phdr->p_paddr, (u32)phdr->p_memsz);
+		return -EINVAL;
+	}
+	memcpy_toio(p, (void *)xvp->firmware->data + phdr->p_offset,
+		    ALIGN(phdr->p_filesz, 4));
+	memset_io(p + ALIGN(phdr->p_filesz, 4), 0,
+		  ALIGN(phdr->p_memsz - ALIGN(phdr->p_filesz, 4), 4));
+	iounmap(p);
+	return 0;
+}
+
 static int xvp_load_firmware(struct xvp *xvp)
 {
 	Elf32_Ehdr *ehdr = (Elf32_Ehdr *)xvp->firmware->data;
@@ -1433,7 +1500,7 @@ static int xvp_load_firmware(struct xvp *xvp)
 	for (i = 0; i < ehdr->e_phnum; ++i) {
 		Elf32_Phdr *phdr = (void *)xvp->firmware->data +
 			ehdr->e_phoff + i * ehdr->e_phentsize;
-		void __iomem *p;
+		int rc;
 
 		/* Only load non-empty loadable segments, R/W/X */
 		if (!(phdr->p_type == PT_LOAD &&
@@ -1451,18 +1518,14 @@ static int xvp_load_firmware(struct xvp *xvp)
 
 		dev_dbg(xvp->dev, "loading segment %d to physical 0x%08x\n",
 			i, (u32)phdr->p_paddr);
-		p = ioremap(phdr->p_paddr, phdr->p_memsz);
-		if (!p) {
-			dev_err(xvp->dev,
-				"couldn't ioremap 0x%08x x 0x%08x\n",
-				(u32)phdr->p_paddr, (u32)phdr->p_memsz);
-			return -EINVAL;
-		}
-		memcpy_toio(p, (void *)xvp->firmware->data + phdr->p_offset,
-			    ALIGN(phdr->p_filesz, 4));
-		memset_io(p + ALIGN(phdr->p_filesz, 4), 0,
-			  ALIGN(phdr->p_memsz - ALIGN(phdr->p_filesz, 4), 4));
-		iounmap(p);
+
+		if (pfn_valid(__phys_to_pfn((u32)phdr->p_paddr)))
+			rc = xvp_load_segment_to_sysmem(xvp, phdr);
+		else
+			rc = xvp_load_segment_to_iomem(xvp, phdr);
+
+		if (rc < 0)
+			return rc;
 	}
 
 	return 0;
