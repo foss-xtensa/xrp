@@ -1,0 +1,8 @@
+/* <Port>  <LowAddr>   <HighAddr>  <NewBaseAddr>  */
+
+    0     0x60000000     0x7fffffff                  /* System RAM */
+    0     0x50000000     0x50ffffff                  /* System ROM */
+    0     0x00000000     0x1fffffff                  /* System RAM L */
+    0     0xf0000000     0xf0ffffff                  /* Shared RAM */
+    0     0xf1000000     0xf1ffffff                  /* MMIO */
+    0     0xf2000000     0xf2ffffff                  /* Shared RAM 2 */

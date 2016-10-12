@@ -1,0 +1,118 @@
+// Copyright (c) 2015 Cadence Design Systems, Inc. ALL RIGHTS RESERVED.
+// These coded instructions, statements, and computer programs are the
+// copyrighted works and confidential proprietary information of
+// Tensilica Inc.  They may be adapted and modified by bona fide
+// purchasers for internal use, but neither the original nor any adapted
+// or modified version may be disclosed or distributed to third parties
+// in any manner, medium, or form, in whole or in part, without the prior
+// written consent of Cadence Design Systems, Inc.
+
+
+/* To IVP
+register <RegisterName>     <BitWidth> <Address>   {<InitialValue>} */
+register  ivp_breset          1         0xF1000000   1
+register  ivp_runstall        1         0xF1000004   1
+register  ivp_statvectorsel   1         0xF1000008   0
+/* Only if IVP has GPIO32
+register  ivp_impwire        32         0xF100000C   0
+*/
+register  ivp_interrupt      13         0xF1000010   0
+register  ivp_interrupt00     1         0xF1000014   0
+register  ivp_interrupt01     1         0xF1000018   0
+register  ivp_interrupt02     1         0xF100001C   0
+register  ivp_interrupt03     1         0xF1000020   0
+register  ivp_interrupt04     1         0xF1000024   0
+register  ivp_interrupt05     1         0xF1000028   0
+register  ivp_interrupt06     1         0xF100002C   0
+register  ivp_interrupt07     1         0xF1000030   0
+register  ivp_interrupt08     1         0xF1000034   0
+register  ivp_interrupt09     1         0xF1000038   0
+register  ivp_interrupt10     1         0xF100003C   0
+register  ivp_interrupt11     1         0xF1000040   0
+register  ivp_interrupt12     1         0xF1000044   0
+register  ivp_pwaitmode       1         0xF1000100   0
+/* Only if IVP has GPIO32
+register  ivp_expstate       32         0xF1000104   0
+*/
+
+/* To host 
+register <RegisterName>     <BitWidth> <Address>   {<InitialValue>} */
+register  host_breset         1         0xF1001000   0
+register  host_runstall       1         0xF1001004   0
+register  host_statvectorsel  1         0xF1001008   0
+register  host_impwire       32         0xF100100C   0
+register  host_interrupt     17         0xF1001010   0
+register  host_interrupt00    1         0xF1001014   0
+register  host_interrupt01    1         0xF1001018   0
+register  host_interrupt02    1         0xF100101C   0
+register  host_interrupt03    1         0xF1001020   0
+register  host_interrupt04    1         0xF1001024   0
+register  host_interrupt05    1         0xF1001028   0
+register  host_interrupt06    1         0xF100102C   0
+register  host_interrupt07    1         0xF1001030   0
+register  host_interrupt08    1         0xF1001034   0
+register  host_interrupt09    1         0xF1001038   0
+register  host_interrupt10    1         0xF100103C   0
+register  host_interrupt11    1         0xF1001040   0
+register  host_interrupt12    1         0xF1001044   0
+register  host_interrupt13    1         0xF1001048   0
+register  host_interrupt14    1         0xF100104C   0
+register  host_interrupt15    1         0xF1001050   0
+register  host_interrupt16    1         0xF1001054   0
+register  host_pwaitmode      1         0xF1001100   0
+register  host_expstate      32         0xF1001104   0
+
+/* 
+output <PortName>           <RegisterName> {<HighBit> {<LowBit>}} */
+output  ivp_breset          ivp_breset          0          0
+output  ivp_runstall        ivp_runstall        0          0
+output  ivp_statvectorsel   ivp_statvectorsel   0          0
+/*
+output  ivp_impwire         ivp_impwire        31          0
+*/
+output  ivp_interrupt       ivp_interrupt      12          0
+output  ivp_interrupt00     ivp_interrupt00     0          0
+output  ivp_interrupt01     ivp_interrupt01     0          0
+output  ivp_interrupt02     ivp_interrupt02     0          0
+output  ivp_interrupt03     ivp_interrupt03     0          0
+output  ivp_interrupt04     ivp_interrupt04     0          0
+output  ivp_interrupt05     ivp_interrupt05     0          0
+output  ivp_interrupt06     ivp_interrupt06     0          0
+output  ivp_interrupt07     ivp_interrupt07     0          0
+output  ivp_interrupt08     ivp_interrupt08     0          0
+output  ivp_interrupt09     ivp_interrupt09     0          0
+output  ivp_interrupt10     ivp_interrupt10     0          0
+output  ivp_interrupt11     ivp_interrupt11     0          0
+output  ivp_interrupt12     ivp_interrupt12     0          0
+output  host_breset         host_breset         0          0
+output  host_runstall       host_runstall       0          0
+output  host_statvectorsel  host_statvectorsel  0          0
+output  host_impwire        host_impwire       31          0
+output  host_interrupt      host_interrupt     16          0
+output  host_interrupt00    host_interrupt00    0          0
+output  host_interrupt01    host_interrupt01    0          0
+output  host_interrupt02    host_interrupt02    0          0
+output  host_interrupt03    host_interrupt03    0          0
+output  host_interrupt04    host_interrupt04    0          0
+output  host_interrupt05    host_interrupt05    0          0
+output  host_interrupt06    host_interrupt06    0          0
+output  host_interrupt07    host_interrupt07    0          0
+output  host_interrupt08    host_interrupt08    0          0
+output  host_interrupt09    host_interrupt09    0          0
+output  host_interrupt10    host_interrupt10    0          0
+output  host_interrupt11    host_interrupt11    0          0
+output  host_interrupt12    host_interrupt12    0          0
+output  host_interrupt13    host_interrupt13    0          0
+output  host_interrupt14    host_interrupt14    0          0
+output  host_interrupt15    host_interrupt15    0          0
+output  host_interrupt16    host_interrupt16    0          0
+
+/*
+input  <ExportName>  <RegisterName>  {<HighBit>  {<LowBit>}}
+-----  -------------  --------------   ---------   --------  */
+input  ivp_pwaitmode  ivp_pwaitmode     0          0
+/*
+input  ivp_expstate   ivp_expstate     31          0
+*/
+input  host_pwaitmode host_pwaitmode    0          0
+input  host_expstate  host_expstate    31          0
