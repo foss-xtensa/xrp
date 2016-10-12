@@ -222,8 +222,6 @@ void xrp_release_buffer(struct xrp_buffer *buffer, enum xrp_status *status)
 				return;
 			}
 			xrp_release_device(buffer->device, &s);
-		} else {
-			free(buffer->ptr);
 		}
 	}
 	set_status(status, release_refcounted(buffer));
