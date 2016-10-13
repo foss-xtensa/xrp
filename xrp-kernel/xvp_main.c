@@ -60,12 +60,6 @@ MODULE_FIRMWARE(FIRMWARE_NAME);
 #define XVP_HOST_IRQ_NUM 5
 #define XVP_IVP_IRQ_NUM 5
 
-#define XVP_COMM_INIT_SYNC_LOC(core) ((core) * 4)
-#define XVP_COMM_CMD (0x100)
-#define XVP_COMM_DATA (0x200)
-#define XVP_COMM_STATUS (0x300)
-#define XVP_COMM_SIZE (0x400)
-
 #define XRP_DSP_SYNC(mode, host_irq_no, ivp_irq_no) \
 	(((mode) ? XRP_DSP_SYNC_MODE_IRQ : XRP_DSP_SYNC_MODE_POLL) | \
 	 (((host_irq_no) & 0xff) << 8) | \
@@ -160,16 +154,6 @@ static inline void xvp_reg_write32(struct xvp *xvp, unsigned addr, u32 v)
 static inline u32 xvp_reg_read32(struct xvp *xvp, unsigned addr)
 {
 	return __raw_readl(xvp->regs + addr);
-}
-
-static inline void xvp_comm_write32(struct xvp *xvp, unsigned addr, u32 v)
-{
-	__raw_writel(v, xvp->comm + addr);
-}
-
-static inline u32 xvp_comm_read32(struct xvp *xvp, unsigned addr)
-{
-	return __raw_readl(xvp->comm + addr);
 }
 
 static inline void xrp_comm_write32(volatile void __iomem *addr, u32 v)
@@ -1542,12 +1526,14 @@ static int xvp_request_firmware(struct xvp *xvp)
 static int xvp_boot_firmware(struct xvp *xvp)
 {
 	int ret;
+	struct xrp_dsp_sync __iomem *shared_sync = xvp->comm;
 
 	ret = xvp_request_firmware(xvp);
 	if (ret < 0)
 		return ret;
 
-	xvp_comm_write32(xvp, XVP_COMM_CMD, XVP_CMD_IDLE);
+	xrp_comm_write32(&shared_sync->ping, 0);
+	xrp_comm_write32(&shared_sync->pong, 0);
 	xvp_release_dsp(xvp);
 
 	ret = xvp_synchronize(xvp);
