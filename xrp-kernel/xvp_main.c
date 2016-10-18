@@ -131,6 +131,7 @@ struct xvp {
 	void __iomem *regs;
 	void __iomem *comm;
 	phys_addr_t pmem;
+	phys_addr_t comm_phys;
 
 	bool use_irq;
 	struct completion completion;
@@ -1461,6 +1462,163 @@ static int xvp_load_segment_to_iomem(struct xvp *xvp, Elf32_Phdr *phdr)
 	return 0;
 }
 
+static inline bool xrp_section_bad(struct xvp *xvp, const Elf32_Shdr *shdr)
+{
+	return shdr->sh_offset > xvp->firmware->size ||
+		shdr->sh_size > xvp->firmware->size - shdr->sh_offset;
+}
+
+static int xrp_firmware_find_symbol(struct xvp *xvp, const char *name,
+				    void **paddr, size_t *psize)
+{
+	const Elf32_Ehdr *ehdr = (Elf32_Ehdr *)xvp->firmware->data;
+	const void *shdr_data = xvp->firmware->data + ehdr->e_shoff;
+	const Elf32_Shdr *sh_symtab = NULL;
+	const Elf32_Shdr *sh_strtab = NULL;
+	const void *sym_data;
+	const void *str_data;
+	const Elf32_Sym *esym;
+	void *addr = NULL;
+	unsigned i;
+
+	if (ehdr->e_shoff == 0) {
+		dev_dbg(xvp->dev, "%s: no section header in the firmware image",
+			__func__);
+		return -ENOENT;
+	}
+	if (ehdr->e_shoff > xvp->firmware->size ||
+	    ehdr->e_shnum * ehdr->e_shentsize > xvp->firmware->size - ehdr->e_shoff) {
+		dev_err(xvp->dev, "%s: bad firmware SHDR information",
+			__func__);
+		return -EINVAL;
+	}
+
+	/* find symbols and string sections */
+
+	for (i = 0; i < ehdr->e_shnum; ++i) {
+		const Elf32_Shdr *shdr = shdr_data + i * ehdr->e_shentsize;
+
+		switch (shdr->sh_type) {
+		case SHT_SYMTAB:
+			sh_symtab = shdr;
+			break;
+		case SHT_STRTAB:
+			sh_strtab = shdr;
+			break;
+		default:
+			break;
+		}
+	}
+
+	if (!sh_symtab || !sh_strtab) {
+		dev_dbg(xvp->dev, "%s: no symtab or strtab in the firmware image",
+			__func__);
+		return -ENOENT;
+	}
+
+	if (xrp_section_bad(xvp, sh_symtab)) {
+		dev_err(xvp->dev, "%s: bad firmware SYMTAB section information",
+			__func__);
+		return -EINVAL;
+	}
+
+	if (xrp_section_bad(xvp, sh_strtab)) {
+		dev_err(xvp->dev, "%s: bad firmware STRTAB section information",
+			__func__);
+		return -EINVAL;
+	}
+
+	/* iterate through all symbols, searching for the name */
+
+	sym_data = xvp->firmware->data + sh_symtab->sh_offset;
+	str_data = xvp->firmware->data + sh_strtab->sh_offset;
+
+	for (i = 0; i < sh_symtab->sh_size; i += sh_symtab->sh_entsize) {
+		esym = sym_data + i;
+
+		if (!(ELF_ST_TYPE(esym->st_info) == STT_OBJECT &&
+		      esym->st_name < sh_strtab->sh_size &&
+		      strncmp(str_data + esym->st_name, name,
+			      sh_strtab->sh_size - esym->st_name) == 0))
+			continue;
+
+		if (esym->st_shndx > 0 && esym->st_shndx < ehdr->e_shnum) {
+			const Elf32_Shdr *shdr = shdr_data +
+				esym->st_shndx * ehdr->e_shentsize;
+			Elf32_Off in_section_off = esym->st_value - shdr->sh_addr;
+
+			if (xrp_section_bad(xvp, shdr)) {
+				dev_err(xvp->dev, "%s: bad firmware section #%d information",
+					__func__, esym->st_shndx);
+				return -EINVAL;
+			}
+
+			if (esym->st_value < shdr->sh_addr ||
+			    in_section_off > shdr->sh_size ||
+			    esym->st_size > shdr->sh_size - in_section_off) {
+				dev_err(xvp->dev, "%s: bad symbol information",
+					__func__);
+				return -EINVAL;
+			}
+			addr = (void *)xvp->firmware->data + shdr->sh_offset +
+				in_section_off;
+
+			dev_dbg(xvp->dev, "%s: found symbol, st_shndx = %d, "
+				"sh_offset = 0x%08x, sh_addr = 0x%08x, "
+				"st_value = 0x%08x, address = %p",
+				__func__, esym->st_shndx, shdr->sh_offset,
+				shdr->sh_addr, esym->st_value, addr);
+		} else {
+			dev_dbg(xvp->dev, "%s: unsupported section index in found symbol: 0x%x",
+				__func__, esym->st_shndx);
+			return -EINVAL;
+		}
+		break;
+	}
+
+	if (!addr)
+		return -ENOENT;
+
+	*paddr = addr;
+	*psize = esym->st_size;
+
+	return 0;
+}
+
+static int xrp_firmware_fixup_symbol(struct xvp *xvp, const char *name,
+				     phys_addr_t v)
+{
+	u32 v32 = XRP_DSP_COMM_BASE_MAGIC;
+	void *addr;
+	size_t sz;
+	int rc;
+
+	rc = xrp_firmware_find_symbol(xvp, name, &addr, &sz);
+	if (rc < 0) {
+		dev_err(xvp->dev, "%s: symbol \"%s\" is not found",
+			__func__, name);
+		return rc;
+	}
+
+	if (sz != sizeof(u32)) {
+		dev_err(xvp->dev, "%s: symbol \"%s\" has wrong size: %zu",
+			__func__, name, sz);
+		return -EINVAL;
+	}
+
+	/* update data associated with symbol */
+
+	if (memcmp(addr, &v32, sz) != 0) {
+		dev_dbg(xvp->dev, "%s: value pointed to by symbol is incorrect: %*ph",
+			__func__, sz, addr);
+	}
+
+	v32 = v;
+	memcpy(addr, &v32, sz);
+
+	return 0;
+}
+
 static int xvp_load_firmware(struct xvp *xvp)
 {
 	Elf32_Ehdr *ehdr = (Elf32_Ehdr *)xvp->firmware->data;
@@ -1490,6 +1648,8 @@ static int xvp_load_firmware(struct xvp *xvp)
 
 	xvp_halt_dsp(xvp);
 	xvp_reset_dsp(xvp);
+
+	xrp_firmware_fixup_symbol(xvp, "xrp_dsp_comm_base", xvp->comm_phys);
 
 	for (i = 0; i < ehdr->e_phnum; ++i) {
 		Elf32_Phdr *phdr = (void *)xvp->firmware->data +
@@ -1613,6 +1773,7 @@ static int xvp_probe(struct platform_device *pdev)
 		ret = -ENODEV;
 		goto err;
 	}
+	xvp->comm_phys = mem->start;
 	xvp->comm = devm_ioremap_resource(&pdev->dev, mem);
 	pr_debug("%s: comm = %pap/%p\n", __func__, &mem->start, xvp->comm);
 
