@@ -47,8 +47,8 @@
 #include "xvp_defs.h"
 #include "xrp_kernel_dsp_interface.h"
 
-#define FIRMWARE_NAME "xvp.elf"
-MODULE_FIRMWARE(FIRMWARE_NAME);
+#define DEFAULT_FIRMWARE_NAME "xvp.elf"
+MODULE_FIRMWARE(DEFAULT_FIRMWARE_NAME);
 
 #define XVP_TIMEOUT_JIFFIES (HZ * 10)
 
@@ -115,6 +115,7 @@ struct xrp_mapping {
 
 struct xvp {
 	struct device *dev;
+	const char *firmware_name;
 	const struct firmware *firmware;
 	struct miscdevice miscdev;
 
@@ -1511,7 +1512,8 @@ static int xvp_load_firmware(struct xvp *xvp)
 
 static int xvp_request_firmware(struct xvp *xvp)
 {
-	int ret = request_firmware(&xvp->firmware, FIRMWARE_NAME, xvp->dev);
+	int ret = request_firmware(&xvp->firmware, xvp->firmware_name,
+				   xvp->dev);
 
 	if (ret < 0)
 		return ret;
@@ -1621,6 +1623,18 @@ static int xvp_probe(struct platform_device *pdev)
 	xvp->free_list->start = mem->start;
 	xvp->free_list->size = resource_size(mem);
 	pr_debug("%s: xvp->pmem = %pap\n", __func__, &xvp->pmem);
+
+	ret = of_property_read_string(pdev->dev.of_node, "firmware-name",
+				      &xvp->firmware_name);
+	if (ret == -EINVAL) {
+		xvp->firmware_name = DEFAULT_FIRMWARE_NAME;
+		dev_dbg(xvp->dev,
+			"no firmware-name property, defaulting to \"%s\"",
+			xvp->firmware_name);
+	} else if (ret < 0) {
+		dev_err(xvp->dev, "invalid firmware name (%d)", ret);
+		goto err_free;
+	}
 
 	xvp_reset_dsp(xvp);
 
