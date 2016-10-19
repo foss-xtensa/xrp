@@ -38,6 +38,7 @@
 #include <linux/module.h>
 #include <linux/mutex.h>
 #include <linux/of.h>
+#include <linux/of_address.h>
 #include <linux/platform_device.h>
 #include <linux/slab.h>
 #include <asm/cacheflush.h>
@@ -1381,9 +1382,16 @@ static void xvp_release_dsp(struct xvp *xvp)
 	xvp_reg_write32(xvp, XVP_REG_RUNSTALL, 0);
 }
 
+static phys_addr_t xvp_translate_addr(struct xvp *xvp, Elf32_Phdr *phdr)
+{
+	__be32 addr = cpu_to_be32((u32)phdr->p_paddr);
+
+	return of_translate_address(xvp->dev->of_node, &addr);
+}
+
 static int xvp_load_segment_to_sysmem(struct xvp *xvp, Elf32_Phdr *phdr)
 {
-	phys_addr_t pa = (u32)phdr->p_paddr;
+	phys_addr_t pa = xvp_translate_addr(xvp, phdr);
 	struct page *page = pfn_to_page(__phys_to_pfn(pa));
 	size_t page_offs = pa & ~PAGE_MASK;
 	size_t offs;
@@ -1430,12 +1438,13 @@ static int xvp_load_segment_to_sysmem(struct xvp *xvp, Elf32_Phdr *phdr)
 
 static int xvp_load_segment_to_iomem(struct xvp *xvp, Elf32_Phdr *phdr)
 {
-	void __iomem *p = ioremap(phdr->p_paddr, phdr->p_memsz);
+	phys_addr_t pa = xvp_translate_addr(xvp, phdr);
+	void __iomem *p = ioremap(pa, phdr->p_memsz);
 
 	if (!p) {
 		dev_err(xvp->dev,
-			"couldn't ioremap 0x%08x x 0x%08x\n",
-			(u32)phdr->p_paddr, (u32)phdr->p_memsz);
+			"couldn't ioremap %pap x 0x%08x\n",
+			&pa, (u32)phdr->p_memsz);
 		return -EINVAL;
 	}
 	memcpy_toio(p, (void *)xvp->firmware->data + phdr->p_offset,
@@ -1479,6 +1488,7 @@ static int xvp_load_firmware(struct xvp *xvp)
 	for (i = 0; i < ehdr->e_phnum; ++i) {
 		Elf32_Phdr *phdr = (void *)xvp->firmware->data +
 			ehdr->e_phoff + i * ehdr->e_phentsize;
+		phys_addr_t pa;
 		int rc;
 
 		/* Only load non-empty loadable segments, R/W/X */
@@ -1495,10 +1505,17 @@ static int xvp_load_firmware(struct xvp *xvp)
 			return -EINVAL;
 		}
 
-		dev_dbg(xvp->dev, "loading segment %d to physical 0x%08x\n",
-			i, (u32)phdr->p_paddr);
+		pa = xvp_translate_addr(xvp, phdr);
+		if (pa == OF_BAD_ADDR) {
+			dev_err(xvp->dev,
+				"device address 0x%08x could not be mapped to host physical address",
+				(u32)phdr->p_paddr);
+			return -EINVAL;
+		}
+		dev_dbg(xvp->dev, "loading segment %d (device 0x%08x) to physical %pap\n",
+			i, (u32)phdr->p_paddr, &pa);
 
-		if (pfn_valid(__phys_to_pfn((u32)phdr->p_paddr)))
+		if (pfn_valid(__phys_to_pfn(pa)))
 			rc = xvp_load_segment_to_sysmem(xvp, phdr);
 		else
 			rc = xvp_load_segment_to_iomem(xvp, phdr);
