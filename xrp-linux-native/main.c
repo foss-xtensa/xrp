@@ -5,10 +5,10 @@
 #include <malloc.h>
 #include "xrp_api.h"
 
-static void f1(void)
+static void f1(int devid)
 {
 	enum xrp_status status;
-	struct xrp_device *device = xrp_open_device(0, &status);
+	struct xrp_device *device = xrp_open_device(devid, &status);
 	struct xrp_queue *queue = xrp_create_queue(device, &status);
 	char in_buf[32];
 	char out_buf[32];
@@ -31,10 +31,10 @@ static void f1(void)
 	xrp_release_device(device, &status);
 }
 
-static void f2(void)
+static void f2(int devid)
 {
 	enum xrp_status status;
-	struct xrp_device *device = xrp_open_device(0, &status);
+	struct xrp_device *device = xrp_open_device(devid, &status);
 	struct xrp_queue *queue = xrp_create_queue(device, &status);
 	struct xrp_buffer_group *group = xrp_create_buffer_group(&status);
 	struct xrp_buffer *buf = xrp_create_buffer(device, 1024, NULL, &status);
@@ -56,10 +56,10 @@ static void f2(void)
 	xrp_release_device(device, &status);
 }
 
-static void f3(void)
+static void f3(int devid)
 {
 	enum xrp_status status;
-	struct xrp_device *device = xrp_open_device(0, &status);
+	struct xrp_device *device = xrp_open_device(devid, &status);
 	struct xrp_queue *queue = xrp_create_queue(device, &status);
 	uint32_t sz;
 	int i;
@@ -102,12 +102,16 @@ static void f3(void)
 	xrp_release_device(device, &status);
 }
 
-int main()
+int main(int argc, char **argv)
 {
-	f1();
+	int devid = 0;
+
+	if (argc > 1)
+		sscanf(argv[1], "%i", &devid);
+	f1(devid);
 	printf("=======================================================\n");
-	f2();
+	f2(devid);
 	printf("=======================================================\n");
-	f3();
+	f3(devid);
 	return 0;
 }
