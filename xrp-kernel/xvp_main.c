@@ -39,6 +39,7 @@
 #include <linux/mutex.h>
 #include <linux/of.h>
 #include <linux/of_address.h>
+#include <linux/of_device.h>
 #include <linux/platform_device.h>
 #include <linux/slab.h>
 #include <asm/cacheflush.h>
@@ -114,11 +115,18 @@ struct xrp_mapping {
 	};
 };
 
+struct xvp_hw_control {
+	void (*reset)(struct xvp *xvp);
+	void (*halt)(struct xvp *xvp);
+	void (*release)(struct xvp *xvp);
+};
+
 struct xvp {
 	struct device *dev;
 	const char *firmware_name;
 	const struct firmware *firmware;
 	struct miscdevice miscdev;
+	const struct xvp_hw_control *hw_control;
 
 	void __iomem *regs;
 	void __iomem *comm;
@@ -1365,21 +1373,19 @@ static int xvp_close(struct inode *inode, struct file *filp)
 	return 0;
 }
 
-static void xvp_reset_dsp(struct xvp *xvp)
+static inline void xvp_reset_dsp(struct xvp *xvp)
 {
-	xvp_reg_write32(xvp, XVP_REG_RESET, 1);
-	udelay(1);
-	xvp_reg_write32(xvp, XVP_REG_RESET, 0);
+	xvp->hw_control->reset(xvp);
 }
 
-static void xvp_halt_dsp(struct xvp *xvp)
+static inline void xvp_halt_dsp(struct xvp *xvp)
 {
-	xvp_reg_write32(xvp, XVP_REG_RUNSTALL, 1);
+	xvp->hw_control->halt(xvp);
 }
 
-static void xvp_release_dsp(struct xvp *xvp)
+static inline void xvp_release_dsp(struct xvp *xvp)
 {
-	xvp_reg_write32(xvp, XVP_REG_RUNSTALL, 0);
+	xvp->hw_control->release(xvp);
 }
 
 static phys_addr_t xvp_translate_addr(struct xvp *xvp, Elf32_Phdr *phdr)
@@ -1641,6 +1647,12 @@ static int xvp_probe(struct platform_device *pdev)
 	xvp->free_list->size = resource_size(mem);
 	pr_debug("%s: xvp->pmem = %pap\n", __func__, &xvp->pmem);
 
+	xvp->hw_control = of_device_get_match_data(xvp->dev);
+	if (xvp->hw_control == NULL) {
+		dev_err(xvp->dev, "couldn't get hw_control for this device");
+		ret = -EINVAL;
+		goto err_free;
+	}
 	ret = of_property_read_string(pdev->dev.of_node, "firmware-name",
 				      &xvp->firmware_name);
 	if (ret == -EINVAL) {
@@ -1691,11 +1703,57 @@ static int xvp_remove(struct platform_device *pdev)
 	return 0;
 }
 
+static void xvp_reset_hw(struct xvp *xvp)
+{
+	xvp_reg_write32(xvp, XVP_REG_RESET, 1);
+	udelay(1);
+	xvp_reg_write32(xvp, XVP_REG_RESET, 0);
+}
+
+static void xvp_halt_hw(struct xvp *xvp)
+{
+	xvp_reg_write32(xvp, XVP_REG_RUNSTALL, 1);
+}
+
+static void xvp_release_hw(struct xvp *xvp)
+{
+	xvp_reg_write32(xvp, XVP_REG_RUNSTALL, 0);
+}
+
+static void xrp_reset_hw(struct xvp *xvp)
+{
+	xvp_reg_write32(xvp, 0, 0x18);
+	udelay(1);
+	xvp_reg_write32(xvp, 0, 0x10);
+}
+
+static void xrp_halt_hw(struct xvp *xvp)
+{
+	xvp_reg_write32(xvp, 0, 0x10);
+}
+
+static void xrp_release_hw(struct xvp *xvp)
+{
+	xvp_reg_write32(xvp, 0, 0x0);
+}
+
 #ifdef CONFIG_OF
 static const struct of_device_id xvp_match[] = {
-	{ .compatible = "cdns,xvp", },
-	{ .compatible = "cdns,xrp", },
-	{},
+	{
+		.compatible = "cdns,xvp",
+		.data = &(struct xvp_hw_control){
+			.reset = xvp_reset_hw,
+			.halt = xvp_halt_hw,
+			.release = xvp_release_hw,
+		},
+	}, {
+		.compatible = "cdns,xrp",
+		.data = &(struct xvp_hw_control){
+			.reset = xrp_reset_hw,
+			.halt = xrp_halt_hw,
+			.release = xrp_release_hw,
+		},
+	}, {},
 };
 MODULE_DEVICE_TABLE(of, xvp_match);
 #endif
