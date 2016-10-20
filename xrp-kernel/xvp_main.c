@@ -1675,7 +1675,7 @@ static int xvp_probe(struct platform_device *pdev)
 
 	xvp->miscdev = (struct miscdevice){
 		.minor = MISC_DYNAMIC_MINOR,
-		.name = "xvp",
+		.name = devm_kstrdup(&pdev->dev, nodename, GFP_KERNEL),
 		.nodename = devm_kstrdup(&pdev->dev, nodename, GFP_KERNEL),
 		.fops = &xvp_fops,
 	};
