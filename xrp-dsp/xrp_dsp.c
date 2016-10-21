@@ -20,7 +20,7 @@ static inline int dprintf(const char *p, ...)
 }
 #endif
 
-void *xrp_dsp_comm_base = (void *)0xf0000000; //XRP_DSP_COMM_BASE_MAGIC;
+void *xrp_dsp_comm_base = (void *)XRP_DSP_COMM_BASE_MAGIC;
 
 static int use_irq;
 static unsigned host_irq_num;
