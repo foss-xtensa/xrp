@@ -252,8 +252,6 @@ start:
 	}
 
 	if (device_irq_mode != XRP_IRQ_NONE) {
-		uint32_t interrupt;
-
 		_xtos_ints_off(1u << device_irq);
 		_xtos_set_interrupt_handler(device_irq, xrp_irq_handler);
 		_xtos_dispatch_level1_interrupts();
