@@ -56,27 +56,11 @@ MODULE_FIRMWARE(DEFAULT_FIRMWARE_NAME);
 
 #define XVP_REG_RESET		(0x00)
 #define XVP_REG_RUNSTALL	(0x04)
-#define XVP_REG_IVP_IRQ(num)	(0x14 + (num) * 4)
-#define XVP_REG_HOST_IRQ(num)	(0x1014 + (num) * 4)
-
-#define XVP_HOST_IRQ_NUM 5
-#define XVP_IVP_IRQ_NUM 5
-
-#define XRP_DSP_SYNC(mode, host_irq_no, ivp_irq_no) \
-	(((mode) ? XRP_DSP_SYNC_MODE_IRQ : XRP_DSP_SYNC_MODE_POLL) | \
-	 (((host_irq_no) & 0xff) << 8) | \
-	 (((ivp_irq_no) & 0xff) << 16))
-
-#define XVP_CMD_IDLE (0)
 
 enum xrp_access_flags {
 	XRP_READ		= 0x1,
 	XRP_WRITE		= 0x2,
 	XRP_READ_WRITE		= 0x3,
-};
-
-enum xvp_comm {
-	SYNC_POST_SYNC = 128,
 };
 
 struct xvp;
@@ -121,6 +105,13 @@ struct xvp_hw_control {
 	void (*release)(struct xvp *xvp);
 };
 
+enum xrp_irq_mode {
+	XRP_IRQ_NONE,
+	XRP_IRQ_LEVEL,
+	XRP_IRQ_EDGE,
+	XRP_IRQ_MAX,
+};
+
 struct xvp {
 	struct device *dev;
 	const char *firmware_name;
@@ -131,9 +122,24 @@ struct xvp {
 	void __iomem *regs;
 	void __iomem *comm;
 	phys_addr_t pmem;
+	phys_addr_t regs_phys;
 	phys_addr_t comm_phys;
 
-	bool use_irq;
+	/* how IRQ is used to notify the device of incoming data */
+	enum xrp_irq_mode device_irq_mode;
+	/*
+	 * offset of IRQ register in MMIO region (host side)
+	 * bit number
+	 * device IRQ#
+	 */
+	u32 device_irq[3];
+	/* how IRQ is used to notify the host of incoming data */
+	enum xrp_irq_mode host_irq_mode;
+	/*
+	 * offset of IRQ register (device side)
+	 * bit number
+	 */
+	u32 host_irq[2];
 	struct completion completion;
 
 	struct mutex free_list_lock;
@@ -218,57 +224,121 @@ static inline void xrp_comm_read(volatile void __iomem *addr, void *p,
 	}
 }
 
+static inline void xrp_send_device_irq(struct xvp *xvp)
+{
+	switch (xvp->device_irq_mode) {
+	case XRP_IRQ_EDGE:
+		xvp_reg_write32(xvp, xvp->device_irq[0], 0);
+		/* fallthrough */
+	case XRP_IRQ_LEVEL:
+		wmb();
+		xvp_reg_write32(xvp, xvp->device_irq[0],
+				BIT(xvp->device_irq[1]));
+		break;
+	default:
+		break;
+	}
+}
+
 static int xvp_synchronize(struct xvp *xvp)
 {
+	static const int irq_mode[] = {
+		[XRP_IRQ_NONE] = XRP_DSP_SYNC_IRQ_MODE_NONE,
+		[XRP_IRQ_LEVEL] = XRP_DSP_SYNC_IRQ_MODE_LEVEL,
+		[XRP_IRQ_EDGE] = XRP_DSP_SYNC_IRQ_MODE_EDGE,
+	};
 	unsigned long deadline = jiffies + XVP_TIMEOUT_JIFFIES;
 	struct xrp_dsp_sync __iomem *shared_sync = xvp->comm;
+	int ret = -ENODEV;
+	u32 v;
 
-	xrp_comm_write32(&shared_sync->ping, 0);
+	xrp_comm_write32(&shared_sync->sync, XRP_DSP_SYNC_START);
 	mb();
-	xrp_comm_write32(&shared_sync->pong,
-			 XRP_DSP_SYNC(xvp->use_irq,
-				      XVP_HOST_IRQ_NUM,
-				      XVP_IVP_IRQ_NUM));
-	mb();
-
-	if (xvp->use_irq)
-		xvp_reg_write32(xvp, XVP_REG_IVP_IRQ(XVP_IVP_IRQ_NUM), 1);
-
 	do {
-		u32 v = xrp_comm_read32(&shared_sync->pong);
-
-		mb();
-		if (v == 0) {
-			xrp_comm_write32(&shared_sync->ping,
-					 SYNC_POST_SYNC);
-			mb();
-			if (xvp->use_irq) {
-				int res = wait_for_completion_timeout(&xvp->completion,
-								      XVP_TIMEOUT_JIFFIES);
-				if (res == 0) {
-					dev_err(xvp->dev,
-						"IRQ mode is requested, but got no IRQ during synchronization\n");
-					break;
-				}
-			}
-			return 0;
-		}
+		v = xrp_comm_read32(&shared_sync->sync);
+		if (v == XRP_DSP_SYNC_DSP_READY)
+			break;
 		schedule();
 	} while (time_before(jiffies, deadline));
 
-	xrp_comm_write32(&shared_sync->pong, 0);
+	if (v != XRP_DSP_SYNC_DSP_READY) {
+		dev_err(xvp->dev, "DSP is not ready for synchronization\n");
+		goto err;
+	}
 
-	return -ENODEV;
+	xrp_comm_write32(&shared_sync->device_mmio_base,
+			 xvp->regs_phys);
+	xrp_comm_write32(&shared_sync->host_irq_mode,
+			 irq_mode[xvp->host_irq_mode]);
+	xrp_comm_write32(&shared_sync->host_irq_offset,
+			 xvp->host_irq[0]);
+	xrp_comm_write32(&shared_sync->host_irq_bit,
+			 xvp->host_irq[1]);
+	xrp_comm_write32(&shared_sync->device_irq_mode,
+			 irq_mode[xvp->device_irq_mode]);
+	xrp_comm_write32(&shared_sync->device_irq_offset,
+			 xvp->device_irq[0]);
+	xrp_comm_write32(&shared_sync->device_irq_bit,
+			 xvp->device_irq[1]);
+	xrp_comm_write32(&shared_sync->device_irq,
+			 xvp->device_irq[2]);
+	mb();
+	xrp_comm_write32(&shared_sync->sync, XRP_DSP_SYNC_HOST_TO_DSP);
+	mb();
+
+	do {
+		v = xrp_comm_read32(&shared_sync->sync);
+		if (v == XRP_DSP_SYNC_DSP_TO_HOST)
+			break;
+		schedule();
+	} while (time_before(jiffies, deadline));
+
+	if (v != XRP_DSP_SYNC_DSP_TO_HOST) {
+		dev_err(xvp->dev,
+			"DSP haven't confirmed initialization data reception\n");
+		goto err;
+	}
+
+	xrp_send_device_irq(xvp);
+
+	if (xvp->host_irq_mode != XRP_IRQ_NONE) {
+		int res = wait_for_completion_timeout(&xvp->completion,
+						      XVP_TIMEOUT_JIFFIES);
+		if (res == 0) {
+			dev_err(xvp->dev,
+				"host IRQ mode is requested, but DSP couldn't deliver IRQ during synchronization\n");
+			goto err;
+		}
+	}
+	ret = 0;
+err:
+	xrp_comm_write32(&shared_sync->sync, XRP_DSP_SYNC_IDLE);
+	return ret;
+}
+
+static bool xrp_cmd_complete(void *p)
+{
+	struct xvp *xvp = p;
+	struct xrp_dsp_cmd __iomem *cmd = xvp->comm;
+	u32 flags = xrp_comm_read32(&cmd->flags);
+
+	rmb();
+	return (flags & (XRP_DSP_CMD_FLAG_REQUEST_VALID |
+			 XRP_DSP_CMD_FLAG_RESPONSE_VALID)) ==
+		(XRP_DSP_CMD_FLAG_REQUEST_VALID |
+		 XRP_DSP_CMD_FLAG_RESPONSE_VALID);
 }
 
 static irqreturn_t xvp_irq_handler(int irq, void *dev_id)
 {
 	struct xvp *xvp = dev_id;
 
-	if (!xvp_reg_read32(xvp, XVP_REG_HOST_IRQ(XVP_HOST_IRQ_NUM)))
+	if (!xrp_cmd_complete(xvp))
 		return IRQ_NONE;
 
-	xvp_reg_write32(xvp, XVP_REG_HOST_IRQ(XVP_HOST_IRQ_NUM), 0);
+	if (xvp->host_irq_mode == XRP_IRQ_LEVEL)
+		xvp_reg_write32(xvp, xvp->host_irq[0], 0);
+
 	complete(&xvp->completion);
 
 	return IRQ_HANDLED;
@@ -1015,19 +1085,6 @@ static long xvp_complete_cmd_poll(bool (*cmd_complete)(void *p),
 	return -EBUSY;
 }
 
-static bool xrp_cmd_complete(void *p)
-{
-	struct xvp *xvp = p;
-	struct xrp_dsp_cmd __iomem *cmd = xvp->comm;
-	u32 flags = xrp_comm_read32(&cmd->flags);
-
-	rmb();
-	return (flags & (XRP_DSP_CMD_FLAG_REQUEST_VALID |
-			 XRP_DSP_CMD_FLAG_RESPONSE_VALID)) ==
-		(XRP_DSP_CMD_FLAG_REQUEST_VALID |
-		 XRP_DSP_CMD_FLAG_RESPONSE_VALID);
-}
-
 static long xrp_ioctl_submit_sync(struct file *filp,
 				  struct xrp_ioctl_queue __user *p)
 {
@@ -1207,9 +1264,9 @@ share_err:
 			 (ioctl_queue.flags & ~XRP_DSP_CMD_FLAG_RESPONSE_VALID) |
 			 XRP_DSP_CMD_FLAG_REQUEST_VALID);
 
-	if (xvp->use_irq) {
-		wmb();
-		xvp_reg_write32(xvp, XVP_REG_IVP_IRQ(XVP_IVP_IRQ_NUM), 1);
+	xrp_send_device_irq(xvp);
+
+	if (xvp->host_irq_mode != XRP_IRQ_NONE) {
 		ret = xvp_complete_cmd_irq(&xvp->completion,
 					   xrp_cmd_complete, xvp);
 	} else {
@@ -1717,8 +1774,8 @@ static int xvp_boot_firmware(struct xvp *xvp)
 	if (ret < 0)
 		return ret;
 
-	xrp_comm_write32(&shared_sync->ping, 0);
-	xrp_comm_write32(&shared_sync->pong, 0);
+	xrp_comm_write32(&shared_sync->sync, XRP_DSP_SYNC_IDLE);
+	mb();
 	xvp_release_dsp(xvp);
 
 	ret = xvp_synchronize(xvp);
@@ -1765,6 +1822,7 @@ static int xvp_probe(struct platform_device *pdev)
 		ret = -ENODEV;
 		goto err;
 	}
+	xvp->regs_phys = mem->start;
 	xvp->regs = devm_ioremap_resource(&pdev->dev, mem);
 	pr_debug("%s: regs = %pap/%p\n", __func__, &mem->start, xvp->regs);
 
@@ -1783,10 +1841,46 @@ static int xvp_probe(struct platform_device *pdev)
 		goto err;
 	}
 
+	ret = of_property_read_u32_array(pdev->dev.of_node, "device-irq",
+					 xvp->device_irq,
+					 ARRAY_SIZE(xvp->device_irq));
+	if (ret == 0) {
+		u32 device_irq_mode;
+
+		ret = of_property_read_u32(pdev->dev.of_node,
+					   "device-irq-mode",
+					   &device_irq_mode);
+		if (device_irq_mode < XRP_IRQ_MAX)
+			xvp->device_irq_mode = device_irq_mode;
+		else
+			ret = -ENOENT;
+	}
+	if (ret == 0) {
+		dev_dbg(xvp->dev,
+			"%s: device IRQ MMIO offset = 0x%08x, bit = %d, device IRQ = %d, IRQ mode = %d",
+			__func__, xvp->device_irq[0], xvp->device_irq[1],
+			xvp->device_irq[2], xvp->device_irq_mode);
+	} else {
+		dev_info(xvp->dev, "using polling mode on the device side\n");
+	}
+
+	ret = of_property_read_u32_array(pdev->dev.of_node, "host-irq",
+					 xvp->host_irq,
+					 ARRAY_SIZE(xvp->host_irq));
+	if (ret == 0) {
+		u32 host_irq_mode;
+
+		ret = of_property_read_u32(pdev->dev.of_node,
+					   "host-irq-mode",
+					   &host_irq_mode);
+		if (host_irq_mode < XRP_IRQ_MAX)
+			xvp->host_irq_mode = host_irq_mode;
+		else
+			ret = -ENOENT;
+	}
 	irq = platform_get_irq(pdev, 0);
-	if (irq >= 0) {
-		pr_debug("%s: irq = %d", __func__, irq);
-		xvp->use_irq = true;
+	if (ret == 0 && irq >= 0) {
+		dev_dbg(xvp->dev, "%s: host IRQ = %d, ", __func__, irq);
 		init_completion(&xvp->completion);
 		ret = devm_request_irq(&pdev->dev, irq, xvp_irq_handler,
 				       IRQF_SHARED, pdev->name, xvp);
@@ -1795,7 +1889,7 @@ static int xvp_probe(struct platform_device *pdev)
 			goto err;
 		}
 	} else {
-		dev_info(xvp->dev, "no IRQ resource, using polling mode\n");
+		dev_info(xvp->dev, "using polling mode on the host side\n");
 	}
 
 	xvp->pmem = mem->start;

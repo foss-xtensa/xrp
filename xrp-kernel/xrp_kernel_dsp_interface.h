@@ -3,20 +3,30 @@
 
 #define XRP_DSP_COMM_BASE_MAGIC		0x20161006
 
-#define XRP_DSP_SYNC_MODE(v)		((v) & 0xf)
 enum {
-	XRP_DSP_SYNC_MODE_IDLE,
-	XRP_DSP_SYNC_MODE_POLL,
-	XRP_DSP_SYNC_MODE_IRQ,
-	XRP_DSP_SYNC_POST_SYNC = 128,
+	XRP_DSP_SYNC_IDLE = 0,
+	XRP_DSP_SYNC_START = 0x100,
+	XRP_DSP_SYNC_DSP_READY = 0x200,
+	XRP_DSP_SYNC_HOST_TO_DSP = 0x1,
+	XRP_DSP_SYNC_DSP_TO_HOST = 0x3,
 };
 
-#define XRP_DSP_SYNC_HOST_IRQ_NUM(v)	(((v) >> 8) & 0xff)
-#define XRP_DSP_SYNC_DSP_IRQ_NUM(v)	(((v) >> 16) & 0xff)
+enum {
+	XRP_DSP_SYNC_IRQ_MODE_NONE = 0x0,
+	XRP_DSP_SYNC_IRQ_MODE_LEVEL = 0x1,
+	XRP_DSP_SYNC_IRQ_MODE_EDGE = 0x2,
+};
 
 struct xrp_dsp_sync {
-	__u32 ping;
-	__u32 pong;
+	__u32 sync;
+	__u32 device_mmio_base;
+	__u32 host_irq_mode;
+	__u32 host_irq_offset;
+	__u32 host_irq_bit;
+	__u32 device_irq_mode;
+	__u32 device_irq_offset;
+	__u32 device_irq_bit;
+	__u32 device_irq;
 };
 
 enum {

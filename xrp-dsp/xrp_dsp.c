@@ -22,14 +22,25 @@ static inline int dprintf(const char *p, ...)
 
 void *xrp_dsp_comm_base = (void *)XRP_DSP_COMM_BASE_MAGIC;
 
-static int use_irq;
-static unsigned host_irq_num;
-static unsigned dsp_irq_num;
+static uint32_t mmio_base;
 
-static void *MMIO = (void *)0xf1000000;
+enum xrp_irq_mode {
+	XRP_IRQ_NONE,
+	XRP_IRQ_LEVEL,
+	XRP_IRQ_EDGE,
+};
+static enum xrp_irq_mode host_irq_mode;
+static enum xrp_irq_mode device_irq_mode;
 
-#define mmio_dsp_irq(n) ((volatile uint32_t *)MMIO + 0x0014/4 + (n))
-#define mmio_host_irq(n)((volatile uint32_t *)MMIO + 0x1014/4 + (n))
+static uint32_t device_irq_offset;
+static uint32_t device_irq_bit;
+static uint32_t device_irq;
+
+static uint32_t host_irq_offset;
+static uint32_t host_irq_bit;
+
+#define device_mmio(off) ((volatile void *)mmio_base + off)
+#define host_mmio(off) ((volatile void *)mmio_base + off)
 
 /* DSP side XRP API implementation */
 
@@ -173,74 +184,132 @@ struct xrp_buffer *xrp_get_buffer_from_group(struct xrp_buffer_group *group,
 
 static void xrp_irq_handler(void)
 {
-	XT_S32RI(0, mmio_dsp_irq(dsp_irq_num), 0);
+	dprintf("%s\n", __func__);
+	if (device_irq_mode == XRP_IRQ_LEVEL)
+		XT_S32RI(0, device_mmio(device_irq_offset), 0);
+}
+
+static void xrp_send_host_irq(void)
+{
+	switch (host_irq_mode) {
+	case XRP_IRQ_EDGE:
+		XT_S32RI(0, host_mmio(host_irq_offset), 0);
+		/* fall through */
+	case XRP_IRQ_LEVEL:
+		XT_S32RI(1u << host_irq_bit, host_mmio(host_irq_offset), 0);
+		break;
+	default:
+		break;
+	}
 }
 
 static void do_handshake(struct xrp_dsp_sync *shared_sync)
 {
 	uint32_t v;
+	static const enum xrp_irq_mode irq_mode[] = {
+		[XRP_DSP_SYNC_IRQ_MODE_NONE] = XRP_IRQ_NONE,
+		[XRP_DSP_SYNC_IRQ_MODE_LEVEL] = XRP_IRQ_LEVEL,
+		[XRP_DSP_SYNC_IRQ_MODE_EDGE] = XRP_IRQ_EDGE,
+	};
 
 start:
-	while (XT_L32AI(&shared_sync->ping, 0)) {
+	while (XT_L32AI(&shared_sync->sync, 0) != XRP_DSP_SYNC_START) {
 	}
 
-	do {
-		v = XT_L32AI(&shared_sync->pong, 0);
-		if (XRP_DSP_SYNC_MODE(v) != XRP_DSP_SYNC_MODE_IDLE)
+	XT_S32RI(XRP_DSP_SYNC_DSP_READY, &shared_sync->sync, 0);
+
+	for (;;) {
+		v = XT_L32AI(&shared_sync->sync, 0);
+		if (v == XRP_DSP_SYNC_HOST_TO_DSP)
 			break;
-		if (XT_L32AI(&shared_sync->ping, 0))
+		if (v != XRP_DSP_SYNC_DSP_READY)
 			goto start;
-	} while (XRP_DSP_SYNC_MODE(v) == XRP_DSP_SYNC_MODE_IDLE);
-
-	XT_S32RI(0, &shared_sync->pong, 0);
-
-	use_irq = XRP_DSP_SYNC_MODE(v) == XRP_DSP_SYNC_MODE_IRQ;
-	host_irq_num = XRP_DSP_SYNC_HOST_IRQ_NUM(v);
-	dsp_irq_num = XRP_DSP_SYNC_DSP_IRQ_NUM(v);
-
-	dprintf("%s: use_irq = %d, host_irq_num = %d, dsp_irq_num = %d\n",
-		__func__, use_irq, host_irq_num, dsp_irq_num);
-	if (use_irq) {
-		XT_S32RI(1, mmio_host_irq(host_irq_num), 0);
-		_xtos_ints_off(1u << dsp_irq_num);
-		_xtos_set_interrupt_handler(dsp_irq_num, xrp_irq_handler);
-		_xtos_dispatch_level1_interrupts();
 	}
 
-	while (XT_L32AI(&shared_sync->ping, 0) != XRP_DSP_SYNC_POST_SYNC) {
-		if (XT_L32AI(&shared_sync->pong, 0) != 0)
+	mmio_base = shared_sync->device_mmio_base;
+	dprintf("%s: mmio_base: 0x%08x\n", __func__, mmio_base);
+
+	if (shared_sync->device_irq_mode < sizeof(irq_mode) / sizeof(*irq_mode)) {
+		device_irq_mode = irq_mode[shared_sync->device_irq_mode];
+		device_irq_offset = shared_sync->device_irq_offset;
+		device_irq_bit = shared_sync->device_irq_bit;
+		device_irq = shared_sync->device_irq;
+		dprintf("%s: device_irq_mode = %d, device_irq_offset = %d, device_irq_bit = %d, device_irq = %d\n",
+			__func__, device_irq_mode,
+			device_irq_offset, device_irq_bit, device_irq);
+	} else {
+		device_irq_mode = XRP_IRQ_NONE;
+	}
+
+	if (shared_sync->host_irq_mode < sizeof(irq_mode) / sizeof(*irq_mode)) {
+		host_irq_mode = irq_mode[shared_sync->host_irq_mode];
+		host_irq_offset = shared_sync->host_irq_offset;
+		host_irq_bit = shared_sync->host_irq_bit;
+		dprintf("%s: host_irq_mode = %d, host_irq_offset = %d, host_irq_bit = %d\n",
+			__func__, host_irq_mode, host_irq_offset, host_irq_bit);
+	} else {
+		host_irq_mode = XRP_IRQ_NONE;
+	}
+
+	if (device_irq_mode != XRP_IRQ_NONE) {
+		uint32_t interrupt;
+
+		_xtos_ints_off(1u << device_irq);
+		_xtos_set_interrupt_handler(device_irq, xrp_irq_handler);
+		_xtos_dispatch_level1_interrupts();
+		XTOS_SET_INTLEVEL(15);
+
+		XT_S32RI(XRP_DSP_SYNC_DSP_TO_HOST, &shared_sync->sync, 0);
+
+		dprintf("%s: waiting for device IRQ...\n", __func__);
+		_xtos_ints_on(1u << device_irq);
+		XT_WAITI(0);
+		XTOS_SET_INTLEVEL(15);
+		_xtos_ints_off(1u << device_irq);
+	} else {
+		XT_S32RI(XRP_DSP_SYNC_DSP_TO_HOST, &shared_sync->sync, 0);
+	}
+	xrp_send_host_irq();
+
+	for (;;) {
+		v = XT_L32AI(&shared_sync->sync, 0);
+		if (v == XRP_DSP_SYNC_IDLE)
+			break;
+		if (v != XRP_DSP_SYNC_DSP_TO_HOST)
 			goto start;
 	}
 }
 
+static inline int xrp_request_valid(struct xrp_dsp_cmd *dsp_cmd)
+{
+	uint32_t flags = XT_L32AI(&dsp_cmd->flags, 0);
+	return (flags & (XRP_DSP_CMD_FLAG_REQUEST_VALID |
+			 XRP_DSP_CMD_FLAG_RESPONSE_VALID)) ==
+		XRP_DSP_CMD_FLAG_REQUEST_VALID;
+
+}
+
 static void wait_for_request(struct xrp_dsp_cmd *dsp_cmd)
 {
-	uint32_t flags;
-
-	if (use_irq) {
+	if (device_irq_mode != XRP_IRQ_NONE) {
 		unsigned level = XTOS_SET_INTLEVEL(15);
 
 		for (;;) {
-			XT_S32RI(0, mmio_dsp_irq(dsp_irq_num), 0);
+			if (device_irq_mode == XRP_IRQ_LEVEL)
+				XT_S32RI(0, device_mmio(device_irq_offset), 0);
 
-			flags = XT_L32AI(&dsp_cmd->flags, 0);
-			if ((flags & (XRP_DSP_CMD_FLAG_REQUEST_VALID |
-				      XRP_DSP_CMD_FLAG_RESPONSE_VALID)) ==
-			    XRP_DSP_CMD_FLAG_REQUEST_VALID)
+			if (xrp_request_valid(dsp_cmd))
 				break;
 
-			_xtos_ints_on(1u << dsp_irq_num);
+			_xtos_ints_on(1u << device_irq);
 			XT_WAITI(0);
 			XTOS_SET_INTLEVEL(15);
-			_xtos_ints_off(1u << dsp_irq_num);
+			_xtos_ints_off(1u << device_irq);
 		}
 		XTOS_RESTORE_INTLEVEL(level);
 	} else {
 		for (;;) {
-			flags = XT_L32AI(&dsp_cmd->flags, 0);
-			if ((flags & (XRP_DSP_CMD_FLAG_REQUEST_VALID |
-				      XRP_DSP_CMD_FLAG_RESPONSE_VALID)) ==
-			    XRP_DSP_CMD_FLAG_REQUEST_VALID)
+			if (xrp_request_valid(dsp_cmd))
 				break;
 		}
 	}
@@ -251,9 +320,7 @@ static void complete_request(struct xrp_dsp_cmd *dsp_cmd)
 	uint32_t flags = dsp_cmd->flags | XRP_DSP_CMD_FLAG_RESPONSE_VALID;
 
 	XT_S32RI(flags, &dsp_cmd->flags, 0);
-	if (use_irq) {
-		XT_S32RI(1, mmio_host_irq(host_irq_num), 0);
-	}
+	xrp_send_host_irq();
 }
 
 static enum xrp_access_flags dsp_buffer_allowed_access(__u32 flags)
