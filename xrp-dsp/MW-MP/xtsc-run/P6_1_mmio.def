@@ -1,0 +1,13 @@
+/*
+register  <RegisterName>  <BitWidth>  <Address>   {<InitialValue>}
+--------  --------------  ----------  ----------   --------------  */
+register    P6_1_intr_reg  32       0xfd002000         0x10
+/*
+output  <PortName>    <RegisterName>  {<HighBit>  {<LowBit>}}
+------  ------------  --------------   ---------   --------  */
+output   P6_1_intr_reg_0   P6_1_intr_reg   0     0
+output   P6_1_intr_reg_1   P6_1_intr_reg   1     1
+output   P6_1_intr_reg_2   P6_1_intr_reg   2     2
+output   P6_1_intr_reg_3   P6_1_intr_reg   3     3
+output   P6_1_intr_reg_4   P6_1_intr_reg   4     4
+output   P6_1_intr_reg_5   P6_1_intr_reg   5     5

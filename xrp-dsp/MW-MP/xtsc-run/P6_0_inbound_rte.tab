@@ -1,0 +1,5 @@
+/* <Port>  <LowAddr>   <HighAddr>  <NewBaseAddr>  */
+
+    0     0xc0020000     0xc003ffff    0x3ffe0000    /* P6_0 DATARAM0 */
+    0     0xc0000000     0xc001ffff    0x3ffc0000    /* P6_0 DATARAM1 */
+    1     0xfd001000     0xfd0011ff                  /* P6_0 MMIO */

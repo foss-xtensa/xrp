@@ -1,0 +1,14 @@
+/* <Port>  <LowAddr>   <HighAddr>  <NewBaseAddr>  */
+
+    0     0xc0020000     0xc003ffff            /* P6_0 DATARAM0 */
+    0     0xc0000000     0xc001ffff            /* P6_0 DATARAM1 */
+    0     0xfd001000     0xfd0011ff            /* P6_0 MMIO */
+    1     0xc0060000     0xc007ffff            /* P6_1 DATARAM0 */
+    1     0xc0040000     0xc005ffff            /* P6_1 DATARAM1 */
+    1     0xfd002000     0xfd0021ff            /* P6_1 MMIO */
+    2     0xfd000000     0xfd0001ff            /* Host MMIO */
+    3     0x60000000     0x7fffffff            /* System RAM */
+    4     0x50000000     0x50ffffff            /* System ROM */
+    5     0x00000000     0xfffffff            /* DeviceMemory: SystemRAM_L */
+    6     0xf0000000     0xfcffffff            /* DeviceMemory: SharedRAM_L */
+    7     0xfe000000     0xffffffff            /* DeviceMemory: SystemROM_L */

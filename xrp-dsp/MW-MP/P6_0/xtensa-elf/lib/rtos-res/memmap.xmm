@@ -1,0 +1,138 @@
+//  Memory map file for ROM-resident text/data/bss images (rtos-res LSP)
+
+// Customer ID=4313; Build=0x61693; Copyright (c) 2005-2015 Cadence Design Systems, Inc.
+//
+// Permission is hereby granted, free of charge, to any person obtaining
+// a copy of this software and associated documentation files (the
+// "Software"), to deal in the Software without restriction, including
+// without limitation the rights to use, copy, modify, merge, publish,
+// distribute, sublicense, and/or sell copies of the Software, and to
+// permit persons to whom the Software is furnished to do so, subject to
+// the following conditions:
+//
+// The above copyright notice and this permission notice shall be included
+// in all copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+// EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+// MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+// IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+// CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+// TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+// SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+RTOS_STYLE=true
+
+ROMING=true
+
+// For ROM-resident LSPs, move default non-writable sections in ROM:
+PLACE SECTIONS(.rodata)        WITH_SECTION(.srom.rodata)
+PLACE SECTIONS(.literal)       WITH_SECTION(.srom.literal)
+PLACE SECTIONS(.text)          WITH_SECTION(.srom.text)
+
+//  Show more details if configuration targets Tensilica-supported FPGA boards:
+INCLUDE_XTBOARD_MEMORIES = try
+
+
+
+// A memory map is a sequence of memory descriptions and
+// optional parameter assignments.
+//
+// Each memory description has the following format:
+//   BEGIN <name>
+//     <addr> [,<paddr>] : <mem-type> : <mem-name> : <size> [,<psize>]
+//                       : [writable] [,executable] [,device] ;
+//     <segment>*
+//   END <name>
+//
+// where each <segment> description has the following format:
+//     <seg-name> : F|C : <start-addr> - <end-addr> [ : STACK ] [ : HEAP ]
+//                : <section-name>* ;
+//
+// Each parameter assignment is a keyword/value pair in the following format:
+//   <keyword> = <value>                (no spaces in <value>)
+// or
+//   <keyword> = "<value>"              (spaces allowed in <value>)
+//
+// The following primitives are also defined:
+//   PLACE SECTIONS( <section-name>* ) { WITH_SECTION(<section-name>)
+//                                       | IN_SEGMENT(<seg-name>) }
+//
+//   NOLOAD <section-name1> [ <section-name2> ... ]
+//
+// Please refer to the Xtensa LSP Reference Manual for more details.
+//
+
+// Additions for -mvecbase option:
+VECBASE = 0x70000000
+
+
+// Additions for -mvecselect option:
+VECSELECT = 0
+
+
+// Additions for -syscore option:
+SYSCORE = P6_0
+
+
+// Additions for -reset-table-vaddr option:
+RESET_TABLE_VADDR = 0x50000300
+
+BEGIN dram1
+0x3ffc0000: dataRam : dram1 : 0x20000 : writable ;
+ dram1_0 : C : 0x3ffc0000 - 0x3ffdffff : .dram1.rodata .dram1.literal .dram1.data .dram1.bss;
+END dram1
+
+BEGIN dram0
+0x3ffe0000: dataRam : dram0 : 0x20000 : writable ;
+ dram0_0 : C : 0x3ffe0000 - 0x3fffffff : .dram0.rodata .dram0.literal .dram0.data .dram0.bss;
+END dram0
+
+BEGIN sysrom_B
+0x50000000: sysrom : sysrom_B : 0x304 : executable ;
+ sysrom_B0 : F : 0x50000000 - 0x500002ff : .SharedResetVector.text;
+ sysrom_B1 : C : 0x50000300 - 0x50000303 : .ResetTable.rodata;
+END sysrom_B
+
+BEGIN sysrom
+0x50000308: sysrom : sysrom : 0x7ffcf8 : executable, shared ;
+ sysrom0 : C : 0x50000308 - 0x507fffff : ;
+END sysrom
+
+BEGIN sysrom_C
+0x50800000: sysrom : sysrom_C : 0x200000 : executable ;
+ sysrom_C0 : C : 0x50800000 - 0x509ffcff : .sysrom.rodata .sysrom.literal .sysrom.text .rom.store;
+ sysrom_C1 : C : 0x509ffd00 - 0x509fffff : .ResetVector.literal .ResetVector.text;
+END sysrom_C
+
+BEGIN sysram
+0x60000000: sysram : sysram : 0x10000000 : executable, shared, writable ;
+ sysram0 : C : 0x60000000 - 0x6fffffff : ;
+END sysram
+
+BEGIN sysram_B
+0x70000000: sysram : sysram_B : 0x4000000 : executable, writable ;
+ sysram_B0 : F : 0x70000000 - 0x70000177 : .WindowVectors.text;
+ sysram_B1 : C : 0x70000178 - 0x7000017f : .Level2InterruptVector.literal;
+ sysram_B2 : F : 0x70000180 - 0x700001b7 : .Level2InterruptVector.text;
+ sysram_B3 : C : 0x700001b8 - 0x700001bf : .DebugExceptionVector.literal;
+ sysram_B4 : F : 0x700001c0 - 0x700001f7 : .DebugExceptionVector.text;
+ sysram_B5 : C : 0x700001f8 - 0x700001ff : .NMIExceptionVector.literal;
+ sysram_B6 : F : 0x70000200 - 0x70000237 : .NMIExceptionVector.text;
+ sysram_B7 : C : 0x70000238 - 0x7000023f : .KernelExceptionVector.literal;
+ sysram_B8 : F : 0x70000240 - 0x70000277 : .KernelExceptionVector.text;
+ sysram_B9 : C : 0x70000278 - 0x7000027f : .UserExceptionVector.literal;
+ sysram_B10 : F : 0x70000280 - 0x700002b7 : .UserExceptionVector.text;
+ sysram_B11 : C : 0x700002b8 - 0x700002ff : .DoubleExceptionVector.literal;
+ sysram_B12 : F : 0x70000300 - 0x7000033f : .DoubleExceptionVector.text;
+ sysram_B13 : C : 0x70000340 - 0x73ffffff :  STACK :  HEAP : .sysram.rodata .rodata .sysram.literal .literal .SharedResetVector.literal .sysram.text .text .sysram.data .data .sysram.bss .bss;
+END sysram_B
+
+BEGIN rambypass
+0x80000000: sysram : rambypass : 0x10000000 : device, executable, writable ;
+END rambypass
+
+BEGIN iobypass
+0x90000000: io : iobypass : 0xda00000 : device, executable, writable ;
+END iobypass
+

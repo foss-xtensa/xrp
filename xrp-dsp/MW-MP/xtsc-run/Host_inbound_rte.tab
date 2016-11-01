@@ -1,0 +1,3 @@
+/* <Port>  <LowAddr>   <HighAddr>  <NewBaseAddr>  */
+
+    0     0xfd000000     0xfd0001ff                  /* Host MMIO */
