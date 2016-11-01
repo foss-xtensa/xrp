@@ -333,9 +333,9 @@
 --connect=P6_0_mmio,P6_0_intr_reg_0,BInterrupt04,P6_0
 --connect=P6_0_mmio,P6_0_intr_reg_1,BInterrupt05,P6_0
 --connect=P6_0_mmio,P6_0_intr_reg_2,BInterrupt12,P6_0
---connect=P6_0_mmio,P6_0_intr_reg_3,BReset,P6_0
---connect=P6_0_mmio,P6_0_intr_reg_4,RunStall,P6_0
---connect=P6_0_mmio,P6_0_intr_reg_5,StatVectorSel,P6_0
+--connect=P6_0_mmio,P6_0_breset,BReset,P6_0
+--connect=P6_0_mmio,P6_0_runstall,RunStall,P6_0
+--connect=P6_0_mmio,P6_0_statvectorsel,StatVectorSel,P6_0
 
 // Create inbound PIF/MMIO router for P6_0
 --set_router_parm=routing_table=$(XTSC_SCRIPT_FILE_PATH)/P6_0_inbound_rte.tab

@@ -275,4 +275,4 @@
 // Connect the TestBench xtsc_master router to the last port of the BUS_arb
 --connect=TestBenchMaster_rte,master_port[0],slave_port[5],BUS_arb
 
-// Connect the outbound router to other processors (if present)
+// Connect the outbound router to other processors (if fast-paths present)

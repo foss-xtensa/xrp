@@ -15,12 +15,9 @@
 --create_mmio=Host_mmio
 
 // Connect Host's MMIO to the proc
---connect=Host_mmio,Host_intr_reg_0,BInterrupt04,Host
---connect=Host_mmio,Host_intr_reg_1,BInterrupt05,Host
---connect=Host_mmio,Host_intr_reg_2,BInterrupt10,Host
---connect=Host_mmio,Host_intr_reg_3,BReset,Host
---connect=Host_mmio,Host_intr_reg_4,RunStall,Host
---connect=Host_mmio,Host_intr_reg_5,StatVectorSel,Host
+--connect=Host_mmio,Host_intr_reg_0,BInterrupt10,Host
+--connect=Host_mmio,Host_intr_reg_1,BInterrupt11,Host
+--connect=Host_mmio,Host_intr_reg_2,BInterrupt12,Host
 
 // Create inbound PIF/MMIO router for Host
 --set_router_parm=routing_table=$(XTSC_SCRIPT_FILE_PATH)/Host_inbound_rte.tab

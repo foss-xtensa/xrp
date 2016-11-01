@@ -2,12 +2,10 @@
 register  <RegisterName>  <BitWidth>  <Address>   {<InitialValue>}
 --------  --------------  ----------  ----------   --------------  */
 register    Host_intr_reg  32       0xfd000000         0
+
 /*
 output  <PortName>    <RegisterName>  {<HighBit>  {<LowBit>}}
 ------  ------------  --------------   ---------   --------  */
 output   Host_intr_reg_0   Host_intr_reg   0     0
 output   Host_intr_reg_1   Host_intr_reg   1     1
 output   Host_intr_reg_2   Host_intr_reg   2     2
-output   Host_intr_reg_3   Host_intr_reg   3     3
-output   Host_intr_reg_4   Host_intr_reg   4     4
-output   Host_intr_reg_5   Host_intr_reg   5     5
