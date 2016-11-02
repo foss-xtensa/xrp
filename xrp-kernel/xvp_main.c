@@ -57,6 +57,9 @@ MODULE_FIRMWARE(DEFAULT_FIRMWARE_NAME);
 #define XVP_REG_RESET		(0x00)
 #define XVP_REG_RUNSTALL	(0x04)
 
+#define XRP_REG_RESET		(0x04)
+#define XRP_REG_RUNSTALL	(0x08)
+
 enum xrp_access_flags {
 	XRP_READ		= 0x1,
 	XRP_WRITE		= 0x2,
@@ -1977,19 +1980,19 @@ static void xvp_release_hw(struct xvp *xvp)
 
 static void xrp_reset_hw(struct xvp *xvp)
 {
-	xvp_reg_write32(xvp, 0, 0x18);
+	xvp_reg_write32(xvp, XRP_REG_RESET, 1);
 	udelay(1);
-	xvp_reg_write32(xvp, 0, 0x10);
+	xvp_reg_write32(xvp, XRP_REG_RESET, 0);
 }
 
 static void xrp_halt_hw(struct xvp *xvp)
 {
-	xvp_reg_write32(xvp, 0, 0x10);
+	xvp_reg_write32(xvp, XRP_REG_RUNSTALL, 1);
 }
 
 static void xrp_release_hw(struct xvp *xvp)
 {
-	xvp_reg_write32(xvp, 0, 0x0);
+	xvp_reg_write32(xvp, XRP_REG_RUNSTALL, 0);
 }
 
 #ifdef CONFIG_OF
