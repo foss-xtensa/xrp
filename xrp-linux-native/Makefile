@@ -1,4 +1,4 @@
-CFLAGS += -W -Wall -I.. -I../xrp-kernel -g
+override CFLAGS += -W -Wall -I.. -I../xrp-kernel -g
 
 OBJS := main.o xrp_linux_native.o
 
