@@ -1,6 +1,6 @@
-xvp-y += xvp_main.o
+xrp-y += xvp_main.o
 
-obj-m += xvp.o
+obj-m += xrp.o
 
 KSRC ?= /lib/modules/$(shell uname -r)/build
 

@@ -162,7 +162,7 @@ MODULE_PARM_DESC(firmware_reboot, "Reboot firmware on command timeout.");
 
 static unsigned xvp_nodeid;
 
-#define DRIVER_NAME "xvp"
+#define DRIVER_NAME "xrp"
 
 static int xvp_boot_firmware(struct xvp *xvp);
 
@@ -2029,5 +2029,5 @@ module_platform_driver(xvp_driver);
 
 MODULE_AUTHOR("Takayuki Sugawara");
 MODULE_AUTHOR("Max Filippov");
-MODULE_DESCRIPTION("XVP: Linux device driver for OpenVX APK");
+MODULE_DESCRIPTION("XRP: Linux device driver for Xtensa Remote Processing");
 MODULE_LICENSE("GPL v2");
