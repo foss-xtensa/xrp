@@ -1,14 +1,13 @@
 // Build P6_0's components
 
 // Create proc P6_0
---xtensa_core=visionp6cnn_ao
+--xtensa_core=visionp6cnn_ao_exls
 --xtensa_params=
 --set_core_parm=ProcessorID=0
 --set_core_parm=SimStaticVectorSelect=0
 --set_core_parm=SimClientFile=$(P6_0_SIM_CLIENT_FILE)
-//--core_args=$(P6_0_BINARY_ARGS)
-//--core_program=$(P6_0_BINARY)
---core_program=
+--core_args=$(P6_0_BINARY_ARGS)
+--core_program=$(P6_0_BINARY)
 --create_core=P6_0
 
 // Create P6_0 DATARAM0
@@ -333,9 +332,9 @@
 --connect=P6_0_mmio,P6_0_intr_reg_0,BInterrupt04,P6_0
 --connect=P6_0_mmio,P6_0_intr_reg_1,BInterrupt05,P6_0
 --connect=P6_0_mmio,P6_0_intr_reg_2,BInterrupt12,P6_0
---connect=P6_0_mmio,P6_0_breset,BReset,P6_0
---connect=P6_0_mmio,P6_0_runstall,RunStall,P6_0
---connect=P6_0_mmio,P6_0_statvectorsel,StatVectorSel,P6_0
+--connect=P6_0_mmio,P6_0_BReset,BReset,P6_0
+--connect=P6_0_mmio,P6_0_RunStall,RunStall,P6_0
+--connect=P6_0_mmio,P6_0_StatVectorSel,StatVectorSel,P6_0
 
 // Create inbound PIF/MMIO router for P6_0
 --set_router_parm=routing_table=$(XTSC_SCRIPT_FILE_PATH)/P6_0_inbound_rte.tab

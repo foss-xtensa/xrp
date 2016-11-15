@@ -18,6 +18,11 @@
 --connect=Host_mmio,Host_intr_reg_0,BInterrupt10,Host
 --connect=Host_mmio,Host_intr_reg_1,BInterrupt11,Host
 --connect=Host_mmio,Host_intr_reg_2,BInterrupt12,Host
+--connect=Host_mmio,Host_BReset,BReset,Host
+--connect=Host_mmio,Host_RunStall,RunStall,Host
+--connect=Host_mmio,Host_StatVectorSel,StatVectorSel,Host
+--connect=Host_mmio,Host_BInterrupt13,BInterrupt13,Host
+--connect=Host_mmio,Host_BInterrupt14,BInterrupt14,Host
 
 // Create inbound PIF/MMIO router for Host
 --set_router_parm=routing_table=$(XTSC_SCRIPT_FILE_PATH)/Host_inbound_rte.tab

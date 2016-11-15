@@ -1,4 +1,4 @@
-# Customer ID=4313; Build=0x61693; Copyright (c) 2003-2015 Cadence Design Systems, Inc.
+# Customer ID=256; Build=0x63880; Copyright (c) 2003-2015 Cadence Design Systems, Inc.
 #
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
@@ -27,7 +27,7 @@
 
 
 *startfile:
- --undefined=_ResetVector --undefined=_KernelExceptionVector --undefined=_UserExceptionVector --undefined=_DoubleExceptionVector --undefined=_WindowVectors --undefined=_Level2InterruptVector --undefined=_DebugExceptionVector --undefined=_NMIExceptionVector
+ --undefined=_ResetVector --undefined=_KernelExceptionVector --undefined=_UserExceptionVector --undefined=_DoubleExceptionVector --undefined=_WindowVectors --undefined=_Level2InterruptVector --undefined=_DebugExceptionVector --undefined=_NMIExceptionVector --undefined=_MemoryExceptionVector
 
 *lib:
 -lc -lgloss -lc -lgcc

@@ -3,9 +3,9 @@ register  <RegisterName>  <BitWidth>  <Address>   {<InitialValue>}
 --------  --------------  ----------  ----------   --------------  */
 register    P6_0_intr_reg  32       0xfd001000         0
 
-register    P6_0_breset          1        0xfd001004     0
-register    P6_0_runstall        1        0xfd001008     1
-register    P6_0_statvectorsel   1        0xfd00100c     0
+register    P6_0_BReset          1    0xfd001004     0
+register    P6_0_RunStall        1    0xfd001008     0
+register    P6_0_StatVectorSel   1    0xfd00100c     0
 
 /*
 output  <PortName>    <RegisterName>  {<HighBit>  {<LowBit>}}
@@ -14,6 +14,6 @@ output   P6_0_intr_reg_0   P6_0_intr_reg   0     0
 output   P6_0_intr_reg_1   P6_0_intr_reg   1     1
 output   P6_0_intr_reg_2   P6_0_intr_reg   2     2
 
-output   P6_0_breset        P6_0_breset        0     0
-output   P6_0_runstall      P6_0_runstall      0     0
-output   P6_0_statvectorsel P6_0_statvectorsel 0     0
+output   P6_0_BReset          P6_0_BReset          0     0
+output   P6_0_RunStall        P6_0_RunStall        0     0
+output   P6_0_StatVectorSel   P6_0_StatVectorSel   0     0

@@ -1,6 +1,6 @@
 /* This linker script generated from xt-genldscripts.tpp for LSP /home/rajivr/MultiCoreWare/MP/sys-x86-linux/subsys.xtsys/package/cores/P6_1/xtensa-elf/lib/rtos-ram */
 /* Linker Script for ld -N */
-/*  Customer ID=4313; Build=0x61693; Copyright (c) 2005-2016 Tensilica Inc.  */
+/*  Customer ID=256; Build=0x63880; Copyright (c) 2005-2016 Tensilica Inc.  */
 /*
  *  This is one of four linker scripts generated for general-purpose,
  *  and for use by RTOS in particular.
@@ -95,20 +95,20 @@ MEMORY
 {
   dram1_0_seg :                       	org = 0x3FFC0000, len = 0x20000
   dram0_0_seg :                       	org = 0x3FFE0000, len = 0x20000
-  sysram_B0_seg :                     	org = 0x74000000, len = 0x178
-  sysram_B1_seg :                     	org = 0x74000178, len = 0x8
-  sysram_B2_seg :                     	org = 0x74000180, len = 0x38
-  sysram_B3_seg :                     	org = 0x740001B8, len = 0x8
-  sysram_B4_seg :                     	org = 0x740001C0, len = 0x38
-  sysram_B5_seg :                     	org = 0x740001F8, len = 0x8
-  sysram_B6_seg :                     	org = 0x74000200, len = 0x38
-  sysram_B7_seg :                     	org = 0x74000238, len = 0x8
-  sysram_B8_seg :                     	org = 0x74000240, len = 0x38
-  sysram_B9_seg :                     	org = 0x74000278, len = 0x8
-  sysram_B10_seg :                    	org = 0x74000280, len = 0x38
-  sysram_B11_seg :                    	org = 0x740002B8, len = 0x48
-  sysram_B12_seg :                    	org = 0x74000300, len = 0x40
-  sysram_B13_seg :                    	org = 0x74000340, len = 0x3FFFCC0
+  sysram_B0_seg :                     	org = 0x61000000, len = 0x178
+  sysram_B1_seg :                     	org = 0x61000178, len = 0x8
+  sysram_B2_seg :                     	org = 0x61000180, len = 0x38
+  sysram_B3_seg :                     	org = 0x610001B8, len = 0x8
+  sysram_B4_seg :                     	org = 0x610001C0, len = 0x38
+  sysram_B5_seg :                     	org = 0x610001F8, len = 0x8
+  sysram_B6_seg :                     	org = 0x61000200, len = 0x38
+  sysram_B7_seg :                     	org = 0x61000238, len = 0x8
+  sysram_B8_seg :                     	org = 0x61000240, len = 0x38
+  sysram_B9_seg :                     	org = 0x61000278, len = 0x8
+  sysram_B10_seg :                    	org = 0x61000280, len = 0x38
+  sysram_B11_seg :                    	org = 0x610002B8, len = 0x48
+  sysram_B12_seg :                    	org = 0x61000300, len = 0x40
+  sysram_B13_seg :                    	org = 0x61000340, len = 0x7FFCC0
   /*  Entry covering the entire address space, to avoid linker errors
       due to mixing sections that are directed to MEMORY regions and
       others that are not:  */
@@ -124,9 +124,9 @@ PHDRS
  *  where <entries> are of the form:
  *	NAME TYPE [ FILEHDR ] [ PHDRS ] [ AT ( ADDRESS ) ] [ FLAGS ( FLAGS ) ] ;
  */
+  sysram_l0_phdr PT_LOAD;
   dram1_0_phdr PT_LOAD;
   dram0_0_phdr PT_LOAD;
-  sysram0_phdr PT_LOAD;
   sysram_B0_phdr PT_LOAD;
   sysram_B1_phdr PT_LOAD;
   sysram_B2_phdr PT_LOAD;
@@ -141,6 +141,9 @@ PHDRS
   sysram_B11_phdr PT_LOAD;
   sysram_B12_phdr PT_LOAD;
   sysram_B13_phdr PT_LOAD;
+  sysram0_phdr PT_LOAD;
+  sharedram_l0_phdr PT_LOAD;
+  mmio0_phdr PT_LOAD;
 }
 
 
@@ -148,68 +151,74 @@ PHDRS
 ENTRY(_start)
 
 /*  Memory boundary addresses:  */
+_memmap_mem_sysram_l_start = 0x4;
+_memmap_mem_sysram_l_end   = 0x10000000;
 _memmap_mem_dram1_start = 0x3ffc0000;
 _memmap_mem_dram1_end   = 0x3ffe0000;
 _memmap_mem_dram0_start = 0x3ffe0000;
 _memmap_mem_dram0_end   = 0x40000000;
-_memmap_mem_sysram_start = 0x60000000;
-_memmap_mem_sysram_end   = 0x70000000;
-_memmap_mem_sysram_B_start = 0x74000000;
-_memmap_mem_sysram_B_end   = 0x78000000;
+_memmap_mem_sysram_B_start = 0x61000000;
+_memmap_mem_sysram_B_end   = 0x61800000;
+_memmap_mem_sysram_start = 0x61800000;
+_memmap_mem_sysram_end   = 0x64000000;
+_memmap_mem_sharedram_l_start = 0xf0000000;
+_memmap_mem_sharedram_l_end   = 0xfd000000;
+_memmap_mem_mmio_start = 0xfd000000;
+_memmap_mem_mmio_end   = 0xfe000000;
 
 /*  Memory segment boundary addresses:  */
 _memmap_seg_dram1_0_start = 0x3ffc0000;
 _memmap_seg_dram1_0_max   = 0x3ffe0000;
 _memmap_seg_dram0_0_start = 0x3ffe0000;
 _memmap_seg_dram0_0_max   = 0x40000000;
-_memmap_seg_sysram_B0_start = 0x74000000;
-_memmap_seg_sysram_B0_max   = 0x74000178;
-_memmap_seg_sysram_B1_start = 0x74000178;
-_memmap_seg_sysram_B1_max   = 0x74000180;
-_memmap_seg_sysram_B2_start = 0x74000180;
-_memmap_seg_sysram_B2_max   = 0x740001b8;
-_memmap_seg_sysram_B3_start = 0x740001b8;
-_memmap_seg_sysram_B3_max   = 0x740001c0;
-_memmap_seg_sysram_B4_start = 0x740001c0;
-_memmap_seg_sysram_B4_max   = 0x740001f8;
-_memmap_seg_sysram_B5_start = 0x740001f8;
-_memmap_seg_sysram_B5_max   = 0x74000200;
-_memmap_seg_sysram_B6_start = 0x74000200;
-_memmap_seg_sysram_B6_max   = 0x74000238;
-_memmap_seg_sysram_B7_start = 0x74000238;
-_memmap_seg_sysram_B7_max   = 0x74000240;
-_memmap_seg_sysram_B8_start = 0x74000240;
-_memmap_seg_sysram_B8_max   = 0x74000278;
-_memmap_seg_sysram_B9_start = 0x74000278;
-_memmap_seg_sysram_B9_max   = 0x74000280;
-_memmap_seg_sysram_B10_start = 0x74000280;
-_memmap_seg_sysram_B10_max   = 0x740002b8;
-_memmap_seg_sysram_B11_start = 0x740002b8;
-_memmap_seg_sysram_B11_max   = 0x74000300;
-_memmap_seg_sysram_B12_start = 0x74000300;
-_memmap_seg_sysram_B12_max   = 0x74000340;
-_memmap_seg_sysram_B13_start = 0x74000340;
-_memmap_seg_sysram_B13_max   = 0x78000000;
+_memmap_seg_sysram_B0_start = 0x61000000;
+_memmap_seg_sysram_B0_max   = 0x61000178;
+_memmap_seg_sysram_B1_start = 0x61000178;
+_memmap_seg_sysram_B1_max   = 0x61000180;
+_memmap_seg_sysram_B2_start = 0x61000180;
+_memmap_seg_sysram_B2_max   = 0x610001b8;
+_memmap_seg_sysram_B3_start = 0x610001b8;
+_memmap_seg_sysram_B3_max   = 0x610001c0;
+_memmap_seg_sysram_B4_start = 0x610001c0;
+_memmap_seg_sysram_B4_max   = 0x610001f8;
+_memmap_seg_sysram_B5_start = 0x610001f8;
+_memmap_seg_sysram_B5_max   = 0x61000200;
+_memmap_seg_sysram_B6_start = 0x61000200;
+_memmap_seg_sysram_B6_max   = 0x61000238;
+_memmap_seg_sysram_B7_start = 0x61000238;
+_memmap_seg_sysram_B7_max   = 0x61000240;
+_memmap_seg_sysram_B8_start = 0x61000240;
+_memmap_seg_sysram_B8_max   = 0x61000278;
+_memmap_seg_sysram_B9_start = 0x61000278;
+_memmap_seg_sysram_B9_max   = 0x61000280;
+_memmap_seg_sysram_B10_start = 0x61000280;
+_memmap_seg_sysram_B10_max   = 0x610002b8;
+_memmap_seg_sysram_B11_start = 0x610002b8;
+_memmap_seg_sysram_B11_max   = 0x61000300;
+_memmap_seg_sysram_B12_start = 0x61000300;
+_memmap_seg_sysram_B12_max   = 0x61000340;
+_memmap_seg_sysram_B13_start = 0x61000340;
+_memmap_seg_sysram_B13_max   = 0x61800000;
 
 _rom_store_table = 0;
-_ResetTable_base = 0x50000300;
-PROVIDE(_memmap_vecbase_reset = 0x74000000);
+_ResetTable_base = 0x50600000;
+PROVIDE(_memmap_vecbase_reset = 0x61000000);
 PROVIDE(_memmap_reset_vector = 0x50000000);
 /* Various memory-map dependent cache attribute settings: */
-_memmap_cacheattr_wb_base = 0x00041040;
-_memmap_cacheattr_wt_base = 0x00043040;
-_memmap_cacheattr_bp_base = 0x00044040;
-_memmap_cacheattr_unused_mask = 0xFFF00F0F;
-_memmap_cacheattr_wb_trapnull = 0x44441440;
-_memmap_cacheattr_wba_trapnull = 0x44441440;
-_memmap_cacheattr_wbna_trapnull = 0x44442440;
-_memmap_cacheattr_wt_trapnull = 0x44443440;
-_memmap_cacheattr_bp_trapnull = 0x44444440;
-_memmap_cacheattr_wb_strict = 0x00041040;
-_memmap_cacheattr_wt_strict = 0x00043040;
-_memmap_cacheattr_bp_strict = 0x00044040;
-_memmap_cacheattr_wb_allvalid = 0x44441444;
-_memmap_cacheattr_wt_allvalid = 0x44443444;
+_memmap_cacheattr_wb_base = 0x10041041;
+_memmap_cacheattr_wt_base = 0x30043043;
+_memmap_cacheattr_bp_base = 0x40044044;
+_memmap_cacheattr_unused_mask = 0x0FF00F00;
+_memmap_cacheattr_wb_trapnull = 0x14441441;
+_memmap_cacheattr_wba_trapnull = 0x14441441;
+_memmap_cacheattr_wbna_trapnull = 0x24442442;
+_memmap_cacheattr_wt_trapnull = 0x34443443;
+_memmap_cacheattr_bp_trapnull = 0x44444444;
+_memmap_cacheattr_wb_strict = 0x10041041;
+_memmap_cacheattr_wt_strict = 0x30043043;
+_memmap_cacheattr_bp_strict = 0x40044044;
+_memmap_cacheattr_wb_allvalid = 0x14441441;
+_memmap_cacheattr_wt_allvalid = 0x34443443;
 _memmap_cacheattr_bp_allvalid = 0x44444444;
 PROVIDE(_memmap_cacheattr_reset = _memmap_cacheattr_wb_trapnull);
 /*
@@ -243,7 +252,7 @@ SECTIONS
 {
 
   /*  -Ttext moves vaddr of what follows:  */
-  .text 0x74000340 : ALIGN(4)
+  .text 0x61000340 : ALIGN(4)
   {
     _stext = .;
     _text_start = ABSOLUTE(.);
@@ -343,8 +352,8 @@ SECTIONS
     _stack_sentry = ALIGN(0x8);
     _memmap_seg_sysram_B13_end = ALIGN(0x8);
   } >ALLMEMORY :NONE
-  PROVIDE(__stack = 0x78000000);
-  _heap_sentry = 0x78000000;
+  PROVIDE(__stack = 0x61800000);
+  _heap_sentry = 0x61800000;
 
   .dram1.rodata : ALIGN(4)
   {
