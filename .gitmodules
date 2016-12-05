@@ -1,0 +1,4 @@
+[submodule "dtc"]
+	path = dtc
+	url = git://github.com/jcmvbkbc/dtc.git
+	branch = xrp-1.4.2

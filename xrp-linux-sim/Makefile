@@ -1,5 +1,6 @@
-CFLAGS += -W -Wall -I.. -I../xrp-kernel -g
-LDFLAGS += -lfdt -lrt
+CFLAGS += -W -Wall -I.. -I../xrp-kernel -I../dtc/libfdt -g
+LDFLAGS += -L../dtc/libfdt -lfdt -lrt
+DTC := ../dtc/dtc
 
 OBJS := main.o xrp_linux_sim.o xrp_alloc.o xrp.o
 
@@ -8,7 +9,7 @@ clean:
 	rm -f linux-sim-test $(OBJS) xrp.s
 
 xrp.s: xrp.dts
-	dtc -o $@ -O asm $<
+	$(DTC) -o $@ -O asm $<
 
 $(OBJS): ../xrp_api.h
 xrp_linux_native.o: ../xrp-kernel/xrp_kernel_defs.h
