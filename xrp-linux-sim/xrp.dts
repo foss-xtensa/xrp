@@ -48,8 +48,8 @@
 		reg = <0xfd001000 0x00000200
 		       0xf0000000 0x00001000
 		       0xf0001000 0x00fff000>;
-		device-irq = <0 1 5>; /* offset, bit#, IRQ# */
-		device-irq-mode = <1>;
+		device-irq = <0xf2fff100 0 16>; /* offset, bit#, IRQ# */
+		device-irq-mode = <2>;
 		host-irq = <0xfffff000 0>; /* offset, bit# */
 		host-irq-mode = <2>;
 		interrupts = <15 0>;
@@ -69,8 +69,8 @@
 		reg = <0xfd002000 0x00000200
 		       0xf1000000 0x00001000
 		       0xf1001000 0x00fff000>;
-		device-irq = <0 1 5>; /* offset, bit#, IRQ# */
-		device-irq-mode = <1>;
+		device-irq = <0xf2ffe104 0 16>; /* offset, bit#, IRQ# */
+		device-irq-mode = <2>;
 		host-irq = <0xffffe000 0>; /* offset, bit# */
 		host-irq-mode = <2>;
 		interrupts = <15 0>;

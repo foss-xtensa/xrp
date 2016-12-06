@@ -21,6 +21,13 @@ typedef uint64_t __u64;
 #include "../xrp-kernel/xrp_kernel_dsp_interface.h"
 #include "xrp_alloc.h"
 
+enum {
+	XRP_IRQ_NONE,
+	XRP_IRQ_LEVEL,
+	XRP_IRQ_EDGE,
+	XRP_IRQ_MAX,
+};
+
 extern char dt_blob_start[];
 
 struct xrp_shmem {
@@ -41,6 +48,9 @@ struct xrp_device_description {
 	phys_addr_t shared_size;
 	void *comm_ptr;
 	void *shared_ptr;
+
+	uint32_t device_irq_mode;
+	uint32_t device_irq[3];
 };
 
 static struct xrp_device_description xrp_device_description[4];
@@ -244,15 +254,33 @@ static void initialize_shmem(void)
 	}
 }
 
-static void synchronize(int i)
+static inline void xrp_send_device_irq(struct xrp_device_description *desc)
+{
+	void *device_irq = p2v(desc->io_base + desc->device_irq[0]);
+
+	switch (desc->device_irq_mode) {
+	case XRP_IRQ_EDGE:
+		xrp_comm_write32(device_irq, 0);
+		/* fallthrough */
+	case XRP_IRQ_LEVEL:
+		mb();
+		xrp_comm_write32(device_irq, 1 << desc->device_irq[1]);
+		break;
+	default:
+		break;
+	}
+}
+
+
+static void synchronize(struct xrp_device_description *desc)
 {
 	static const int irq_mode[] = {
-		[0] = XRP_DSP_SYNC_IRQ_MODE_NONE,
-		[1] = XRP_DSP_SYNC_IRQ_MODE_LEVEL,
-		[2] = XRP_DSP_SYNC_IRQ_MODE_EDGE,
+		[XRP_IRQ_NONE] = XRP_DSP_SYNC_IRQ_MODE_NONE,
+		[XRP_IRQ_LEVEL] = XRP_DSP_SYNC_IRQ_MODE_LEVEL,
+		[XRP_IRQ_EDGE] = XRP_DSP_SYNC_IRQ_MODE_EDGE,
 	};
 
-	struct xrp_dsp_sync *shared_sync = xrp_device_description[i].comm_ptr;
+	struct xrp_dsp_sync *shared_sync = desc->comm_ptr;
 
 	xrp_comm_write32(&shared_sync->sync, XRP_DSP_SYNC_START);
 	mb();
@@ -264,7 +292,7 @@ static void synchronize(int i)
 	} while (1);
 
 	xrp_comm_write32(&shared_sync->device_mmio_base,
-			 xrp_device_description[i].io_base);
+			 desc->io_base);
 	xrp_comm_write32(&shared_sync->host_irq_mode,
 			 irq_mode[0]);
 	xrp_comm_write32(&shared_sync->host_irq_offset,
@@ -272,13 +300,13 @@ static void synchronize(int i)
 	xrp_comm_write32(&shared_sync->host_irq_bit,
 			 0);
 	xrp_comm_write32(&shared_sync->device_irq_mode,
-			 irq_mode[0]);
+			 irq_mode[desc->device_irq_mode]);
 	xrp_comm_write32(&shared_sync->device_irq_offset,
-			 0);
+			 desc->device_irq[0]);
 	xrp_comm_write32(&shared_sync->device_irq_bit,
-			 0);
+			 desc->device_irq[1]);
 	xrp_comm_write32(&shared_sync->device_irq,
-			 0);
+			 desc->device_irq[2]);
 	mb();
 	xrp_comm_write32(&shared_sync->sync, XRP_DSP_SYNC_HOST_TO_DSP);
 	mb();
@@ -290,9 +318,9 @@ static void synchronize(int i)
 		schedule();
 	} while (1);
 
-#if 0
-	xrp_send_device_irq(xvp);
+	xrp_send_device_irq(desc);
 
+#if 0
 	if (xvp->host_irq_mode != XRP_IRQ_NONE) {
 		int res = wait_for_completion_timeout(&xvp->completion,
 						      XVP_TIMEOUT_JIFFIES);
@@ -317,6 +345,8 @@ static void initialize(void)
 
 	for (i = 0; ; ++i) {
 		const void *reg;
+		const void *device_irq;
+		const void *device_irq_mode;
 		int len;
 
 		offset = fdt_node_offset_by_compatible(fdt,
@@ -342,6 +372,30 @@ static void initialize(void)
 			.shared_size = getprop_u32(reg, 20),
 		};
 
+		device_irq_mode = fdt_getprop(fdt, offset, "device-irq-mode", &len);
+		if (!device_irq_mode || len < 4) {
+			printf("%s: valid device-irq-mode not found, not using\n",
+			       __func__);
+			device_irq_mode = NULL;
+		}
+		if (device_irq_mode && getprop_u32(device_irq_mode, 0)) {
+			device_irq = fdt_getprop(fdt, offset, "device-irq", &len);
+			if (!device_irq || len < 12) {
+				printf("%s: valid device-irq not found, not using\n",
+				       __func__);
+				device_irq_mode = NULL;
+				device_irq = NULL;
+			} else {
+				xrp_device_description[i].device_irq_mode =
+					getprop_u32(device_irq_mode, 0);
+				xrp_device_description[i].device_irq[0] =
+					getprop_u32(device_irq, 0);
+				xrp_device_description[i].device_irq[1] =
+					getprop_u32(device_irq, 4);
+				xrp_device_description[i].device_irq[2] =
+					getprop_u32(device_irq, 8);
+			}
+		}
 		xrp_device_description[i].comm_ptr =
 			p2v(xrp_device_description[i].comm_base);
 		if (!xrp_device_description[i].comm_ptr) {
@@ -358,7 +412,7 @@ static void initialize(void)
 			break;
 		}
 
-		synchronize(i);
+		synchronize(xrp_device_description + i);
 		++xrp_device_count;
 	}
 
@@ -765,6 +819,8 @@ void xrp_enqueue_command(struct xrp_queue *queue,
 
 	barrier();
 	xrp_comm_write32(&dsp_cmd->flags, XRP_DSP_CMD_FLAG_REQUEST_VALID);
+	barrier();
+	xrp_send_device_irq(device->description);
 	do {
 		barrier();
 	} while (xrp_comm_read32(&dsp_cmd->flags) !=
