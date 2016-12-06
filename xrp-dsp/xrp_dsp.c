@@ -212,6 +212,7 @@ static void do_handshake(struct xrp_dsp_sync *shared_sync)
 		[XRP_DSP_SYNC_IRQ_MODE_EDGE] = XRP_IRQ_EDGE,
 	};
 
+	dprintf("%s, shared_sync = %p\n", __func__, shared_sync);
 start:
 	while (XT_L32AI(&shared_sync->sync, 0) != XRP_DSP_SYNC_START) {
 	}
@@ -276,6 +277,7 @@ start:
 		if (v != XRP_DSP_SYNC_DSP_TO_HOST)
 			goto start;
 	}
+	dprintf("%s: done\n", __func__);
 }
 
 static inline int xrp_request_valid(struct xrp_dsp_cmd *dsp_cmd)
