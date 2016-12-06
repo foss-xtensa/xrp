@@ -270,13 +270,6 @@ start:
 	}
 	xrp_send_host_irq();
 
-	for (;;) {
-		v = XT_L32AI(&shared_sync->sync, 0);
-		if (v == XRP_DSP_SYNC_IDLE)
-			break;
-		if (v != XRP_DSP_SYNC_DSP_TO_HOST)
-			goto start;
-	}
 	dprintf("%s: done\n", __func__);
 }
 
