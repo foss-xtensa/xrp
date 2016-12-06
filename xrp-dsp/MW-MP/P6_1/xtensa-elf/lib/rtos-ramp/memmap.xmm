@@ -1,7 +1,7 @@
 //  Memory map file for RAM-only text/data/bss images
 //  packed into a contiguous set of bytes (rtos-ramp LSP)
 
-// Customer ID=256; Build=0x63880; Copyright (c) 2005-2015 Cadence Design Systems, Inc.
+// Copyright (c) 2005-2015 Cadence Design Systems, Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining
 // a copy of this software and associated documentation files (the
@@ -85,15 +85,15 @@ BEGIN sysram_l
  sysram_l0 : C : 0x4 - 0xfffffff : ;
 END sysram_l
 
-BEGIN dram1
-0x3ffc0000: dataRam : dram1 : 0x20000 : writable ;
- dram1_0 : C : 0x3ffc0000 - 0x3ffdffff : .dram1.rodata .dram1.literal .dram1.data .dram1.bss;
-END dram1
-
 BEGIN dram0
-0x3ffe0000: dataRam : dram0 : 0x20000 : writable ;
- dram0_0 : C : 0x3ffe0000 - 0x3fffffff : .dram0.rodata .dram0.literal .dram0.data .dram0.bss;
+0x3ff00000: dataRam : dram0 : 0x80000 : writable ;
+ dram0_0 : C : 0x3ff00000 - 0x3ff7ffff : .dram0.rodata .dram0.literal .dram0.data .dram0.bss;
 END dram0
+
+BEGIN dram1
+0x3ff80000: dataRam : dram1 : 0x80000 : writable ;
+ dram1_0 : C : 0x3ff80000 - 0x3fffffff : .dram1.rodata .dram1.literal .dram1.data .dram1.bss;
+END dram1
 
 BEGIN sysrom_B
 0x50000000: sysrom : sysrom_B : 0x300 : executable ;
@@ -101,30 +101,20 @@ BEGIN sysrom_B
 END sysrom_B
 
 BEGIN sysrom_C
-0x50000300: sysrom : sysrom_C : 0x30 : executable, shared ;
- sysrom_C0 : C : 0x50000300 - 0x5000032f : .SharedMemoryExceptionVector.literal;
+0x50000300: sysrom : sysrom_C : 0xd00 : executable, shared ;
+ sysrom_C0 : C : 0x50000300 - 0x50000fff : ;
 END sysrom_C
 
 BEGIN sysrom_D
-0x50000330: sysrom : sysrom_D : 0x180 : executable ;
- sysrom_D0 : F : 0x50000330 - 0x500004af : .MemoryExceptionVector.text;
+0x50400000: sysrom : sysrom_D : 0x200000 : executable ;
+ sysrom_D0 : C : 0x50400000 - 0x505ffcff : .sysrom.rodata .sysrom.literal .sysrom.text;
+ sysrom_D1 : C : 0x505ffd00 - 0x505fffff : .ResetVector.literal .ResetVector.text;
 END sysrom_D
 
 BEGIN sysrom_E
-0x500004b0: sysrom : sysrom_E : 0xb50 : executable, shared ;
- sysrom_E0 : C : 0x500004b0 - 0x50000fff : ;
+0x50600004: sysrom : sysrom_E : 0x4 : executable ;
+ sysrom_E0 : C : 0x50600004 - 0x50600007 : .ResetTable.rodata;
 END sysrom_E
-
-BEGIN sysrom_F
-0x50400000: sysrom : sysrom_F : 0x200000 : executable ;
- sysrom_F0 : C : 0x50400000 - 0x505ffcff : .sysrom.rodata .sysrom.literal .sysrom.text;
- sysrom_F1 : C : 0x505ffd00 - 0x505fffff : .ResetVector.literal .ResetVector.text;
-END sysrom_F
-
-BEGIN sysrom_G
-0x50600004: sysrom : sysrom_G : 0x4 : executable ;
- sysrom_G0 : C : 0x50600004 - 0x50600007 : .ResetTable.rodata;
-END sysrom_G
 
 BEGIN sysrom
 0x50600008: sysrom : sysrom : 0x9ffff8 : executable, shared ;
@@ -167,8 +157,8 @@ BEGIN iobypass
 END iobypass
 
 BEGIN sharedram_l
-0xf0000000: sysram : sharedram_l : 0xd000000 : executable, shared, writable ;
- sharedram_l0 : C : 0xf0000000 - 0xfcffffff : ;
+0xf0000000: sysram : sharedram_l : 0x8000000 : executable, shared, writable ;
+ sharedram_l0 : C : 0xf0000000 - 0xf7ffffff : ;
 END sharedram_l
 
 BEGIN mmio

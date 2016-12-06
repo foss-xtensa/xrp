@@ -1,15 +1,13 @@
-/* This linker script generated from xt-genldscripts.tpp for LSP /home/rajivr/MultiCoreWare/MP/sys-x86-linux/subsys.xtsys/package/cores/P6_0/xtensa-elf/lib/xtkc705-rt-rom */
+/* This linker script generated from xt-genldscripts.tpp for LSP /home/rajivr/MultiCoreWare/MP/emul/sys-x86-linux/subsys.xtsys/package/cores/P6_0/xtensa-elf/lib/xtkc705-rt-rom */
 /* Linker Script for ld -n */
 MEMORY
 {
-  dram1_0_seg :                       	org = 0x3FFC0000, len = 0x20000
-  dram0_0_seg :                       	org = 0x3FFE0000, len = 0x20000
+  dram0_0_seg :                       	org = 0x3FF00000, len = 0x80000
+  dram1_0_seg :                       	org = 0x3FF80000, len = 0x80000
   sysrom_B0_seg :                     	org = 0x50000000, len = 0x300
-  sysrom_C0_seg :                     	org = 0x50000300, len = 0x30
-  sysrom_D0_seg :                     	org = 0x50000330, len = 0x180
-  sysrom_F0_seg :                     	org = 0x50001000, len = 0x3FED00
-  sysrom_F1_seg :                     	org = 0x503FFD00, len = 0x300
-  sysrom_G0_seg :                     	org = 0x50600000, len = 0x4
+  sysrom_D0_seg :                     	org = 0x50001000, len = 0x3FED00
+  sysrom_D1_seg :                     	org = 0x503FFD00, len = 0x300
+  sysrom_E0_seg :                     	org = 0x50600000, len = 0x4
   sysram_B0_seg :                     	org = 0x60000000, len = 0x178
   sysram_B1_seg :                     	org = 0x60000178, len = 0x8
   sysram_B2_seg :                     	org = 0x60000180, len = 0x38
@@ -29,17 +27,15 @@ MEMORY
 PHDRS
 {
   sysram_l0_phdr PT_LOAD;
-  dram1_0_phdr PT_LOAD;
-  dram1_0_bss_phdr PT_LOAD;
   dram0_0_phdr PT_LOAD;
   dram0_0_bss_phdr PT_LOAD;
+  dram1_0_phdr PT_LOAD;
+  dram1_0_bss_phdr PT_LOAD;
   sysrom_B0_phdr PT_LOAD;
   sysrom_C0_phdr PT_LOAD;
   sysrom_D0_phdr PT_LOAD;
+  sysrom_D1_phdr PT_LOAD;
   sysrom_E0_phdr PT_LOAD;
-  sysrom_F0_phdr PT_LOAD;
-  sysrom_F1_phdr PT_LOAD;
-  sysrom_G0_phdr PT_LOAD;
   sysrom0_phdr PT_LOAD;
   sysram_B0_phdr PT_LOAD;
   sysram_B1_phdr PT_LOAD;
@@ -68,22 +64,18 @@ ENTRY(_ResetVector)
 /*  Memory boundary addresses:  */
 _memmap_mem_sysram_l_start = 0x4;
 _memmap_mem_sysram_l_end   = 0x10000000;
-_memmap_mem_dram1_start = 0x3ffc0000;
-_memmap_mem_dram1_end   = 0x3ffe0000;
-_memmap_mem_dram0_start = 0x3ffe0000;
-_memmap_mem_dram0_end   = 0x40000000;
+_memmap_mem_dram0_start = 0x3ff00000;
+_memmap_mem_dram0_end   = 0x3ff80000;
+_memmap_mem_dram1_start = 0x3ff80000;
+_memmap_mem_dram1_end   = 0x40000000;
 _memmap_mem_sysrom_B_start = 0x50000000;
 _memmap_mem_sysrom_B_end   = 0x50000300;
 _memmap_mem_sysrom_C_start = 0x50000300;
-_memmap_mem_sysrom_C_end   = 0x50000330;
-_memmap_mem_sysrom_D_start = 0x50000330;
-_memmap_mem_sysrom_D_end   = 0x500004b0;
-_memmap_mem_sysrom_E_start = 0x500004b0;
-_memmap_mem_sysrom_E_end   = 0x50001000;
-_memmap_mem_sysrom_F_start = 0x50001000;
-_memmap_mem_sysrom_F_end   = 0x50400000;
-_memmap_mem_sysrom_G_start = 0x50600000;
-_memmap_mem_sysrom_G_end   = 0x50600004;
+_memmap_mem_sysrom_C_end   = 0x50001000;
+_memmap_mem_sysrom_D_start = 0x50001000;
+_memmap_mem_sysrom_D_end   = 0x50400000;
+_memmap_mem_sysrom_E_start = 0x50600000;
+_memmap_mem_sysrom_E_end   = 0x50600004;
 _memmap_mem_sysrom_start = 0x50600008;
 _memmap_mem_sysrom_end   = 0x51000000;
 _memmap_mem_sysram_B_start = 0x60000000;
@@ -91,27 +83,23 @@ _memmap_mem_sysram_B_end   = 0x61000000;
 _memmap_mem_sysram_start = 0x61800000;
 _memmap_mem_sysram_end   = 0x64000000;
 _memmap_mem_sharedram_l_start = 0xf0000000;
-_memmap_mem_sharedram_l_end   = 0xfd000000;
+_memmap_mem_sharedram_l_end   = 0xf8000000;
 _memmap_mem_mmio_start = 0xfd000000;
 _memmap_mem_mmio_end   = 0xfe000000;
 
 /*  Memory segment boundary addresses:  */
-_memmap_seg_dram1_0_start = 0x3ffc0000;
-_memmap_seg_dram1_0_max   = 0x3ffe0000;
-_memmap_seg_dram0_0_start = 0x3ffe0000;
-_memmap_seg_dram0_0_max   = 0x40000000;
+_memmap_seg_dram0_0_start = 0x3ff00000;
+_memmap_seg_dram0_0_max   = 0x3ff80000;
+_memmap_seg_dram1_0_start = 0x3ff80000;
+_memmap_seg_dram1_0_max   = 0x40000000;
 _memmap_seg_sysrom_B0_start = 0x50000000;
 _memmap_seg_sysrom_B0_max   = 0x50000300;
-_memmap_seg_sysrom_C0_start = 0x50000300;
-_memmap_seg_sysrom_C0_max   = 0x50000330;
-_memmap_seg_sysrom_D0_start = 0x50000330;
-_memmap_seg_sysrom_D0_max   = 0x500004b0;
-_memmap_seg_sysrom_F0_start = 0x50001000;
-_memmap_seg_sysrom_F0_max   = 0x503ffd00;
-_memmap_seg_sysrom_F1_start = 0x503ffd00;
-_memmap_seg_sysrom_F1_max   = 0x50400000;
-_memmap_seg_sysrom_G0_start = 0x50600000;
-_memmap_seg_sysrom_G0_max   = 0x50600004;
+_memmap_seg_sysrom_D0_start = 0x50001000;
+_memmap_seg_sysrom_D0_max   = 0x503ffd00;
+_memmap_seg_sysrom_D1_start = 0x503ffd00;
+_memmap_seg_sysrom_D1_max   = 0x50400000;
+_memmap_seg_sysrom_E0_start = 0x50600000;
+_memmap_seg_sysrom_E0_max   = 0x50600004;
 _memmap_seg_sysram_B0_start = 0x60000000;
 _memmap_seg_sysram_B0_max   = 0x60000178;
 _memmap_seg_sysram_B1_start = 0x60000178;
@@ -170,7 +158,7 @@ SECTIONS
     _sysrom_rodata_start = ABSOLUTE(.);
     *(.sysrom.rodata)
     _sysrom_rodata_end = ABSOLUTE(.);
-  } >sysrom_F0_seg :sysrom_F0_phdr
+  } >sysrom_D0_seg :sysrom_D0_phdr
 
   .sysrom.text : ALIGN(4)
   {
@@ -178,15 +166,6 @@ SECTIONS
     *(.sysrom.literal .sysrom.text)
     . = ALIGN(4);
     _rom_store_table = .;
-    LONG(_dram1_rodata_start);
-    LONG(_dram1_rodata_end);
-    LONG(LOADADDR(.dram1.rodata));
-    LONG(_dram1_literal_start);
-    LONG(_dram1_literal_end);
-    LONG(LOADADDR(.dram1.literal));
-    LONG(_dram1_data_start);
-    LONG(_dram1_data_end);
-    LONG(LOADADDR(.dram1.data));
     LONG(_dram0_rodata_start);
     LONG(_dram0_rodata_end);
     LONG(LOADADDR(.dram0.rodata));
@@ -196,6 +175,15 @@ SECTIONS
     LONG(_dram0_data_start);
     LONG(_dram0_data_end);
     LONG(LOADADDR(.dram0.data));
+    LONG(_dram1_rodata_start);
+    LONG(_dram1_rodata_end);
+    LONG(LOADADDR(.dram1.rodata));
+    LONG(_dram1_literal_start);
+    LONG(_dram1_literal_end);
+    LONG(LOADADDR(.dram1.literal));
+    LONG(_dram1_data_start);
+    LONG(_dram1_data_end);
+    LONG(LOADADDR(.dram1.data));
     LONG(_WindowVectors_text_start);
     LONG(_WindowVectors_text_end);
     LONG(LOADADDR(.WindowVectors.text));
@@ -261,41 +249,10 @@ SECTIONS
     LONG(0);
     _rom_store = .;
     _sysrom_text_end = ABSOLUTE(.);
-    _memmap_seg_sysrom_F0_end = ALIGN(0x8);
-  } >sysrom_F0_seg :sysrom_F0_phdr
+    _memmap_seg_sysrom_D0_end = ALIGN(0x8);
+  } >sysrom_D0_seg :sysrom_D0_phdr
 
-  .dram1.rodata : AT(LOADADDR(.sysrom.text) + ((SIZEOF(.sysrom.text) + 3) & 0xFFFFFFFC)) ALIGN(4)
-  {
-    _dram1_rodata_start = ABSOLUTE(.);
-    *(.dram1.rodata)
-    _dram1_rodata_end = ABSOLUTE(.);
-  } >dram1_0_seg :dram1_0_phdr
-
-  .dram1.literal : AT(LOADADDR(.dram1.rodata) + (ADDR(.dram1.literal) - ADDR(.dram1.rodata))) ALIGN(4)
-  {
-    _dram1_literal_start = ABSOLUTE(.);
-    *(.dram1.literal)
-    _dram1_literal_end = ABSOLUTE(.);
-  } >dram1_0_seg :dram1_0_phdr
-
-  .dram1.data : AT(LOADADDR(.dram1.literal) + (ADDR(.dram1.data) - ADDR(.dram1.literal))) ALIGN(4)
-  {
-    _dram1_data_start = ABSOLUTE(.);
-    *(.dram1.data)
-    _dram1_data_end = ABSOLUTE(.);
-  } >dram1_0_seg :dram1_0_phdr
-
-  .dram1.bss (NOLOAD) : ALIGN(8)
-  {
-    . = ALIGN (8);
-    _dram1_bss_start = ABSOLUTE(.);
-    *(.dram1.bss)
-    . = ALIGN (8);
-    _dram1_bss_end = ABSOLUTE(.);
-    _memmap_seg_dram1_0_end = ALIGN(0x8);
-  } >dram1_0_seg :dram1_0_bss_phdr
-
-  .dram0.rodata : AT(LOADADDR(.dram1.data) + ((SIZEOF(.dram1.data) + 3) & 0xFFFFFFFC)) ALIGN(4)
+  .dram0.rodata : AT(LOADADDR(.sysrom.text) + ((SIZEOF(.sysrom.text) + 3) & 0xFFFFFFFC)) ALIGN(4)
   {
     _dram0_rodata_start = ABSOLUTE(.);
     *(.dram0.rodata)
@@ -326,6 +283,37 @@ SECTIONS
     _memmap_seg_dram0_0_end = ALIGN(0x8);
   } >dram0_0_seg :dram0_0_bss_phdr
 
+  .dram1.rodata : AT(LOADADDR(.dram0.data) + ((SIZEOF(.dram0.data) + 3) & 0xFFFFFFFC)) ALIGN(4)
+  {
+    _dram1_rodata_start = ABSOLUTE(.);
+    *(.dram1.rodata)
+    _dram1_rodata_end = ABSOLUTE(.);
+  } >dram1_0_seg :dram1_0_phdr
+
+  .dram1.literal : AT(LOADADDR(.dram1.rodata) + (ADDR(.dram1.literal) - ADDR(.dram1.rodata))) ALIGN(4)
+  {
+    _dram1_literal_start = ABSOLUTE(.);
+    *(.dram1.literal)
+    _dram1_literal_end = ABSOLUTE(.);
+  } >dram1_0_seg :dram1_0_phdr
+
+  .dram1.data : AT(LOADADDR(.dram1.literal) + (ADDR(.dram1.data) - ADDR(.dram1.literal))) ALIGN(4)
+  {
+    _dram1_data_start = ABSOLUTE(.);
+    *(.dram1.data)
+    _dram1_data_end = ABSOLUTE(.);
+  } >dram1_0_seg :dram1_0_phdr
+
+  .dram1.bss (NOLOAD) : ALIGN(8)
+  {
+    . = ALIGN (8);
+    _dram1_bss_start = ABSOLUTE(.);
+    *(.dram1.bss)
+    . = ALIGN (8);
+    _dram1_bss_end = ABSOLUTE(.);
+    _memmap_seg_dram1_0_end = ALIGN(0x8);
+  } >dram1_0_seg :dram1_0_bss_phdr
+
   .SharedResetVector.text : ALIGN(4)
   {
     _SharedResetVector_text_start = ABSOLUTE(.);
@@ -334,39 +322,23 @@ SECTIONS
     _memmap_seg_sysrom_B0_end = ALIGN(0x8);
   } >sysrom_B0_seg :sysrom_B0_phdr
 
-  .SharedMemoryExceptionVector.literal : ALIGN(4)
-  {
-    _SharedMemoryExceptionVector_literal_start = ABSOLUTE(.);
-    *(.SharedMemoryExceptionVector.literal)
-    _SharedMemoryExceptionVector_literal_end = ABSOLUTE(.);
-    _memmap_seg_sysrom_C0_end = ALIGN(0x8);
-  } >sysrom_C0_seg :sysrom_C0_phdr
-
-  .MemoryExceptionVector.text : ALIGN(4)
-  {
-    _MemoryExceptionVector_text_start = ABSOLUTE(.);
-    KEEP (*(.MemoryExceptionVector.text))
-    _MemoryExceptionVector_text_end = ABSOLUTE(.);
-    _memmap_seg_sysrom_D0_end = ALIGN(0x8);
-  } >sysrom_D0_seg :sysrom_D0_phdr
-
   .ResetVector.text : ALIGN(4)
   {
     _ResetVector_text_start = ABSOLUTE(.);
     *(.ResetVector.literal .ResetVector.text)
     _ResetVector_text_end = ABSOLUTE(.);
-    _memmap_seg_sysrom_F1_end = ALIGN(0x8);
-  } >sysrom_F1_seg :sysrom_F1_phdr
+    _memmap_seg_sysrom_D1_end = ALIGN(0x8);
+  } >sysrom_D1_seg :sysrom_D1_phdr
 
   .ResetTable.rodata : ALIGN(4)
   {
     _ResetTable_rodata_start = ABSOLUTE(.);
     *(.ResetTable.rodata)
     _ResetTable_rodata_end = ABSOLUTE(.);
-    _memmap_seg_sysrom_G0_end = ALIGN(0x8);
-  } >sysrom_G0_seg :sysrom_G0_phdr
+    _memmap_seg_sysrom_E0_end = ALIGN(0x8);
+  } >sysrom_E0_seg :sysrom_E0_phdr
 
-  .WindowVectors.text : AT(LOADADDR(.dram0.data) + ((SIZEOF(.dram0.data) + 3) & 0xFFFFFFFC)) ALIGN(4)
+  .WindowVectors.text : AT(LOADADDR(.dram1.data) + ((SIZEOF(.dram1.data) + 3) & 0xFFFFFFFC)) ALIGN(4)
   {
     _WindowVectors_text_start = ABSOLUTE(.);
     KEEP (*(.WindowVectors.text))
@@ -509,10 +481,10 @@ SECTIONS
     *(.gnu.version_d)
     . = ALIGN(4);		/* this table MUST be 4-byte aligned */
     _bss_table_start = ABSOLUTE(.);
-    LONG(_dram1_bss_start)
-    LONG(_dram1_bss_end)
     LONG(_dram0_bss_start)
     LONG(_dram0_bss_end)
+    LONG(_dram1_bss_start)
+    LONG(_dram1_bss_end)
     LONG(_bss_start)
     LONG(_bss_end)
     _bss_table_end = ABSOLUTE(.);
@@ -603,7 +575,7 @@ SECTIONS
   .rom_store_end LOADADDR(.data) + SIZEOF(.data) : 
   { 
     _rom_store_end = .;
-  } >sysrom_F0_seg
+  } >sysrom_D0_seg
   .debug  0 :  { *(.debug) }
   .line  0 :  { *(.line) }
   .debug_srcinfo  0 :  { *(.debug_srcinfo) }

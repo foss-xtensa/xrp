@@ -29,7 +29,7 @@
 /*#define XCORE_PRID			...*/
 #define XCORE_CORE_NAME			"P6_0"
 #define XCORE_CORE_NAME_ID		P6_0
-#define XCORE_CONFIG_NAME		"visionp6cnn_ao_exls"
-#define XCORE_CONFIG_NAME_ID		visionp6cnn_ao_exls
+#define XCORE_CONFIG_NAME		"XRC_Vision_P6_AO_noECC_bigmem"
+#define XCORE_CONFIG_NAME_ID		XRC_Vision_P6_AO_noECC_bigmem
 /*#define XCORE_CONFIG_INDEX		...*/
 

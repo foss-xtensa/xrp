@@ -1,6 +1,6 @@
-/* This linker script generated from xt-genldscripts.tpp for LSP /home/rajivr/MultiCoreWare/MP/sys-x86-linux/subsys.xtsys/package/cores/P6_0/xtensa-elf/lib/rtos-ramp */
+/* This linker script generated from xt-genldscripts.tpp for LSP /home/rajivr/MultiCoreWare/MP/emul/sys-x86-linux/subsys.xtsys/package/cores/P6_0/xtensa-elf/lib/rtos-ramp */
 /* Linker Script for ld -n */
-/*  Customer ID=256; Build=0x63880; Copyright (c) 2005-2016 Tensilica Inc.  */
+/*  Copyright (c) 2005-2016 Tensilica Inc.  */
 /*
  *  This is one of four linker scripts generated for general-purpose,
  *  and for use by RTOS in particular.
@@ -93,8 +93,8 @@
  */
 MEMORY
 {
-  dram1_0_seg :                       	org = 0x3FFC0000, len = 0x20000
-  dram0_0_seg :                       	org = 0x3FFE0000, len = 0x20000
+  dram0_0_seg :                       	org = 0x3FF00000, len = 0x80000
+  dram1_0_seg :                       	org = 0x3FF80000, len = 0x80000
   sysram_B0_seg :                     	org = 0x60000000, len = 0x178
   sysram_B1_seg :                     	org = 0x60000178, len = 0x8
   sysram_B2_seg :                     	org = 0x60000180, len = 0x38
@@ -135,24 +135,24 @@ ENTRY(_start)
 /*  Memory boundary addresses:  */
 _memmap_mem_sysram_l_start = 0x4;
 _memmap_mem_sysram_l_end   = 0x10000000;
-_memmap_mem_dram1_start = 0x3ffc0000;
-_memmap_mem_dram1_end   = 0x3ffe0000;
-_memmap_mem_dram0_start = 0x3ffe0000;
-_memmap_mem_dram0_end   = 0x40000000;
+_memmap_mem_dram0_start = 0x3ff00000;
+_memmap_mem_dram0_end   = 0x3ff80000;
+_memmap_mem_dram1_start = 0x3ff80000;
+_memmap_mem_dram1_end   = 0x40000000;
 _memmap_mem_sysram_B_start = 0x60000000;
 _memmap_mem_sysram_B_end   = 0x61000000;
 _memmap_mem_sysram_start = 0x61800000;
 _memmap_mem_sysram_end   = 0x64000000;
 _memmap_mem_sharedram_l_start = 0xf0000000;
-_memmap_mem_sharedram_l_end   = 0xfd000000;
+_memmap_mem_sharedram_l_end   = 0xf8000000;
 _memmap_mem_mmio_start = 0xfd000000;
 _memmap_mem_mmio_end   = 0xfe000000;
 
 /*  Memory segment boundary addresses:  */
-_memmap_seg_dram1_0_start = 0x3ffc0000;
-_memmap_seg_dram1_0_max   = 0x3ffe0000;
-_memmap_seg_dram0_0_start = 0x3ffe0000;
-_memmap_seg_dram0_0_max   = 0x40000000;
+_memmap_seg_dram0_0_start = 0x3ff00000;
+_memmap_seg_dram0_0_max   = 0x3ff80000;
+_memmap_seg_dram1_0_start = 0x3ff80000;
+_memmap_seg_dram1_0_max   = 0x40000000;
 _memmap_seg_sysram_B0_start = 0x60000000;
 _memmap_seg_sysram_B0_max   = 0x60000178;
 _memmap_seg_sysram_B1_start = 0x60000178;
@@ -274,10 +274,10 @@ SECTIONS
     *(.gnu.version_d)
     . = ALIGN(4);		/* this table MUST be 4-byte aligned */
     _bss_table_start = ABSOLUTE(.);
-    LONG(_dram1_bss_start)
-    LONG(_dram1_bss_end)
     LONG(_dram0_bss_start)
     LONG(_dram0_bss_end)
+    LONG(_dram1_bss_start)
+    LONG(_dram1_bss_end)
     LONG(_bss_start)
     LONG(_bss_end)
     _bss_table_end = ABSOLUTE(.);
@@ -306,15 +306,6 @@ SECTIONS
     *(.sysram.data)
     . = ALIGN(4);
     _rom_store_table = .;
-    LONG(_dram1_rodata_start);
-    LONG(_dram1_rodata_end);
-    LONG(LOADADDR(.dram1.rodata));
-    LONG(_dram1_literal_start);
-    LONG(_dram1_literal_end);
-    LONG(LOADADDR(.dram1.literal));
-    LONG(_dram1_data_start);
-    LONG(_dram1_data_end);
-    LONG(LOADADDR(.dram1.data));
     LONG(_dram0_rodata_start);
     LONG(_dram0_rodata_end);
     LONG(LOADADDR(.dram0.rodata));
@@ -324,6 +315,15 @@ SECTIONS
     LONG(_dram0_data_start);
     LONG(_dram0_data_end);
     LONG(LOADADDR(.dram0.data));
+    LONG(_dram1_rodata_start);
+    LONG(_dram1_rodata_end);
+    LONG(LOADADDR(.dram1.rodata));
+    LONG(_dram1_literal_start);
+    LONG(_dram1_literal_end);
+    LONG(LOADADDR(.dram1.literal));
+    LONG(_dram1_data_start);
+    LONG(_dram1_data_end);
+    LONG(LOADADDR(.dram1.data));
     LONG(_WindowVectors_text_start);
     LONG(_WindowVectors_text_end);
     LONG(LOADADDR(.WindowVectors.text));
@@ -372,38 +372,7 @@ SECTIONS
   PROVIDE(__stack = 0x61000000);
   _heap_sentry = 0x61000000;
 
-  .dram1.rodata : AT(LOADADDR(.data) + ((SIZEOF(.data) + 3) & 0xFFFFFFFC)) ALIGN(4)
-  {
-    _dram1_rodata_start = ABSOLUTE(.);
-    *(.dram1.rodata)
-    _dram1_rodata_end = ABSOLUTE(.);
-  } >dram1_0_seg :packed_phdr
-
-  .dram1.literal : AT(LOADADDR(.dram1.rodata) + (ADDR(.dram1.literal) - ADDR(.dram1.rodata))) ALIGN(4)
-  {
-    _dram1_literal_start = ABSOLUTE(.);
-    *(.dram1.literal)
-    _dram1_literal_end = ABSOLUTE(.);
-  } >dram1_0_seg :packed_phdr
-
-  .dram1.data : AT(LOADADDR(.dram1.literal) + (ADDR(.dram1.data) - ADDR(.dram1.literal))) ALIGN(4)
-  {
-    _dram1_data_start = ABSOLUTE(.);
-    *(.dram1.data)
-    _dram1_data_end = ABSOLUTE(.);
-  } >dram1_0_seg :packed_phdr
-
-  .dram1.bss (NOLOAD) : ALIGN(8)
-  {
-    . = ALIGN (8);
-    _dram1_bss_start = ABSOLUTE(.);
-    *(.dram1.bss)
-    . = ALIGN (8);
-    _dram1_bss_end = ABSOLUTE(.);
-    _memmap_seg_dram1_0_end = ALIGN(0x8);
-  } >dram1_0_seg :NONE
-
-  .dram0.rodata : AT(LOADADDR(.dram1.data) + ((SIZEOF(.dram1.data) + 3) & 0xFFFFFFFC)) ALIGN(4)
+  .dram0.rodata : AT(LOADADDR(.data) + ((SIZEOF(.data) + 3) & 0xFFFFFFFC)) ALIGN(4)
   {
     _dram0_rodata_start = ABSOLUTE(.);
     *(.dram0.rodata)
@@ -434,7 +403,38 @@ SECTIONS
     _memmap_seg_dram0_0_end = ALIGN(0x8);
   } >dram0_0_seg :NONE
 
-  .WindowVectors.text : AT(LOADADDR(.dram0.data) + ((SIZEOF(.dram0.data) + 3) & 0xFFFFFFFC)) ALIGN(4)
+  .dram1.rodata : AT(LOADADDR(.dram0.data) + ((SIZEOF(.dram0.data) + 3) & 0xFFFFFFFC)) ALIGN(4)
+  {
+    _dram1_rodata_start = ABSOLUTE(.);
+    *(.dram1.rodata)
+    _dram1_rodata_end = ABSOLUTE(.);
+  } >dram1_0_seg :packed_phdr
+
+  .dram1.literal : AT(LOADADDR(.dram1.rodata) + (ADDR(.dram1.literal) - ADDR(.dram1.rodata))) ALIGN(4)
+  {
+    _dram1_literal_start = ABSOLUTE(.);
+    *(.dram1.literal)
+    _dram1_literal_end = ABSOLUTE(.);
+  } >dram1_0_seg :packed_phdr
+
+  .dram1.data : AT(LOADADDR(.dram1.literal) + (ADDR(.dram1.data) - ADDR(.dram1.literal))) ALIGN(4)
+  {
+    _dram1_data_start = ABSOLUTE(.);
+    *(.dram1.data)
+    _dram1_data_end = ABSOLUTE(.);
+  } >dram1_0_seg :packed_phdr
+
+  .dram1.bss (NOLOAD) : ALIGN(8)
+  {
+    . = ALIGN (8);
+    _dram1_bss_start = ABSOLUTE(.);
+    *(.dram1.bss)
+    . = ALIGN (8);
+    _dram1_bss_end = ABSOLUTE(.);
+    _memmap_seg_dram1_0_end = ALIGN(0x8);
+  } >dram1_0_seg :NONE
+
+  .WindowVectors.text : AT(LOADADDR(.dram1.data) + ((SIZEOF(.dram1.data) + 3) & 0xFFFFFFFC)) ALIGN(4)
   {
     _WindowVectors_text_start = ABSOLUTE(.);
     KEEP (*(.WindowVectors.text))
