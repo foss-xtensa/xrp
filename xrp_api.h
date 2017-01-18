@@ -130,7 +130,6 @@ void xrp_release_buffer_group(struct xrp_buffer_group *group,
 /*
  * Add buffer to the group and get its index.
  * This adds a reference to the buffer.
- * A buffer may be added to at most one group.
  *
  * \param access_flags: granted access. User of the buffer on the DSP side
  * will be able to map it only for this type of access.
