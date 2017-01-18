@@ -1,0 +1,223 @@
+Transition from OpenVX-specific interafce.
+
+OpenVX-specific API has the following host-side functions:
+
+	int32_t apk2os_init(void);
+	int32_t apk2os_deinit(void);
+
+	int32_t apk2os_shared_alloc(size_t alignment, size_t size, void ** ptr);
+	int32_t apk2os_shared_free(void * ptr);
+
+	uint8_t * apk2os_share_buffer_with_core(uint32_t remote_core_id, uint8_t * ptr, uint32_t size);
+	uint8_t * apk2os_share_buffer_from_core(uint32_t remote_core_id, uint8_t * ptr, uint32_t size);
+
+	int32_t xvp_submit_sync(uint32_t cmd, cmd_data *cmd_data);
+
+XRP interface is described in the xrp_api.h
+
+
+There's the following correspondence between the OpenVX API and XRP API:
+
+- apk2os_init/apk2os_deinit correspond to xrp_open_device/xrp_release_device.
+- apk2os_shared_alloc/apk2os_shared_free correspond to xrp_create_buffer/xrp_release_buffer.
+- apk2os_share_buffer_with_core/apk2os_share_buffer_from_core don't have XRP
+  equivalents. They are replaced by a combination of buffer mapping/unmapping and
+  buffer_group functions.
+- xvp_submit_sync corresponds to xrp_run_command_sync.
+
+
+The following code transformation is needed on the host side to move from
+OpenVX API to XRP API:
+
+int32_t f_host_openvx_api(void)
+{
+	void *data = NULL;
+	void *in = NULL;
+	void *out = NULL;
+	cmd_data *cmd_data;
+	int32_t ret;
+
+	apk2os_init();
+
+	ret = apk2os_shared_alloc(1, sizeof(cmd_data), &data);
+	if (ret != status_success)
+		return ret;
+	ret = apk2os_shared_alloc(1, 4096, &in);
+	if (ret != status_success)
+		return ret;
+	ret = apk2os_shared_alloc(1, 4096, &out);
+	if (ret != status_success)
+		return ret;
+
+	if (argv[1])
+		strcpy(in, argv[1]);
+	else
+		strcpy(in, "world");
+	cmd_data = data;
+	cmd_data->hello.in = apk2os_share_buffer_with_core(0, in, 4096);
+	cmd_data->hello.out = apk2os_share_buffer_with_core(0, out, 4096);
+
+	ret = xvp_submit_sync(XVP_CMD_HELLO_WORLD, cmd_data);
+	if (ret == status_success) {
+		apk2os_share_buffer_from_core(0, out, 4096);
+		printf("%s\n", out);
+	}
+
+	return ret;
+}
+
+becomes 
+
+int32_t f_host_xrp_api(void)
+{
+	enum xrp_status status;
+	struct xrp_device *device = NULL;
+	struct xrp_queue *queue = NULL;
+	struct xrp_buffer *in = NULL;
+	struct xrp_buffer *out = NULL;
+	void *p;
+	struct xrp_buffer_group *group = xrp_create_buffer_group(NULL);
+	struct cmd_data {
+		int cmd;
+		struct hello {
+			int in;
+			int out;
+		} hello;
+	} cmd_data;
+
+	device = xrp_open_device(0, &status);
+
+	if (status != XRP_STATUS_SUCCESS)
+		goto cleanup;
+
+	queue = xrp_create_queue(device, &status);
+	if (status != XRP_STATUS_SUCCESS)
+		goto cleanup;
+
+	in = xrp_create_buffer(device, 4096, NULL, &status);
+	if (status != XRP_STATUS_SUCCESS)
+		goto cleanup;
+	out = xrp_create_buffer(device, 4096, NULL, &status);
+	if (status != XRP_STATUS_SUCCESS)
+		goto cleanup;
+
+	p = xrp_map_buffer(in, 0, 4096, XRP_READ_WRITE, &status);
+	if (status != XRP_STATUS_SUCCESS)
+		goto cleanup;
+
+	if (argv[1])
+		strcpy(p, argv[1]);
+	else
+		strcpy(p, "world");
+	xrp_unmap_buffer(in, p, NULL);
+
+	cmd_data.cmd = XVP_CMD_HELLO_WORLD;
+	cmd_data.hello.in = xrp_add_buffer_to_group(group, in, XRP_READ, NULL);
+	cmd_data.hello.out = xrp_add_buffer_to_group(group, out, XRP_WRITE, NULL);
+
+	ret = xrp_run_command_sync(queue, &cmd_data, sizeof(cmd_data),
+				   NULL, 0, group, &status);
+	if (status != XRP_STATUS_SUCCESS)
+		goto cleanup;
+
+	p = xrp_map_buffer(out, 0, 4096, XRP_READ, &status);
+	if (status != XRP_STATUS_SUCCESS)
+		goto cleanup;
+	printf("%s\n", p);
+	xrp_unmap_buffer(in, p, NULL);
+
+cleanup:
+	if (in)
+		xrp_release_buffer(in, NULL);
+	if (out)
+		xrp_release_buffer(out, NULL);
+	if (queue)
+		xrp_release_queue(queue, NULL);
+	if (device)
+		xrp_release_device(device, NULL);
+
+	return status;
+}
+
+
+And the following changes are required on the device side:
+
+int32_t apk2os_process_cmd(uint32_t * terminate)
+{
+	cmd_data *cmd_data;
+	uint32_t cmd = xvp_get_cmd(&cmd_data);
+	int32_t ret;
+
+	switch (cmd) {
+	case XVP_CMD_IDLE:
+		return status_success;
+
+	case XVP_CMD_HELLO_WORLD:
+		strcpy(cmd_data->hello.out, "hello ");
+		strcat(cmd_data->hello.out, cmd_data->hello.in);
+		ret = status_success;
+		break;
+
+	default:
+		dprintf("I: %s: unknown command\n", __func__);
+		ret = status_illegal_os_cmd;
+		break;
+	}
+	xvp_complete_cmd(ret);
+	return status_success;
+}
+
+becomes
+
+void xrp_run_command(const void *in_data, size_t in_data_size,
+		     void *out_data, size_t out_data_size,
+		     struct xrp_buffer_group *buffer_group,
+		     enum xrp_status *status)
+{
+	const struct cmd_data *cmd_data = in_data;
+	switch (cmd_data->cmd) {
+	case XVP_CMD_HELLO_WORLD:
+		{
+			struct xrp_buffer *in = NULL;
+			struct xrp_buffer *out = NULL;
+			char *p_in = NULL;
+			char *p_out = NULL;
+
+			in = xrp_get_buffer_from_group(buffer_group,
+						       cmd_data->hello.in,
+						       status);
+			if (*status != XRP_STATUS_SUCCESS)
+				goto hello_world_cleanup;
+
+			out = xrp_get_buffer_from_group(buffer_group,
+							cmd_data->hello.out,
+							status);
+			if (*status != XRP_STATUS_SUCCESS)
+				goto hello_world_cleanup;
+
+			p_in = xrp_map_buffer(in, 0, 4096, XRP_MAP_READ, status);
+			if (*status != XRP_STATUS_SUCCESS)
+				goto hello_world_cleanup;
+
+			p_out = xrp_map_buffer(out, 0, 4096, XRP_MAP_WRITE, status);
+			if (*status != XRP_STATUS_SUCCESS)
+				goto hello_world_cleanup;
+
+			strcpy(p_out, "hello ");
+			strcat(p_out, p_in);
+hello_world_cleanup:
+			if (p_in)
+				xrp_unmap_buffer(in, p_in, NULL);
+			if (p_out)
+				xrp_unmap_buffer(out, p_out, NULL);
+			if (in)
+				xrp_release_buffer(in, NULL);
+			if (out)
+				xrp_release_buffer(out, NULL);
+		}
+		break;
+	default:
+		*status = XRP_STATUS_FAILURE;
+		break;
+	}
+}
