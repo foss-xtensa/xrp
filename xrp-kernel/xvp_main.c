@@ -160,6 +160,16 @@ static int firmware_reboot = 1;
 module_param(firmware_reboot, int, 0644);
 MODULE_PARM_DESC(firmware_reboot, "Reboot firmware on command timeout.");
 
+enum {
+	LOOPBACK_NORMAL,	/* normal work mode */
+	LOOPBACK_NOIO,		/* don't communicate with FW, but still load it and control DSP */
+	LOOPBACK_NOMMIO,	/* don't comminicate with FW or use DSP MMIO, but still load the FW */
+	LOOPBACK_NOFIRMWARE,	/* don't communicate with FW or use DSP MMIO, don't load the FW */
+};
+static int loopback = 0;
+module_param(loopback, int, 0644);
+MODULE_PARM_DESC(loopback, "Don't use actual DSP, perform everything locally.");
+
 static unsigned xvp_nodeid;
 
 #define DRIVER_NAME "xrp"
@@ -1094,7 +1104,6 @@ static long xrp_ioctl_submit_sync(struct file *filp,
 	struct mm_struct *mm = current->mm;
 	struct xvp_file *xvp_file = filp->private_data;
 	struct xvp *xvp = xvp_file->xvp;
-	struct xrp_dsp_cmd __iomem *cmd = xvp->comm;
 
 	struct xrp_ioctl_queue ioctl_queue;
 	unsigned long in_data_phys = 0, out_data_phys = 0;
@@ -1232,67 +1241,70 @@ share_err:
 
 	mutex_lock(&xvp->comm_lock);
 
-	/* write to registers */
-	xrp_comm_write32(&cmd->in_data_size, ioctl_queue.in_data_size);
-	xrp_comm_write32(&cmd->out_data_size, ioctl_queue.out_data_size);
-	xrp_comm_write32(&cmd->buffer_size, n_buffers * sizeof(struct xrp_dsp_buffer));
+	if (loopback < LOOPBACK_NOIO) {
+		struct xrp_dsp_cmd __iomem *cmd = xvp->comm;
 
-	if (ioctl_queue.in_data_size > XRP_DSP_CMD_INLINE_DATA_SIZE)
-		xrp_comm_write32(&cmd->in_data_addr, in_data_phys);
-	else
-		xrp_comm_write(&cmd->in_data, in_data,
-			       ioctl_queue.in_data_size);
+		/* write to registers */
+		xrp_comm_write32(&cmd->in_data_size, ioctl_queue.in_data_size);
+		xrp_comm_write32(&cmd->out_data_size, ioctl_queue.out_data_size);
+		xrp_comm_write32(&cmd->buffer_size, n_buffers * sizeof(struct xrp_dsp_buffer));
 
-	if (ioctl_queue.out_data_size > XRP_DSP_CMD_INLINE_DATA_SIZE)
-		xrp_comm_write32(&cmd->out_data_addr, out_data_phys);
+		if (ioctl_queue.in_data_size > XRP_DSP_CMD_INLINE_DATA_SIZE)
+			xrp_comm_write32(&cmd->in_data_addr, in_data_phys);
+		else
+			xrp_comm_write(&cmd->in_data, in_data,
+				       ioctl_queue.in_data_size);
 
-	if (n_buffers > XRP_DSP_CMD_INLINE_BUFFER_COUNT)
-		xrp_comm_write32(&cmd->buffer_addr, dsp_buffer_phys);
-	else
-		xrp_comm_write(&cmd->buffer_data, dsp_buffer,
-			       n_buffers * sizeof(struct xrp_dsp_buffer));
+		if (ioctl_queue.out_data_size > XRP_DSP_CMD_INLINE_DATA_SIZE)
+			xrp_comm_write32(&cmd->out_data_addr, out_data_phys);
+
+		if (n_buffers > XRP_DSP_CMD_INLINE_BUFFER_COUNT)
+			xrp_comm_write32(&cmd->buffer_addr, dsp_buffer_phys);
+		else
+			xrp_comm_write(&cmd->buffer_data, dsp_buffer,
+				       n_buffers * sizeof(struct xrp_dsp_buffer));
 
 #ifdef DEBUG
-	{
-		struct xrp_dsp_cmd dsp_cmd;
-		xrp_comm_read(cmd, &dsp_cmd, sizeof(dsp_cmd));
-		pr_debug("%s: cmd for DSP: %*ph\n",
-			 __func__, sizeof(dsp_cmd), &dsp_cmd);
-	}
+		{
+			struct xrp_dsp_cmd dsp_cmd;
+			xrp_comm_read(cmd, &dsp_cmd, sizeof(dsp_cmd));
+			pr_debug("%s: cmd for DSP: %*ph\n",
+				 __func__, sizeof(dsp_cmd), &dsp_cmd);
+		}
 #endif
 
-	wmb();
-	/* update flags */
-	xrp_comm_write32(&cmd->flags,
-			 (ioctl_queue.flags & ~XRP_DSP_CMD_FLAG_RESPONSE_VALID) |
-			 XRP_DSP_CMD_FLAG_REQUEST_VALID);
+		wmb();
+		/* update flags */
+		xrp_comm_write32(&cmd->flags,
+				 (ioctl_queue.flags & ~XRP_DSP_CMD_FLAG_RESPONSE_VALID) |
+				 XRP_DSP_CMD_FLAG_REQUEST_VALID);
 
-	xrp_send_device_irq(xvp);
+		xrp_send_device_irq(xvp);
 
-	if (xvp->host_irq_mode != XRP_IRQ_NONE) {
-		ret = xvp_complete_cmd_irq(&xvp->completion,
-					   xrp_cmd_complete, xvp);
-	} else {
-		ret = xvp_complete_cmd_poll(xrp_cmd_complete, xvp);
+		if (xvp->host_irq_mode != XRP_IRQ_NONE) {
+			ret = xvp_complete_cmd_irq(&xvp->completion,
+						   xrp_cmd_complete, xvp);
+		} else {
+			ret = xvp_complete_cmd_poll(xrp_cmd_complete, xvp);
+		}
+
+		/* copy back inline data */
+		if (ret == 0) {
+			if (ioctl_queue.out_data_size <= XRP_DSP_CMD_INLINE_DATA_SIZE)
+				xrp_comm_read(&cmd->out_data, out_data,
+					      ioctl_queue.out_data_size);
+			if (n_buffers <= XRP_DSP_CMD_INLINE_BUFFER_COUNT)
+				xrp_comm_read(&cmd->buffer_data, dsp_buffer,
+					      n_buffers * sizeof(struct xrp_dsp_buffer));
+		} else if (ret == -EBUSY && firmware_reboot) {
+			int rc;
+
+			pr_debug("%s: restarting firmware...\n", __func__);
+			rc = xvp_boot_firmware(xvp);
+			if (rc < 0)
+				ret = rc;
+		}
 	}
-
-	/* copy back inline data */
-	if (ret == 0) {
-		if (ioctl_queue.out_data_size <= XRP_DSP_CMD_INLINE_DATA_SIZE)
-			xrp_comm_read(&cmd->out_data, out_data,
-				      ioctl_queue.out_data_size);
-		if (n_buffers <= XRP_DSP_CMD_INLINE_BUFFER_COUNT)
-			xrp_comm_read(&cmd->buffer_data, dsp_buffer,
-				      n_buffers * sizeof(struct xrp_dsp_buffer));
-	} else if (ret == -EBUSY && firmware_reboot) {
-		int rc;
-
-		pr_debug("%s: restarting firmware...\n", __func__);
-		rc = xvp_boot_firmware(xvp);
-		if (rc < 0)
-			ret = rc;
-	}
-
 	mutex_unlock(&xvp->comm_lock);
 
 	if (ioctl_queue.in_data_size > XRP_DSP_CMD_INLINE_DATA_SIZE)
@@ -1436,17 +1448,20 @@ static int xvp_close(struct inode *inode, struct file *filp)
 
 static inline void xvp_reset_dsp(struct xvp *xvp)
 {
-	xvp->hw_control->reset(xvp);
+	if (loopback < LOOPBACK_NOMMIO)
+		xvp->hw_control->reset(xvp);
 }
 
 static inline void xvp_halt_dsp(struct xvp *xvp)
 {
-	xvp->hw_control->halt(xvp);
+	if (loopback < LOOPBACK_NOMMIO)
+		xvp->hw_control->halt(xvp);
 }
 
 static inline void xvp_release_dsp(struct xvp *xvp)
 {
-	xvp->hw_control->release(xvp);
+	if (loopback < LOOPBACK_NOMMIO)
+		xvp->hw_control->release(xvp);
 }
 
 static phys_addr_t xvp_translate_addr(struct xvp *xvp, Elf32_Phdr *phdr)
@@ -1773,19 +1788,26 @@ static int xvp_boot_firmware(struct xvp *xvp)
 	int ret;
 	struct xrp_dsp_sync __iomem *shared_sync = xvp->comm;
 
-	ret = xvp_request_firmware(xvp);
-	if (ret < 0)
-		return ret;
+	if (loopback < LOOPBACK_NOFIRMWARE) {
+		ret = xvp_request_firmware(xvp);
+		if (ret < 0)
+			return ret;
+	}
 
-	xrp_comm_write32(&shared_sync->sync, XRP_DSP_SYNC_IDLE);
-	mb();
+	if (loopback < LOOPBACK_NOIO) {
+		xrp_comm_write32(&shared_sync->sync, XRP_DSP_SYNC_IDLE);
+		mb();
+	}
 	xvp_release_dsp(xvp);
 
-	ret = xvp_synchronize(xvp);
-	if (ret < 0) {
-		xvp_halt_dsp(xvp);
-		pr_err("%s: couldn't synchronize with IVP core\n", __func__);
-		return ret;
+	if (loopback < LOOPBACK_NOIO) {
+		ret = xvp_synchronize(xvp);
+		if (ret < 0) {
+			xvp_halt_dsp(xvp);
+			pr_err("%s: couldn't synchronize with IVP core\n",
+			       __func__);
+			return ret;
+		}
 	}
 	return 0;
 }
