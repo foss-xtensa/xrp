@@ -1352,13 +1352,9 @@ share_err:
 
 static long xvp_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 {
-	struct vm_area_struct *vma;
 	long retval;
 
 	pr_debug("%s: %x\n", __func__, cmd);
-
-	vma  = filp->private_data;
-	retval = 0;
 
 	switch(cmd){
 	case XRP_IOCTL_ALLOC:
@@ -1377,7 +1373,8 @@ static long xvp_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		break;
 
 	default:
-		return -ENOTTY;
+		retval = -EINVAL;
+		break;
 	}
 	return retval;
 }
@@ -1816,9 +1813,6 @@ static const struct file_operations xvp_fops = {
 	.owner  = THIS_MODULE,
 	.llseek = no_llseek,
 	.unlocked_ioctl = xvp_ioctl,
-#ifdef CONFIG_COMPAT
-	.compat_ioctl = xvp_compat_ioctl,
-#endif
 	.mmap = xvp_mmap,
 	.open = xvp_open,
 	.release = xvp_close,
