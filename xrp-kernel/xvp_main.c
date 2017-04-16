@@ -46,7 +46,6 @@
 #include <asm/mman.h>
 #include <asm/uaccess.h>
 #include "xrp_kernel_defs.h"
-#include "xvp_defs.h"
 #include "xrp_kernel_dsp_interface.h"
 
 #define DEFAULT_FIRMWARE_NAME "xvp.elf"
