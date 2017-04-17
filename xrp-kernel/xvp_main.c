@@ -59,12 +59,6 @@ MODULE_FIRMWARE(DEFAULT_FIRMWARE_NAME);
 #define XRP_REG_RESET		(0x04)
 #define XRP_REG_RUNSTALL	(0x08)
 
-enum xrp_access_flags {
-	XRP_READ		= 0x1,
-	XRP_WRITE		= 0x2,
-	XRP_READ_WRITE		= 0x3,
-};
-
 struct xvp;
 struct xvp_file;
 
@@ -884,9 +878,9 @@ static long xrp_share_kernel(struct file *filp,
 	pr_debug("%s: mapping = %p, mapping->type = %d\n",
 		 __func__, mapping, mapping->type);
 
-	if (flags & XRP_WRITE) {
+	if (flags & XRP_FLAG_WRITE) {
 		xvp_flush_cache((void *)virt, phys, size);
-	} else if (flags & XRP_READ) {
+	} else if (flags & XRP_FLAG_READ) {
 		xvp_clean_cache((void *)virt, phys, size);
 	}
 	return 0;
@@ -998,9 +992,9 @@ static long __xrp_share_block(struct file *filp,
 	pr_debug("%s: mapping = %p, mapping->type = %d\n",
 		 __func__, mapping, mapping->type);
 
-	if (flags & XRP_WRITE) {
+	if (flags & XRP_FLAG_WRITE) {
 		xvp_flush_cache((void *)virt, phys, size);
-	} else if (flags & XRP_READ) {
+	} else if (flags & XRP_FLAG_READ) {
 		xvp_clean_cache((void *)virt, phys, size);
 	}
 	return 0;
@@ -1020,7 +1014,7 @@ static long __xrp_unshare_block(struct file *filp, struct xrp_mapping *mapping,
 		break;
 
 	case XRP_MAPPING_ALIEN:
-		if ((flags & XRP_WRITE) &&
+		if ((flags & XRP_FLAG_WRITE) &&
 		    mapping->xvp_alien_mapping->type == ALIEN_COPY) {
 			struct xvp_alien_mapping *alien_mapping =
 				mapping->xvp_alien_mapping;
@@ -1160,7 +1154,7 @@ static long xrp_ioctl_submit_sync(struct file *filp,
 	if (ioctl_queue.in_data_size > XRP_DSP_CMD_INLINE_DATA_SIZE) {
 		ret = __xrp_share_block(filp, ioctl_queue.in_data_addr,
 					ioctl_queue.in_data_size,
-					XRP_READ, &in_data_phys,
+					XRP_FLAG_READ, &in_data_phys,
 					&in_data_mapping);
 		if(ret < 0) {
 			pr_debug("%s: in_data could not be shared\n",
@@ -1181,7 +1175,7 @@ static long xrp_ioctl_submit_sync(struct file *filp,
 	if (ioctl_queue.out_data_size > XRP_DSP_CMD_INLINE_DATA_SIZE) {
 		ret = __xrp_share_block(filp, ioctl_queue.out_data_addr,
 					ioctl_queue.out_data_size,
-					XRP_WRITE, &out_data_phys,
+					XRP_FLAG_WRITE, &out_data_phys,
 					&out_data_mapping);
 		if (ret < 0) {
 			pr_debug("%s: out_data could not be shared\n",
@@ -1201,7 +1195,7 @@ static long xrp_ioctl_submit_sync(struct file *filp,
 			ret = -EFAULT;
 			goto share_err;
 		}
-		if (ioctl_buffer.flags & (XRP_READ | XRP_WRITE)) {
+		if (ioctl_buffer.flags & XRP_FLAG_READ_WRITE) {
 			ret = __xrp_share_block(filp, ioctl_buffer.addr,
 						ioctl_buffer.size,
 						ioctl_buffer.flags,
@@ -1224,7 +1218,7 @@ static long xrp_ioctl_submit_sync(struct file *filp,
 	if (n_buffers > XRP_DSP_CMD_INLINE_BUFFER_COUNT) {
 		ret = xrp_share_kernel(filp, (unsigned long)dsp_buffer,
 				       n_buffers * sizeof(*dsp_buffer),
-				       XRP_READ | XRP_WRITE, &dsp_buffer_phys,
+				       XRP_FLAG_READ_WRITE, &dsp_buffer_phys,
 				       &dsp_buffer_mapping);
 		if(ret < 0) {
 			pr_debug("%s: buffer descriptors could not be shared\n",
@@ -1324,9 +1318,10 @@ share_err:
 	mutex_unlock(&xvp->comm_lock);
 
 	if (ioctl_queue.in_data_size > XRP_DSP_CMD_INLINE_DATA_SIZE)
-		__xrp_unshare_block(filp, &in_data_mapping, XRP_READ);
+		__xrp_unshare_block(filp, &in_data_mapping, XRP_FLAG_READ);
 	if (ioctl_queue.out_data_size > XRP_DSP_CMD_INLINE_DATA_SIZE) {
-		long rc = __xrp_unshare_block(filp, &out_data_mapping, XRP_WRITE);
+		long rc = __xrp_unshare_block(filp, &out_data_mapping,
+					      XRP_FLAG_WRITE);
 
 		if (rc < 0) {
 			pr_debug("%s: out_data could not be unshared\n",
@@ -1344,7 +1339,7 @@ share_err:
 	}
 	if (n_buffers > XRP_DSP_CMD_INLINE_BUFFER_COUNT)
 		__xrp_unshare_block(filp, &dsp_buffer_mapping,
-				    XRP_READ | XRP_WRITE);
+				    XRP_FLAG_READ_WRITE);
 
 	for (i = 0; i < n_buffers; ++i) {
 		long rc = __xrp_unshare_block(filp, buffer_mapping + i,

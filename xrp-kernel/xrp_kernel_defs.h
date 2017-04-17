@@ -13,6 +13,12 @@ struct xrp_ioctl_alloc {
 	__u64 addr;
 };
 
+enum {
+	XRP_FLAG_READ = 0x1,
+	XRP_FLAG_WRITE = 0x2,
+	XRP_FLAG_READ_WRITE = 0x3,
+};
+
 struct xrp_ioctl_buffer {
 	__u32 flags;
 	__u32 size;
