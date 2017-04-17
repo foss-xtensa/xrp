@@ -949,7 +949,7 @@ static long __xrp_share_block(struct file *filp,
 		mapping->type = XRP_MAPPING_NATIVE;
 		mapping->xvp_allocation = xvp_allocation;
 		xvp_allocation_get(mapping->xvp_allocation);
-		phys = xvp_allocation->start +
+		phys = xvp_file->xvp->pmem + (vma->vm_pgoff << PAGE_SHIFT) +
 			virt - vma->vm_start;
 	} else {
 		struct xvp_alien_mapping *alien_mapping = NULL;
