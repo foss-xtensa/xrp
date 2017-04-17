@@ -1194,22 +1194,24 @@ static long xrp_ioctl_submit_sync(struct file *filp,
 
 	for (i = 0; i < n_buffers; ++i) {
 		struct xrp_ioctl_buffer ioctl_buffer;
-		unsigned long buffer_phys;
+		unsigned long buffer_phys = ~0ul;
 
 		if (copy_from_user(&ioctl_buffer, buffer + i,
 				   sizeof(ioctl_buffer))) {
 			ret = -EFAULT;
 			goto share_err;
 		}
-		ret = __xrp_share_block(filp, ioctl_buffer.addr,
-					ioctl_buffer.size,
-					ioctl_buffer.flags,
-					&buffer_phys,
-					buffer_mapping + i);
-		if (ret < 0) {
-			pr_debug("%s: buffer %d could not be shared\n",
-				 __func__, i);
-			goto share_err;
+		if (ioctl_buffer.flags & (XRP_READ | XRP_WRITE)) {
+			ret = __xrp_share_block(filp, ioctl_buffer.addr,
+						ioctl_buffer.size,
+						ioctl_buffer.flags,
+						&buffer_phys,
+						buffer_mapping + i);
+			if (ret < 0) {
+				pr_debug("%s: buffer %d could not be shared\n",
+					 __func__, i);
+				goto share_err;
+			}
 		}
 
 		dsp_buffer[i] = (struct xrp_dsp_buffer){
