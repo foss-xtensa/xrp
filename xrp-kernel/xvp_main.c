@@ -871,6 +871,27 @@ static unsigned xvp_get_region_vma_count(unsigned long virt,
 	return 0;
 }
 
+static long xrp_share_kernel(struct file *filp,
+			     unsigned long virt, unsigned long size,
+			     unsigned long flags, unsigned long *paddr,
+			     struct xrp_mapping *mapping)
+{
+	unsigned long phys = __pa(virt);
+
+	mapping->type = XRP_MAPPING_KERNEL;
+	*paddr = phys;
+	pr_debug("%s: sharing kernel-only buffer: 0x%08lx\n", __func__, phys);
+	pr_debug("%s: mapping = %p, mapping->type = %d\n",
+		 __func__, mapping, mapping->type);
+
+	if (flags & XRP_WRITE) {
+		xvp_flush_cache((void *)virt, phys, size);
+	} else if (flags & XRP_READ) {
+		xvp_clean_cache((void *)virt, phys, size);
+	}
+	return 0;
+}
+
 /* Share blocks of memory, from host to IVP or back.
  *
  * When sharing to IVP return physical addresses in paddr.
@@ -885,100 +906,94 @@ static long __xrp_share_block(struct file *filp,
 			      struct xrp_mapping *mapping)
 {
 	unsigned long phys = ~0ul;
+	struct xvp_file *xvp_file = filp->private_data;
+	struct mm_struct *mm = current->mm;
+	struct vm_area_struct *vma = find_vma(mm, virt);
 
-	if (virt >= TASK_SIZE) {
-		mapping->type = XRP_MAPPING_KERNEL;
-		phys = __pa(virt);
-		pr_debug("%s: sharing kernel-only buffer: 0x%08lx\n", __func__, phys);
-	} else {
-		struct xvp_file *xvp_file = filp->private_data;
-		struct mm_struct *mm = current->mm;
-		struct vm_area_struct *vma = find_vma(mm, virt);
-
-		if (!vma) {
-			pr_debug("%s: no vma for vaddr/size = 0x%08lx/0x%08lx\n",
-				 __func__, virt, size);
-			return -EINVAL;
-		}
-		/*
-		 * Region requested for sharing should be within single VMA.
-		 * That's true for the majority of cases, but sometimes (e.g.
-		 * sharing buffer in the beginning of .bss which shares a
-		 * file-mapped page with .data, followed by anonymous page)
-		 * region will cross multiple VMAs. Support it in the simplest
-		 * way possible: start with get_user_pages and use shadow copy
-		 * if that fails.
-		 */
-		switch (xvp_get_region_vma_count(virt, size, vma)) {
-		case 0:
-			pr_debug("%s: bad vma for vaddr/size = 0x%08lx/0x%08lx\n",
-				 __func__, virt, size);
-			pr_debug("%s: vma->vm_start = 0x%08lx, vma->vm_end = 0x%08lx\n",
-				 __func__, vma->vm_start, vma->vm_end);
-			return -EINVAL;
-		case 1:
-			break;
-		default:
-			pr_debug("%s: multiple vmas cover vaddr/size = 0x%08lx/0x%08lx\n",
-				 __func__, virt, size);
-			vma = NULL;
-			break;
-		}
-		/*
-		 * And it need to be allocated from the same file descriptor.
-		 */
-		if (vma && vma->vm_file == filp) {
-			struct xvp_allocation *xvp_allocation =
-				vma->vm_private_data;
-
-			mapping->type = XRP_MAPPING_NATIVE;
-			mapping->xvp_allocation = xvp_allocation;
-			xvp_allocation_get(mapping->xvp_allocation);
-			phys = xvp_allocation->start +
-				virt - vma->vm_start;
-		} else {
-			struct xvp_alien_mapping *alien_mapping = NULL;
-			long rc;
-
-			/* Otherwise this is alien allocation. */
-			pr_debug("%s: non-XVP allocation at 0x%08lx\n",
-				 __func__, virt);
-
-			if (vma && vma->vm_flags & (VM_IO | VM_PFNMAP)) {
-				rc = xvp_pfn_map_virt_to_phys(xvp_file, vma,
-							      virt, size,
-							      &phys,
-							      &alien_mapping);
-			} else {
-				up_read(&mm->mmap_sem);
-				rc = xvp_gup_virt_to_phys(xvp_file, virt,
-							  size, &phys,
-							  &alien_mapping);
-				down_read(&mm->mmap_sem);
-			}
-
-			/*
-			 * If we couldn't share try to make a shadow copy.
-			 */
-			if (rc < 0)
-				rc = xvp_copy_virt_to_phys(xvp_file, virt,
-							   size, &phys,
-							   &alien_mapping);
-
-			/* We couldn't share it. Fail the request. */
-			if (rc < 0) {
-				pr_debug("%s: couldn't map virt to phys\n",
-					 __func__);
-				return -EINVAL;
-			}
-
-			phys = alien_mapping->paddr +
-				virt - alien_mapping->vaddr;
-
-			mapping->type = XRP_MAPPING_ALIEN;
-			mapping->xvp_alien_mapping = alien_mapping;
-		}
+	if (!vma) {
+		pr_debug("%s: no vma for vaddr/size = 0x%08lx/0x%08lx\n",
+			 __func__, virt, size);
+		return -EINVAL;
 	}
+	/*
+	 * Region requested for sharing should be within single VMA.
+	 * That's true for the majority of cases, but sometimes (e.g.
+	 * sharing buffer in the beginning of .bss which shares a
+	 * file-mapped page with .data, followed by anonymous page)
+	 * region will cross multiple VMAs. Support it in the simplest
+	 * way possible: start with get_user_pages and use shadow copy
+	 * if that fails.
+	 */
+	switch (xvp_get_region_vma_count(virt, size, vma)) {
+	case 0:
+		pr_debug("%s: bad vma for vaddr/size = 0x%08lx/0x%08lx\n",
+			 __func__, virt, size);
+		pr_debug("%s: vma->vm_start = 0x%08lx, vma->vm_end = 0x%08lx\n",
+			 __func__, vma->vm_start, vma->vm_end);
+		return -EINVAL;
+	case 1:
+		break;
+	default:
+		pr_debug("%s: multiple vmas cover vaddr/size = 0x%08lx/0x%08lx\n",
+			 __func__, virt, size);
+		vma = NULL;
+		break;
+	}
+	/*
+	 * And it need to be allocated from the same file descriptor.
+	 */
+	if (vma && vma->vm_file == filp) {
+		struct xvp_allocation *xvp_allocation =
+			vma->vm_private_data;
+
+		mapping->type = XRP_MAPPING_NATIVE;
+		mapping->xvp_allocation = xvp_allocation;
+		xvp_allocation_get(mapping->xvp_allocation);
+		phys = xvp_allocation->start +
+			virt - vma->vm_start;
+	} else {
+		struct xvp_alien_mapping *alien_mapping = NULL;
+		long rc;
+
+		/* Otherwise this is alien allocation. */
+		pr_debug("%s: non-XVP allocation at 0x%08lx\n",
+			 __func__, virt);
+
+		if (vma && vma->vm_flags & (VM_IO | VM_PFNMAP)) {
+			rc = xvp_pfn_map_virt_to_phys(xvp_file, vma,
+						      virt, size,
+						      &phys,
+						      &alien_mapping);
+		} else {
+			up_read(&mm->mmap_sem);
+			rc = xvp_gup_virt_to_phys(xvp_file, virt,
+						  size, &phys,
+						  &alien_mapping);
+			down_read(&mm->mmap_sem);
+		}
+
+		/*
+		 * If we couldn't share try to make a shadow copy.
+		 */
+		if (rc < 0)
+			rc = xvp_copy_virt_to_phys(xvp_file, virt,
+						   size, &phys,
+						   &alien_mapping);
+
+		/* We couldn't share it. Fail the request. */
+		if (rc < 0) {
+			pr_debug("%s: couldn't map virt to phys\n",
+				 __func__);
+			return -EINVAL;
+		}
+
+		phys = alien_mapping->paddr +
+			virt - alien_mapping->vaddr;
+
+		mapping->type = XRP_MAPPING_ALIEN;
+		mapping->xvp_alien_mapping = alien_mapping;
+	}
+
 	*paddr = phys;
 	pr_debug("%s: mapping = %p, mapping->type = %d\n",
 		 __func__, mapping, mapping->type);
@@ -1205,10 +1220,10 @@ static long xrp_ioctl_submit_sync(struct file *filp,
 	}
 
 	if (n_buffers > XRP_DSP_CMD_INLINE_BUFFER_COUNT) {
-		ret = __xrp_share_block(filp, (unsigned long)dsp_buffer,
-					n_buffers * sizeof(*dsp_buffer),
-					XRP_READ | XRP_WRITE, &dsp_buffer_phys,
-					&dsp_buffer_mapping);
+		ret = xrp_share_kernel(filp, (unsigned long)dsp_buffer,
+				       n_buffers * sizeof(*dsp_buffer),
+				       XRP_READ | XRP_WRITE, &dsp_buffer_phys,
+				       &dsp_buffer_mapping);
 		if(ret < 0) {
 			pr_debug("%s: buffer descriptors could not be shared\n",
 				 __func__);
