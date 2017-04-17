@@ -558,7 +558,7 @@ static void xvp_allocation_queue(struct xvp_file *xvp_file,
 }
 
 static struct xvp_allocation *xvp_allocation_dequeue(struct xvp_file *xvp_file,
-						     phys_addr_t paddr)
+						     phys_addr_t paddr, u32 size)
 {
 	struct xvp_allocation **pcur;
 	struct xvp_allocation *cur;
@@ -567,7 +567,7 @@ static struct xvp_allocation *xvp_allocation_dequeue(struct xvp_file *xvp_file,
 
 	for (pcur = &xvp_file->busy_list; (cur = *pcur); pcur = &((*pcur)->next)) {
 		pr_debug("%s: %pap / %pap x %d\n", __func__, &paddr, &cur->start, cur->size);
-		if (paddr >= cur->start && paddr < cur->start + cur->size) {
+		if (paddr >= cur->start && paddr + size - cur->start <= cur->size) {
 			*pcur = cur->next;
 			break;
 		}
@@ -1403,14 +1403,20 @@ static int xvp_mmap(struct file *filp, struct vm_area_struct *vma)
 	struct xvp_allocation *xvp_allocation;
 
 	pr_debug("%s\n", __func__);
-	err = remap_pfn_range(vma, vma->vm_start, pfn,
-			      vma->vm_end - vma->vm_start,
-			      vma->vm_page_prot);
+	xvp_allocation = xvp_allocation_dequeue(filp->private_data,
+						pfn << PAGE_SHIFT,
+						vma->vm_end - vma->vm_start);
+	if (xvp_allocation) {
+		err = remap_pfn_range(vma, vma->vm_start, pfn,
+				      vma->vm_end - vma->vm_start,
+				      vma->vm_page_prot);
 
-	xvp_allocation = xvp_allocation_dequeue(filp->private_data, pfn << PAGE_SHIFT);
 
-	vma->vm_private_data = xvp_allocation;
-	vma->vm_ops = &xvp_vm_ops;
+		vma->vm_private_data = xvp_allocation;
+		vma->vm_ops = &xvp_vm_ops;
+	} else {
+		err = -EINVAL;
+	}
 
 	return err;
 }
