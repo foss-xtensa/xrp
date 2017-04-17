@@ -1,4 +1,4 @@
-TESTS := test-map
+TESTS := test-map test-queue
 
 all: $(TESTS)
 clean:
