@@ -687,11 +687,11 @@ static void xvp_alien_mapping_destroy(struct xvp_alien_mapping *alien_mapping)
 	kfree(alien_mapping);
 }
 
-static long xvp_pfn_map_virt_to_phys(struct xvp_file *xvp_file,
-				     struct vm_area_struct *vma,
-				     unsigned long vaddr, unsigned long size,
-				     unsigned long *paddr,
-				     struct xvp_alien_mapping **mapping)
+static long xvp_pfn_virt_to_phys(struct xvp_file *xvp_file,
+				 struct vm_area_struct *vma,
+				 unsigned long vaddr, unsigned long size,
+				 unsigned long *paddr,
+				 struct xvp_alien_mapping **mapping)
 {
 	int i;
 	int ret;
@@ -954,10 +954,10 @@ static long __xrp_share_block(struct file *filp,
 			 __func__, virt);
 
 		if (vma && vma->vm_flags & (VM_IO | VM_PFNMAP)) {
-			rc = xvp_pfn_map_virt_to_phys(xvp_file, vma,
-						      virt, size,
-						      &phys,
-						      &alien_mapping);
+			rc = xvp_pfn_virt_to_phys(xvp_file, vma,
+						  virt, size,
+						  &phys,
+						  &alien_mapping);
 		} else {
 			up_read(&mm->mmap_sem);
 			rc = xvp_gup_virt_to_phys(xvp_file, virt,
