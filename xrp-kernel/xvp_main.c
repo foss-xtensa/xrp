@@ -796,6 +796,7 @@ out:
 }
 
 static long xvp_copy_virt_to_phys(struct xvp_file *xvp_file,
+				  unsigned long flags,
 				  unsigned long vaddr, unsigned long size,
 				  unsigned long *paddr,
 				  struct xvp_alien_mapping **mapping)
@@ -814,9 +815,13 @@ static long xvp_copy_virt_to_phys(struct xvp_file *xvp_file,
 	if (p < allocation)
 		p += align;
 
-	if (copy_from_user(p, (void __user *)vaddr, size)) {
-		kfree(allocation);
-		return -EFAULT;
+	if (flags & XRP_FLAG_READ) {
+		if (copy_from_user(p, (void __user *)vaddr, size)) {
+			kfree(allocation);
+			return -EFAULT;
+		}
+	} else {
+		memset(p, 0, size);
 	}
 
 	phys = __pa(p);
@@ -970,8 +975,8 @@ static long __xrp_share_block(struct file *filp,
 		 * If we couldn't share try to make a shadow copy.
 		 */
 		if (rc < 0)
-			rc = xvp_copy_virt_to_phys(xvp_file, virt,
-						   size, &phys,
+			rc = xvp_copy_virt_to_phys(xvp_file, flags,
+						   virt, size, &phys,
 						   &alien_mapping);
 
 		/* We couldn't share it. Fail the request. */
