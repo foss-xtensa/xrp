@@ -801,21 +801,21 @@ static long xvp_copy_virt_to_phys(struct xvp_file *xvp_file,
 				  struct xvp_alien_mapping **mapping)
 {
 	unsigned long phys;
-	unsigned long offset = vaddr & (PAGE_SIZE - 1);
-	void *allocation = kmalloc(size + (offset ? PAGE_SIZE : 0),
-				   GFP_KERNEL);
+	unsigned long align = clamp(vaddr & -vaddr, PAGE_SIZE, 16ul);
+	unsigned long offset = vaddr & (align - 1);
+	void *allocation = kmalloc(size + align, GFP_KERNEL);
 	void *p;
 	struct xvp_alien_mapping *alien_mapping;
 
 	if (!allocation)
 		return -ENOMEM;
 
-	p = (void *)((((unsigned long)allocation) & PAGE_MASK) | offset);
+	p = (void *)((((unsigned long)allocation) & -align) | offset);
 	if (p < allocation)
-		p += PAGE_SIZE;
+		p += align;
 
 	if (copy_from_user(p, (void __user *)vaddr, size)) {
-		kfree(p);
+		kfree(allocation);
 		return -EFAULT;
 	}
 
