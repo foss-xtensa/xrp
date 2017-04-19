@@ -678,7 +678,7 @@ static void xvp_alien_mapping_destroy(struct xvp_alien_mapping *alien_mapping)
 			put_page(page + i);
 		break;
 	case ALIEN_COPY:
-		kfree(alien_mapping->allocation);
+		xvp_allocation_put(alien_mapping->allocation);
 		break;
 	default:
 		break;
@@ -794,6 +794,85 @@ out:
 	return ret;
 }
 
+static long _xrp_copy_user_phys(struct xvp *xvp,
+				unsigned long vaddr, unsigned long size,
+				phys_addr_t paddr, bool to_phys)
+{
+	if (pfn_valid(__phys_to_pfn(paddr))) {
+		struct page *page = pfn_to_page(__phys_to_pfn(paddr));
+		size_t page_offs = paddr & ~PAGE_MASK;
+		size_t offs;
+
+		if (!to_phys)
+			dma_sync_single_for_cpu(xvp->dev, paddr, size,
+						DMA_FROM_DEVICE);
+		for (offs = 0; offs < size; ++page) {
+			void *p = kmap(page);
+			size_t sz = PAGE_SIZE - page_offs;
+			size_t copy_sz = sz;
+			unsigned long rc;
+
+			if (!p)
+				return -ENOMEM;
+
+			if (size - offs < copy_sz)
+				copy_sz = size - offs;
+
+			if (to_phys)
+				rc = copy_from_user(p + page_offs,
+						    (void __user *)(vaddr + offs),
+						    copy_sz);
+			else
+				rc = copy_to_user((void __user *)(vaddr + offs),
+						  p + page_offs, copy_sz);
+
+			page_offs = 0;
+			offs += copy_sz;
+
+			kunmap(page);
+			if (rc)
+				return -EFAULT;
+		}
+		if (to_phys)
+			dma_sync_single_for_device(xvp->dev, paddr, size,
+						   DMA_TO_DEVICE);
+	} else {
+		void __iomem *p = ioremap(paddr, size);
+		unsigned long rc;
+
+		if (!p) {
+			dev_err(xvp->dev,
+				"couldn't ioremap %pap x 0x%08x\n",
+				&paddr, (u32)size);
+			return -EINVAL;
+		}
+		if (to_phys)
+			rc = copy_from_user(__io_virt(p),
+					    (void __user *)vaddr, size);
+		else
+			rc = copy_to_user((void __user *)vaddr,
+					  __io_virt(p), size);
+		iounmap(p);
+		if (rc)
+			return -EFAULT;
+	}
+	return 0;
+}
+
+static long xrp_copy_user_to_phys(struct xvp *xvp,
+				  unsigned long vaddr, unsigned long size,
+				  phys_addr_t paddr)
+{
+	return _xrp_copy_user_phys(xvp, vaddr, size, paddr, true);
+}
+
+static long xrp_copy_user_from_phys(struct xvp *xvp,
+				    unsigned long vaddr, unsigned long size,
+				    phys_addr_t paddr)
+{
+	return _xrp_copy_user_phys(xvp, vaddr, size, paddr, false);
+}
+
 static long xvp_copy_virt_to_phys(struct xvp_file *xvp_file,
 				  unsigned long flags,
 				  unsigned long vaddr, unsigned long size,
@@ -803,27 +882,26 @@ static long xvp_copy_virt_to_phys(struct xvp_file *xvp_file,
 	unsigned long phys;
 	unsigned long align = clamp(vaddr & -vaddr, PAGE_SIZE, 16ul);
 	unsigned long offset = vaddr & (align - 1);
-	void *allocation = kmalloc(size + align, GFP_KERNEL);
-	void *p;
+	struct xvp_allocation *allocation;
 	struct xvp_alien_mapping *alien_mapping;
+	long rc;
 
-	if (!allocation)
-		return -ENOMEM;
+	rc = xvp_allocate(xvp_file, size + align, align, &allocation);
+	if (rc < 0)
+		return rc;
 
-	p = (void *)((((unsigned long)allocation) & -align) | offset);
-	if (p < allocation)
-		p += align;
+	phys = (allocation->start & -align) | offset;
+	if (phys < allocation->start)
+		phys += align;
 
 	if (flags & XRP_FLAG_READ) {
-		if (copy_from_user(p, (void __user *)vaddr, size)) {
-			kfree(allocation);
+		if (xrp_copy_user_to_phys(xvp_file->xvp,
+					  vaddr, size, phys)) {
+			xvp_allocation_put(allocation);
 			return -EFAULT;
 		}
-	} else {
-		memset(p, 0, size);
 	}
 
-	phys = __pa(p);
 	*paddr = phys;
 	alien_mapping = xvp_alien_mapping_create((struct xvp_alien_mapping){
 						 .vaddr = vaddr,
@@ -833,7 +911,7 @@ static long xvp_copy_virt_to_phys(struct xvp_file *xvp_file,
 						 .type = ALIEN_COPY,
 						 });
 	if (!alien_mapping) {
-		kfree(allocation);
+		xvp_allocation_put(allocation);
 		return -ENOMEM;
 	}
 
@@ -907,6 +985,7 @@ static long __xrp_share_block(struct file *filp,
 	struct xvp_file *xvp_file = filp->private_data;
 	struct mm_struct *mm = current->mm;
 	struct vm_area_struct *vma = find_vma(mm, virt);
+	bool do_cache = true;
 
 	if (!vma) {
 		pr_debug("%s: no vma for vaddr/size = 0x%08lx/0x%08lx\n",
@@ -973,10 +1052,12 @@ static long __xrp_share_block(struct file *filp,
 		/*
 		 * If we couldn't share try to make a shadow copy.
 		 */
-		if (rc < 0)
+		if (rc < 0) {
 			rc = xvp_copy_virt_to_phys(xvp_file, flags,
 						   virt, size, &phys,
 						   &alien_mapping);
+			do_cache = false;
+		}
 
 		/* We couldn't share it. Fail the request. */
 		if (rc < 0) {
@@ -996,10 +1077,12 @@ static long __xrp_share_block(struct file *filp,
 	pr_debug("%s: mapping = %p, mapping->type = %d\n",
 		 __func__, mapping, mapping->type);
 
-	if (flags & XRP_FLAG_WRITE) {
-		xvp_flush_cache((void *)virt, phys, size);
-	} else if (flags & XRP_FLAG_READ) {
-		xvp_clean_cache((void *)virt, phys, size);
+	if (do_cache) {
+		if (flags & XRP_FLAG_WRITE) {
+			xvp_flush_cache((void *)virt, phys, size);
+		} else if (flags & XRP_FLAG_READ) {
+			xvp_clean_cache((void *)virt, phys, size);
+		}
 	}
 	return 0;
 }
@@ -1020,15 +1103,17 @@ static long __xrp_unshare_block(struct file *filp, struct xrp_mapping *mapping,
 	case XRP_MAPPING_ALIEN:
 		if ((flags & XRP_FLAG_WRITE) &&
 		    mapping->xvp_alien_mapping->type == ALIEN_COPY) {
+			struct xvp_file *xvp_file = filp->private_data;
 			struct xvp_alien_mapping *alien_mapping =
 				mapping->xvp_alien_mapping;
 
 			pr_debug("%s: synchronizing alien copy @pa = %pap back to %p\n",
 				 __func__, &alien_mapping->paddr,
 				 (void __user *)alien_mapping->vaddr);
-			if (copy_to_user((void __user *)alien_mapping->vaddr,
-					 __va(alien_mapping->paddr),
-					 alien_mapping->size))
+			if (xrp_copy_user_from_phys(xvp_file->xvp,
+						    alien_mapping->vaddr,
+						    alien_mapping->size,
+						    alien_mapping->paddr))
 				ret = -EINVAL;
 		}
 		xvp_alien_mapping_destroy(mapping->xvp_alien_mapping);
