@@ -439,7 +439,7 @@ static inline void xvp_allocation_put(struct xvp_allocation *xvp_allocation)
 }
 
 static long xvp_allocate(struct xvp_file *xvp_file,
-			 u32 size, u32 align, u32 type,
+			 u32 size, u32 align,
 			 struct xvp_allocation **alloc)
 {
 	struct xvp *xvp = xvp_file->xvp;
@@ -589,7 +589,6 @@ static long xrp_ioctl_alloc(struct file *filp,
 
 	err = xvp_allocate(xvp_file, xrp_ioctl_alloc.size,
 			   xrp_ioctl_alloc.align,
-			   0,
 			   &xvp_allocation);
 	if (err)
 		return err;
