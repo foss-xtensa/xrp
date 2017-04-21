@@ -1460,6 +1460,56 @@ share_err:
 	return ret;
 }
 
+static void xrp_fill_hw_request(struct xrp_dsp_cmd __iomem *cmd,
+				struct xrp_request *rq)
+{
+	xrp_comm_write32(&cmd->in_data_size, rq->ioctl_queue.in_data_size);
+	xrp_comm_write32(&cmd->out_data_size, rq->ioctl_queue.out_data_size);
+	xrp_comm_write32(&cmd->buffer_size,
+			 rq->n_buffers * sizeof(struct xrp_dsp_buffer));
+
+	if (rq->ioctl_queue.in_data_size > XRP_DSP_CMD_INLINE_DATA_SIZE)
+		xrp_comm_write32(&cmd->in_data_addr, rq->in_data_phys);
+	else
+		xrp_comm_write(&cmd->in_data, rq->in_data,
+			       rq->ioctl_queue.in_data_size);
+
+	if (rq->ioctl_queue.out_data_size > XRP_DSP_CMD_INLINE_DATA_SIZE)
+		xrp_comm_write32(&cmd->out_data_addr, rq->out_data_phys);
+
+	if (rq->n_buffers > XRP_DSP_CMD_INLINE_BUFFER_COUNT)
+		xrp_comm_write32(&cmd->buffer_addr, rq->dsp_buffer_phys);
+	else
+		xrp_comm_write(&cmd->buffer_data, rq->dsp_buffer,
+			       rq->n_buffers * sizeof(struct xrp_dsp_buffer));
+
+#ifdef DEBUG
+	{
+		struct xrp_dsp_cmd dsp_cmd;
+		xrp_comm_read(cmd, &dsp_cmd, sizeof(dsp_cmd));
+		pr_debug("%s: cmd for DSP: %*ph\n",
+			 __func__, sizeof(dsp_cmd), &dsp_cmd);
+	}
+#endif
+
+	wmb();
+	/* update flags */
+	xrp_comm_write32(&cmd->flags,
+			 (rq->ioctl_queue.flags & ~XRP_DSP_CMD_FLAG_RESPONSE_VALID) |
+			 XRP_DSP_CMD_FLAG_REQUEST_VALID);
+}
+
+static void xrp_complete_hw_request(struct xrp_dsp_cmd __iomem *cmd,
+				    struct xrp_request *rq)
+{
+	if (rq->ioctl_queue.out_data_size <= XRP_DSP_CMD_INLINE_DATA_SIZE)
+		xrp_comm_read(&cmd->out_data, rq->out_data,
+			      rq->ioctl_queue.out_data_size);
+	if (rq->n_buffers <= XRP_DSP_CMD_INLINE_BUFFER_COUNT)
+		xrp_comm_read(&cmd->buffer_data, rq->dsp_buffer,
+			      rq->n_buffers * sizeof(struct xrp_dsp_buffer));
+}
+
 static long xrp_ioctl_submit_sync(struct file *filp,
 				  struct xrp_ioctl_queue __user *p)
 {
@@ -1480,45 +1530,10 @@ static long xrp_ioctl_submit_sync(struct file *filp,
 		return ret;
 	}
 
-	mutex_lock(&xvp->comm_lock);
-
 	if (loopback < LOOPBACK_NOIO) {
-		struct xrp_dsp_cmd __iomem *cmd = xvp->comm;
+		mutex_lock(&xvp->comm_lock);
 
-		/* write to registers */
-		xrp_comm_write32(&cmd->in_data_size, rq->ioctl_queue.in_data_size);
-		xrp_comm_write32(&cmd->out_data_size, rq->ioctl_queue.out_data_size);
-		xrp_comm_write32(&cmd->buffer_size, rq->n_buffers * sizeof(struct xrp_dsp_buffer));
-
-		if (rq->ioctl_queue.in_data_size > XRP_DSP_CMD_INLINE_DATA_SIZE)
-			xrp_comm_write32(&cmd->in_data_addr, rq->in_data_phys);
-		else
-			xrp_comm_write(&cmd->in_data, rq->in_data,
-				       rq->ioctl_queue.in_data_size);
-
-		if (rq->ioctl_queue.out_data_size > XRP_DSP_CMD_INLINE_DATA_SIZE)
-			xrp_comm_write32(&cmd->out_data_addr, rq->out_data_phys);
-
-		if (rq->n_buffers > XRP_DSP_CMD_INLINE_BUFFER_COUNT)
-			xrp_comm_write32(&cmd->buffer_addr, rq->dsp_buffer_phys);
-		else
-			xrp_comm_write(&cmd->buffer_data, rq->dsp_buffer,
-				       rq->n_buffers * sizeof(struct xrp_dsp_buffer));
-
-#ifdef DEBUG
-		{
-			struct xrp_dsp_cmd dsp_cmd;
-			xrp_comm_read(cmd, &dsp_cmd, sizeof(dsp_cmd));
-			pr_debug("%s: cmd for DSP: %*ph\n",
-				 __func__, sizeof(dsp_cmd), &dsp_cmd);
-		}
-#endif
-
-		wmb();
-		/* update flags */
-		xrp_comm_write32(&cmd->flags,
-				 (rq->ioctl_queue.flags & ~XRP_DSP_CMD_FLAG_RESPONSE_VALID) |
-				 XRP_DSP_CMD_FLAG_REQUEST_VALID);
+		xrp_fill_hw_request(xvp->comm, rq);
 
 		xrp_send_device_irq(xvp);
 
@@ -1531,12 +1546,7 @@ static long xrp_ioctl_submit_sync(struct file *filp,
 
 		/* copy back inline data */
 		if (ret == 0) {
-			if (rq->ioctl_queue.out_data_size <= XRP_DSP_CMD_INLINE_DATA_SIZE)
-				xrp_comm_read(&cmd->out_data, rq->out_data,
-					      rq->ioctl_queue.out_data_size);
-			if (rq->n_buffers <= XRP_DSP_CMD_INLINE_BUFFER_COUNT)
-				xrp_comm_read(&cmd->buffer_data, rq->dsp_buffer,
-					      rq->n_buffers * sizeof(struct xrp_dsp_buffer));
+			xrp_complete_hw_request(xvp->comm, rq);
 		} else if (ret == -EBUSY && firmware_reboot) {
 			int rc;
 
@@ -1545,8 +1555,8 @@ static long xrp_ioctl_submit_sync(struct file *filp,
 			if (rc < 0)
 				ret = rc;
 		}
+		mutex_unlock(&xvp->comm_lock);
 	}
-	mutex_unlock(&xvp->comm_lock);
 
 	if (ret == 0)
 		ret = xrp_unmap_request(filp, rq, true, NULL);
