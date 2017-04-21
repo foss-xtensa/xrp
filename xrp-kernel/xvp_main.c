@@ -1154,7 +1154,17 @@ static long __xrp_unshare_block(struct file *filp, struct xrp_mapping *mapping,
 		break;
 	}
 
+	mapping->type = XRP_MAPPING_NONE;
+
 	return ret;
+}
+
+static bool xrp_unshare_block_need_mm(struct xrp_mapping *mapping,
+				      unsigned long flags)
+{
+	return mapping->type == XRP_MAPPING_ALIEN &&
+		(flags & XRP_FLAG_WRITE) &&
+		mapping->xvp_alien_mapping->type == ALIEN_COPY;
 }
 
 static long xrp_ioctl_free(struct file *filp,
@@ -1223,65 +1233,165 @@ static long xvp_complete_cmd_poll(bool (*cmd_complete)(void *p),
 	return -EBUSY;
 }
 
-static long xrp_ioctl_submit_sync(struct file *filp,
-				  struct xrp_ioctl_queue __user *p)
-{
-	struct mm_struct *mm = current->mm;
-	struct xvp_file *xvp_file = filp->private_data;
-	struct xvp *xvp = xvp_file->xvp;
-
+struct xrp_request {
 	struct xrp_ioctl_queue ioctl_queue;
-	unsigned long in_data_phys = 0, out_data_phys = 0;
-	struct xrp_mapping in_data_mapping = {0};
-	struct xrp_mapping out_data_mapping = {0};
-	u8 in_data[XRP_DSP_CMD_INLINE_DATA_SIZE];
-	u8 out_data[XRP_DSP_CMD_INLINE_DATA_SIZE];
-
 	size_t n_buffers;
-	struct xrp_ioctl_buffer __user *buffer;
-	struct xrp_dsp_buffer buffer_data[XRP_DSP_CMD_INLINE_BUFFER_COUNT];
-	struct xrp_dsp_buffer *dsp_buffer = buffer_data;
-	unsigned long dsp_buffer_phys = 0;
-	struct xrp_mapping *buffer_mapping = NULL;
-	struct xrp_mapping dsp_buffer_mapping = {0};
+	struct xrp_mapping *buffer_mapping;
+	struct xrp_dsp_buffer *dsp_buffer;
+	unsigned long in_data_phys;
+	unsigned long out_data_phys;
+	unsigned long dsp_buffer_phys;
+	union {
+		struct xrp_mapping in_data_mapping;
+		u8 in_data[XRP_DSP_CMD_INLINE_DATA_SIZE];
+	};
+	union {
+		struct xrp_mapping out_data_mapping;
+		u8 out_data[XRP_DSP_CMD_INLINE_DATA_SIZE];
+	};
+	union {
+		struct xrp_mapping dsp_buffer_mapping;
+		struct xrp_dsp_buffer buffer_data[XRP_DSP_CMD_INLINE_BUFFER_COUNT];
+	};
+};
 
-	long ret = 0;
-	int i;
+static void xrp_unmap_request_nowb(struct file *filp, struct xrp_request *rq)
+{
+	size_t n_buffers = rq->n_buffers;
+	size_t i;
 
-	if (copy_from_user(&ioctl_queue, p, sizeof(*p)))
-		return -EFAULT;
-
-	n_buffers = ioctl_queue.buffer_size / sizeof(struct xrp_ioctl_buffer);
+	if (rq->ioctl_queue.in_data_size > XRP_DSP_CMD_INLINE_DATA_SIZE)
+		__xrp_unshare_block(filp, &rq->in_data_mapping, 0);
+	if (rq->ioctl_queue.out_data_size > XRP_DSP_CMD_INLINE_DATA_SIZE)
+		__xrp_unshare_block(filp, &rq->out_data_mapping, 0);
+	for (i = 0; i < n_buffers; ++i)
+		__xrp_unshare_block(filp, rq->buffer_mapping + i, 0);
+	if (n_buffers > XRP_DSP_CMD_INLINE_BUFFER_COUNT)
+		__xrp_unshare_block(filp, &rq->dsp_buffer_mapping, 0);
 
 	if (n_buffers) {
-		buffer_mapping = kzalloc(n_buffers * sizeof(*buffer_mapping),
-					 GFP_KERNEL);
+		kfree(rq->buffer_mapping);
 		if (n_buffers > XRP_DSP_CMD_INLINE_BUFFER_COUNT) {
-			dsp_buffer = kmalloc(n_buffers * sizeof(*dsp_buffer),
-					     GFP_KERNEL);
-			if (!dsp_buffer) {
-				kfree(buffer_mapping);
+			kfree(rq->dsp_buffer);
+		}
+	}
+}
+
+static long xrp_unmap_request(struct file *filp, struct xrp_request *rq,
+			      bool has_mm, bool *_need_mm)
+{
+	bool need_mm = false;
+	bool need_mm_buffers = false;
+	size_t n_buffers = rq->n_buffers;
+	size_t i;
+	long ret = 0;
+	long rc;
+
+	if (rq->ioctl_queue.in_data_size > XRP_DSP_CMD_INLINE_DATA_SIZE)
+		__xrp_unshare_block(filp, &rq->in_data_mapping, XRP_FLAG_READ);
+	if (rq->ioctl_queue.out_data_size > XRP_DSP_CMD_INLINE_DATA_SIZE) {
+		if (!has_mm && xrp_unshare_block_need_mm(&rq->out_data_mapping,
+							 XRP_FLAG_WRITE)) {
+			need_mm = true;
+		} else {
+			rc = __xrp_unshare_block(filp, &rq->out_data_mapping,
+						 XRP_FLAG_WRITE);
+
+			if (rc < 0) {
+				pr_debug("%s: out_data could not be unshared\n",
+					 __func__);
+				ret = rc;
+			}
+		}
+	} else if (has_mm) {
+		if (copy_to_user((void __user *)(unsigned long)rq->ioctl_queue.out_data_addr,
+				 rq->out_data,
+				 rq->ioctl_queue.out_data_size)) {
+			pr_debug("%s: out_data could not be copied\n",
+				 __func__);
+			ret = -EFAULT;
+		}
+	} else {
+		need_mm = true;
+	}
+
+	if (n_buffers > XRP_DSP_CMD_INLINE_BUFFER_COUNT)
+		__xrp_unshare_block(filp, &rq->dsp_buffer_mapping,
+				    XRP_FLAG_READ_WRITE);
+
+	for (i = 0; i < n_buffers; ++i) {
+		if (!has_mm &&
+		    xrp_unshare_block_need_mm(rq->buffer_mapping + i,
+					      rq->dsp_buffer[i].flags)) {
+			need_mm_buffers = true;
+		} else {
+			rc = __xrp_unshare_block(filp, rq->buffer_mapping + i,
+						 rq->dsp_buffer[i].flags);
+			if (rc < 0) {
+				pr_debug("%s: buffer %d could not be unshared\n",
+					 __func__, i);
+				ret = rc;
+			}
+		}
+	}
+
+	if (!need_mm_buffers && n_buffers) {
+		kfree(rq->buffer_mapping);
+		if (n_buffers > XRP_DSP_CMD_INLINE_BUFFER_COUNT) {
+			kfree(rq->dsp_buffer);
+		}
+		rq->n_buffers = 0;
+	}
+
+	if (_need_mm)
+		*_need_mm = need_mm || need_mm_buffers;
+	return ret;
+}
+
+static long xrp_map_request(struct file *filp, struct xrp_request *rq,
+			    struct mm_struct *mm)
+{
+	struct xrp_ioctl_buffer __user *buffer;
+	size_t n_buffers = rq->ioctl_queue.buffer_size /
+		sizeof(struct xrp_ioctl_buffer);
+
+	size_t i;
+	long ret = 0;
+
+	rq->n_buffers = n_buffers;
+	if (n_buffers) {
+		rq->buffer_mapping =
+			kzalloc(n_buffers * sizeof(*rq->buffer_mapping),
+				GFP_KERNEL);
+		if (n_buffers > XRP_DSP_CMD_INLINE_BUFFER_COUNT) {
+			rq->dsp_buffer =
+				kmalloc(n_buffers * sizeof(*rq->dsp_buffer),
+					GFP_KERNEL);
+			if (!rq->dsp_buffer) {
+				kfree(rq->buffer_mapping);
 				return -ENOMEM;
 			}
+		} else {
+			rq->dsp_buffer = rq->buffer_data;
 		}
 	}
 
 	down_read(&mm->mmap_sem);
 
-	if (ioctl_queue.in_data_size > XRP_DSP_CMD_INLINE_DATA_SIZE) {
-		ret = __xrp_share_block(filp, ioctl_queue.in_data_addr,
-					ioctl_queue.in_data_size,
-					XRP_FLAG_READ, &in_data_phys,
-					&in_data_mapping);
+	if (rq->ioctl_queue.in_data_size > XRP_DSP_CMD_INLINE_DATA_SIZE) {
+		ret = __xrp_share_block(filp, rq->ioctl_queue.in_data_addr,
+					rq->ioctl_queue.in_data_size,
+					XRP_FLAG_READ, &rq->in_data_phys,
+					&rq->in_data_mapping);
 		if(ret < 0) {
 			pr_debug("%s: in_data could not be shared\n",
 				 __func__);
 			goto share_err;
 		}
 	} else {
-		if (copy_from_user(in_data,
-				   (void __user *)(unsigned long)ioctl_queue.in_data_addr,
-				   ioctl_queue.in_data_size)) {
+		if (copy_from_user(rq->in_data,
+				   (void __user *)(unsigned long)rq->ioctl_queue.in_data_addr,
+				   rq->ioctl_queue.in_data_size)) {
 			pr_debug("%s: in_data could not be copied\n",
 				 __func__);
 			ret = -EFAULT;
@@ -1289,11 +1399,11 @@ static long xrp_ioctl_submit_sync(struct file *filp,
 		}
 	}
 
-	if (ioctl_queue.out_data_size > XRP_DSP_CMD_INLINE_DATA_SIZE) {
-		ret = __xrp_share_block(filp, ioctl_queue.out_data_addr,
-					ioctl_queue.out_data_size,
-					XRP_FLAG_WRITE, &out_data_phys,
-					&out_data_mapping);
+	if (rq->ioctl_queue.out_data_size > XRP_DSP_CMD_INLINE_DATA_SIZE) {
+		ret = __xrp_share_block(filp, rq->ioctl_queue.out_data_addr,
+					rq->ioctl_queue.out_data_size,
+					XRP_FLAG_WRITE, &rq->out_data_phys,
+					&rq->out_data_mapping);
 		if (ret < 0) {
 			pr_debug("%s: out_data could not be shared\n",
 				 __func__);
@@ -1301,7 +1411,7 @@ static long xrp_ioctl_submit_sync(struct file *filp,
 		}
 	}
 
-	buffer = (void __user *)(unsigned long)ioctl_queue.buffer_addr;
+	buffer = (void __user *)(unsigned long)rq->ioctl_queue.buffer_addr;
 
 	for (i = 0; i < n_buffers; ++i) {
 		struct xrp_ioctl_buffer ioctl_buffer;
@@ -1317,7 +1427,7 @@ static long xrp_ioctl_submit_sync(struct file *filp,
 						ioctl_buffer.size,
 						ioctl_buffer.flags,
 						&buffer_phys,
-						buffer_mapping + i);
+						rq->buffer_mapping + i);
 			if (ret < 0) {
 				pr_debug("%s: buffer %d could not be shared\n",
 					 __func__, i);
@@ -1325,7 +1435,7 @@ static long xrp_ioctl_submit_sync(struct file *filp,
 			}
 		}
 
-		dsp_buffer[i] = (struct xrp_dsp_buffer){
+		rq->dsp_buffer[i] = (struct xrp_dsp_buffer){
 			.flags = ioctl_buffer.flags,
 			.size = ioctl_buffer.size,
 			.addr = buffer_phys,
@@ -1333,10 +1443,10 @@ static long xrp_ioctl_submit_sync(struct file *filp,
 	}
 
 	if (n_buffers > XRP_DSP_CMD_INLINE_BUFFER_COUNT) {
-		ret = xrp_share_kernel(filp, (unsigned long)dsp_buffer,
-				       n_buffers * sizeof(*dsp_buffer),
-				       XRP_FLAG_READ_WRITE, &dsp_buffer_phys,
-				       &dsp_buffer_mapping);
+		ret = xrp_share_kernel(filp, (unsigned long)rq->dsp_buffer,
+				       n_buffers * sizeof(*rq->dsp_buffer),
+				       XRP_FLAG_READ_WRITE, &rq->dsp_buffer_phys,
+				       &rq->dsp_buffer_mapping);
 		if(ret < 0) {
 			pr_debug("%s: buffer descriptors could not be shared\n",
 				 __func__);
@@ -1344,25 +1454,29 @@ static long xrp_ioctl_submit_sync(struct file *filp,
 		}
 	}
 share_err:
-	if (ret < 0) {
-		if (ioctl_queue.in_data_size > XRP_DSP_CMD_INLINE_DATA_SIZE)
-			__xrp_unshare_block(filp, &in_data_mapping, 0);
-		if (ioctl_queue.out_data_size > XRP_DSP_CMD_INLINE_DATA_SIZE)
-			__xrp_unshare_block(filp, &out_data_mapping, 0);
-		for (i = 0; i < n_buffers; ++i)
-			__xrp_unshare_block(filp, buffer_mapping + i, 0);
-		if (n_buffers > XRP_DSP_CMD_INLINE_BUFFER_COUNT)
-			__xrp_unshare_block(filp, &dsp_buffer_mapping, 0);
-	}
 	up_read(&mm->mmap_sem);
+	if (ret < 0)
+		xrp_unmap_request_nowb(filp, rq);
+	return ret;
+}
 
+static long xrp_ioctl_submit_sync(struct file *filp,
+				  struct xrp_ioctl_queue __user *p)
+{
+	struct xvp_file *xvp_file = filp->private_data;
+	struct xvp *xvp = xvp_file->xvp;
+	struct xrp_request *rq = kzalloc(sizeof(*rq), GFP_KERNEL);
+	long ret = 0;
+
+	if (!rq)
+		return -ENOMEM;
+
+	if (copy_from_user(&rq->ioctl_queue, p, sizeof(*p)))
+		return -EFAULT;
+
+	ret = xrp_map_request(filp, rq, current->mm);
 	if (ret < 0) {
-		if (n_buffers) {
-			kfree(buffer_mapping);
-			if (n_buffers > XRP_DSP_CMD_INLINE_BUFFER_COUNT) {
-				kfree(dsp_buffer);
-			}
-		}
+		kfree(rq);
 		return ret;
 	}
 
@@ -1372,24 +1486,24 @@ share_err:
 		struct xrp_dsp_cmd __iomem *cmd = xvp->comm;
 
 		/* write to registers */
-		xrp_comm_write32(&cmd->in_data_size, ioctl_queue.in_data_size);
-		xrp_comm_write32(&cmd->out_data_size, ioctl_queue.out_data_size);
-		xrp_comm_write32(&cmd->buffer_size, n_buffers * sizeof(struct xrp_dsp_buffer));
+		xrp_comm_write32(&cmd->in_data_size, rq->ioctl_queue.in_data_size);
+		xrp_comm_write32(&cmd->out_data_size, rq->ioctl_queue.out_data_size);
+		xrp_comm_write32(&cmd->buffer_size, rq->n_buffers * sizeof(struct xrp_dsp_buffer));
 
-		if (ioctl_queue.in_data_size > XRP_DSP_CMD_INLINE_DATA_SIZE)
-			xrp_comm_write32(&cmd->in_data_addr, in_data_phys);
+		if (rq->ioctl_queue.in_data_size > XRP_DSP_CMD_INLINE_DATA_SIZE)
+			xrp_comm_write32(&cmd->in_data_addr, rq->in_data_phys);
 		else
-			xrp_comm_write(&cmd->in_data, in_data,
-				       ioctl_queue.in_data_size);
+			xrp_comm_write(&cmd->in_data, rq->in_data,
+				       rq->ioctl_queue.in_data_size);
 
-		if (ioctl_queue.out_data_size > XRP_DSP_CMD_INLINE_DATA_SIZE)
-			xrp_comm_write32(&cmd->out_data_addr, out_data_phys);
+		if (rq->ioctl_queue.out_data_size > XRP_DSP_CMD_INLINE_DATA_SIZE)
+			xrp_comm_write32(&cmd->out_data_addr, rq->out_data_phys);
 
-		if (n_buffers > XRP_DSP_CMD_INLINE_BUFFER_COUNT)
-			xrp_comm_write32(&cmd->buffer_addr, dsp_buffer_phys);
+		if (rq->n_buffers > XRP_DSP_CMD_INLINE_BUFFER_COUNT)
+			xrp_comm_write32(&cmd->buffer_addr, rq->dsp_buffer_phys);
 		else
-			xrp_comm_write(&cmd->buffer_data, dsp_buffer,
-				       n_buffers * sizeof(struct xrp_dsp_buffer));
+			xrp_comm_write(&cmd->buffer_data, rq->dsp_buffer,
+				       rq->n_buffers * sizeof(struct xrp_dsp_buffer));
 
 #ifdef DEBUG
 		{
@@ -1403,7 +1517,7 @@ share_err:
 		wmb();
 		/* update flags */
 		xrp_comm_write32(&cmd->flags,
-				 (ioctl_queue.flags & ~XRP_DSP_CMD_FLAG_RESPONSE_VALID) |
+				 (rq->ioctl_queue.flags & ~XRP_DSP_CMD_FLAG_RESPONSE_VALID) |
 				 XRP_DSP_CMD_FLAG_REQUEST_VALID);
 
 		xrp_send_device_irq(xvp);
@@ -1417,12 +1531,12 @@ share_err:
 
 		/* copy back inline data */
 		if (ret == 0) {
-			if (ioctl_queue.out_data_size <= XRP_DSP_CMD_INLINE_DATA_SIZE)
-				xrp_comm_read(&cmd->out_data, out_data,
-					      ioctl_queue.out_data_size);
-			if (n_buffers <= XRP_DSP_CMD_INLINE_BUFFER_COUNT)
-				xrp_comm_read(&cmd->buffer_data, dsp_buffer,
-					      n_buffers * sizeof(struct xrp_dsp_buffer));
+			if (rq->ioctl_queue.out_data_size <= XRP_DSP_CMD_INLINE_DATA_SIZE)
+				xrp_comm_read(&cmd->out_data, rq->out_data,
+					      rq->ioctl_queue.out_data_size);
+			if (rq->n_buffers <= XRP_DSP_CMD_INLINE_BUFFER_COUNT)
+				xrp_comm_read(&cmd->buffer_data, rq->dsp_buffer,
+					      rq->n_buffers * sizeof(struct xrp_dsp_buffer));
 		} else if (ret == -EBUSY && firmware_reboot) {
 			int rc;
 
@@ -1434,46 +1548,11 @@ share_err:
 	}
 	mutex_unlock(&xvp->comm_lock);
 
-	if (ioctl_queue.in_data_size > XRP_DSP_CMD_INLINE_DATA_SIZE)
-		__xrp_unshare_block(filp, &in_data_mapping, XRP_FLAG_READ);
-	if (ioctl_queue.out_data_size > XRP_DSP_CMD_INLINE_DATA_SIZE) {
-		long rc = __xrp_unshare_block(filp, &out_data_mapping,
-					      XRP_FLAG_WRITE);
-
-		if (rc < 0) {
-			pr_debug("%s: out_data could not be unshared\n",
-				 __func__);
-			ret = rc;
-		}
-	} else if (ret == 0) {
-		if (copy_to_user((void __user *)(unsigned long)ioctl_queue.out_data_addr,
-				 out_data,
-				 ioctl_queue.out_data_size)) {
-			pr_debug("%s: out_data could not be copied\n",
-				 __func__);
-			ret = -EFAULT;
-		}
-	}
-	if (n_buffers > XRP_DSP_CMD_INLINE_BUFFER_COUNT)
-		__xrp_unshare_block(filp, &dsp_buffer_mapping,
-				    XRP_FLAG_READ_WRITE);
-
-	for (i = 0; i < n_buffers; ++i) {
-		long rc = __xrp_unshare_block(filp, buffer_mapping + i,
-					      dsp_buffer[i].flags);
-		if (rc < 0) {
-			pr_debug("%s: buffer %d could not be unshared\n",
-				 __func__, i);
-			ret = rc;
-		}
-	}
-
-	if (n_buffers) {
-		kfree(buffer_mapping);
-		if (n_buffers > XRP_DSP_CMD_INLINE_BUFFER_COUNT) {
-			kfree(dsp_buffer);
-		}
-	}
+	if (ret == 0)
+		ret = xrp_unmap_request(filp, rq, true, NULL);
+	else
+		xrp_unmap_request_nowb(filp, rq);
+	kfree(rq);
 
 	return ret;
 }
