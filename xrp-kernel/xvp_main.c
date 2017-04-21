@@ -1087,6 +1087,45 @@ static long __xrp_share_block(struct file *filp,
 	return 0;
 }
 
+static long xrp_writeback_alien_mapping(struct xvp_file *xvp_file,
+					struct xvp_alien_mapping *alien_mapping)
+{
+	struct page *page;
+	size_t nr_pages;
+	size_t i;
+	long ret = 0;
+
+	switch (alien_mapping->type) {
+	case ALIEN_GUP:
+		pr_debug("%s: dirtying alien GUP @va = %p, pa = %pap\n",
+			 __func__, (void __user *)alien_mapping->vaddr,
+			 &alien_mapping->paddr);
+		page = pfn_to_page(__phys_to_pfn(alien_mapping->paddr));
+		nr_pages =
+			((alien_mapping->vaddr + alien_mapping->size +
+			  PAGE_SIZE - 1) >> PAGE_SHIFT) -
+			(alien_mapping->vaddr >> PAGE_SHIFT);
+		for (i = 0; i < nr_pages; ++i)
+			SetPageDirty(page + i);
+		break;
+
+	case ALIEN_COPY:
+		pr_debug("%s: synchronizing alien copy @pa = %pap back to %p\n",
+			 __func__, &alien_mapping->paddr,
+			 (void __user *)alien_mapping->vaddr);
+		if (xrp_copy_user_from_phys(xvp_file->xvp,
+					    alien_mapping->vaddr,
+					    alien_mapping->size,
+					    alien_mapping->paddr))
+			ret = -EINVAL;
+		break;
+
+	default:
+		break;
+	}
+	return ret;
+}
+
 /*
  *
  */
@@ -1101,21 +1140,10 @@ static long __xrp_unshare_block(struct file *filp, struct xrp_mapping *mapping,
 		break;
 
 	case XRP_MAPPING_ALIEN:
-		if ((flags & XRP_FLAG_WRITE) &&
-		    mapping->xvp_alien_mapping->type == ALIEN_COPY) {
-			struct xvp_file *xvp_file = filp->private_data;
-			struct xvp_alien_mapping *alien_mapping =
-				mapping->xvp_alien_mapping;
+		if (flags & XRP_FLAG_WRITE)
+			ret = xrp_writeback_alien_mapping(filp->private_data,
+							  mapping->xvp_alien_mapping);
 
-			pr_debug("%s: synchronizing alien copy @pa = %pap back to %p\n",
-				 __func__, &alien_mapping->paddr,
-				 (void __user *)alien_mapping->vaddr);
-			if (xrp_copy_user_from_phys(xvp_file->xvp,
-						    alien_mapping->vaddr,
-						    alien_mapping->size,
-						    alien_mapping->paddr))
-				ret = -EINVAL;
-		}
 		xvp_alien_mapping_destroy(mapping->xvp_alien_mapping);
 		break;
 
