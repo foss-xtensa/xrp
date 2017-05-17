@@ -1,4 +1,31 @@
+Kernel driver requirements.
+==========================
+
+The linux kernel driver is well tested with linux kernel version 4.8 and is
+known to work with linux kernel version 4.3 on xtensa and 32-bit ARM linux.
+The driver makes the following assumptions:
+- there exists reset and runstall memory-mapped registers for each DSP core,
+  DSP doesn't need any additional setup to run (i.e. no clock setup, no power
+  management, default reset vector);
+- there may exist memory-mapped register for sending IRQ to DSP core; if it
+  exists then in addition to always available polling mode the DSP firmware
+  may run in IRQ mode;
+- there may exist memory-mapped register for sending IRQ from DSP to the host;
+  if it exists then in addition to always available polling mode the linux
+  driver may run in IRQ mode.
+- DSP DRAM and IRAM are writable from the linux host. Host may access DRAM
+  and IRAM at physical addresses different from their physical addresses used
+  by the DSP (i.e. multiple DSPs may have identical configurations, and thus
+  IRAM and DRAM at the same addresses, but the host need to see each IRAM
+  and DRAM at physical addresses that don't overlap).
+- the driver provides functions to manage contiguous memory allocation for the
+  DSP. These functions manage physical memory pool configured for the DSP.
+  The DSP must have access to this physical memory at the same physical
+  address as the host.
+
+
 Transition from OpenVX-specific interafce.
+=========================================
 
 OpenVX-specific API has the following host-side functions:
 
