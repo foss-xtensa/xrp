@@ -43,7 +43,8 @@ static inline int dprintf(const char *p, ...)
 }
 #endif
 
-void *xrp_dsp_comm_base = (void *)XRP_DSP_COMM_BASE_MAGIC;
+extern char xrp_dsp_comm_base_magic[] __attribute__((weak));
+void *xrp_dsp_comm_base = &xrp_dsp_comm_base_magic;
 
 static uint32_t mmio_base;
 
