@@ -1,3 +1,103 @@
+Xtensa Remote Processing.
+========================
+
+- Introduction
+- Terminology
+- Implementations
+- Configuration
+- Code structure
+- Building
+
+Xtensa Remote Processing (XRP) is a master-slave communication interface for
+linux-based systems containing Xtensa processors. It allows linux userspace
+tasks to send messages to the firmware running on Xtensa processors. Message
+structure details are not defined by XRP, but it is assumed that the message
+is a small structure that describes requested action accompanied by a vector
+of buffers with data or storage for that action.
+
+Terminology.
+===========
+
+XRP API uses the following terms:
+
+- device: single Xtensa DSP core. Devices are numbered sequentially from 0
+          to N - 1. There's an API call that opens device by its number.
+
+- queue: a communication stream between an application and a device. Commands
+         queued into one queue are processed in order and there's no ordering
+         between commands in different queues.
+
+- buffer: a descriptor for a contiguous piece of memory. A buffer must be
+          mapped before its memory is accessible. A buffer must be unmapped
+          before it may be passed to a device. A buffer may be allocated in
+          the device specific memory or in the generic system memory. A buffer
+          in the device specific memory is the most effective way to pass
+          bulk data to/from the Xtensa DSP, it is physically contiguous and
+          data transfer does not require copying. Buffer in the generic system
+          memory may be physically noncontiguous and tranferring data may
+          require copying to/from the intermediate bounce buffer.
+
+- buffer group: a vector of buffers and associated allowed access flags.
+                Buffers are numbered sequentially from 0 to N - 1. A buffer
+                may be added to the end of a group. A buffer descriptor may be
+                acquired from the buffer group by index. A buffer may be added
+                to a buffer group with the access flags allowing reading,
+                writing or both. These access flags limit the ways in which
+                the buffer descriptor acquired from the buffer group may be
+                mapped.
+
+- message: a unit of communication between the XRP API users. A message may be
+           sent by the master to a queue synchronously or asynchronously. It
+           is processed synchronously by the Xtensa DSP and the reply is
+           delivered back to master. If a message was sent synchronously the
+           sender is unblocked at that point. If a message was sent
+           asynchronously the sender gets an event object that can be used to
+           wait for the message processing completion.
+           A message takes a small read-only region of memory with a message
+           description data, a small write-only region of memory where the
+           result description data is written and a buffer group with buffers
+           for the bulk data being processed.
+
+Devices, queues, buffers, buffer groups and events are reference-counted. For
+each object type there's a couple of functions that increment and decrement
+object's reference counter. An object is freed when its reference counter
+drops to zero.
+
+XRP implementations.
+===================
+
+There are two implementations of the XRP interface: native and fast simulation.
+
+Native implementation runs on a system where CPU cores running host linux code
+and Xtensa DSP cores are connected to shared memory. It may be a hardware or
+a simulated system. It consists of the following three parts: native linux
+implementation of the XRP interface, linux kernel driver and DSP implementation
+of the XRP interface.
+- native linux XRP implementation is a library code that runs in linux
+  userspace processes on linux CPU cores. It communicates with devices managed
+  by the linux kernel driver through the file-based interface exposed by the
+  driver;
+- linux kernel driver does the following:
+  - manages Xtensa DSP cores: loads firmware into them, configures shared
+    memory/used IRQs, performs initial synchronization and manages request
+    queue;
+  - manages dedicated physical memory of the Xtensa DSP cores;
+  - maps and unmaps userspace buffers associated with requests making them
+    physically contiguous.
+- Xtensa DSP side XRP implementation is a library code that runs as a part
+  of firmware on Xtensa DSP implementing DSP subset of the XRP API. It
+  receives requests, invokes handler and sends replies back to host.
+
+Fast simulation runs linux-side code on a linux-based system and communicates
+with unmodiified Xtensa DSP code running in a simulator on the same linux-based
+system. It consists of the following two parts: fast simulation implementation
+of the XRP interface and the DSP implementation of the XRP interface.
+- fast simulation XRP implementation is a library code that runs in linux
+  userspace process and communicates through the shared memory with the Xtensa
+  DSP side XRP code running in simulator;
+- Xtensa DSP side XRP implementation is the same both in native and in fast
+  simulation cases.
+
 Kernel driver requirements.
 ==========================
 
@@ -23,228 +123,80 @@ The driver makes the following assumptions:
   The DSP must have access to this physical memory at the same physical
   address as the host.
 
+Configuration.
+=============
 
-Transition from OpenVX-specific interafce.
-=========================================
+Number and configuration of Xtensa DSPs, details of MMIO registers that
+control them, location and amount of the shared memory all may change. The
+following pieces of the code capture the details of the configuration and need
+to be adjusted whenever it is changed:
 
-OpenVX-specific API has the following host-side functions:
+Native mode:
+- the device tree. Linux kernel need to have a device tree node for each
+  Xtensa DSP managed by the XRP linux kernel driver. Please see
+  xrp-kernel/cdns,xrp.txt for the device tree binding information.
+- DSP firmware bits of the XRP don't have any hardcoded addresses, but the
+  firmware image depends on the linker map.
 
-	int32_t apk2os_init(void);
-	int32_t apk2os_deinit(void);
+Fast simulation mode:
+- the device tree. Although there's no linux kernel and kernel driver involved,
+  the configuration is maintained in the same format as in native mode. But in
+  addition to a device node for each managed Xtensa DSP there must be a device
+  node for all segments of memory shared with Xtensa simulators. Please see
+  xrp-linux-sim/cdns,sim-shmem.txt for the device tree binding information.
+- DSP firmware bits of the XRP built for fast simulation have the base address
+  of the communication area in the shared memory built into it. See how
+  XRP_DSP_COMM_BASE_MAGIC is used.
 
-	int32_t apk2os_shared_alloc(size_t alignment, size_t size, void ** ptr);
-	int32_t apk2os_shared_free(void * ptr);
+Code structure.
+==============
 
-	uint8_t * apk2os_share_buffer_with_core(uint32_t remote_core_id, uint8_t * ptr, uint32_t size);
-	uint8_t * apk2os_share_buffer_from_core(uint32_t remote_core_id, uint8_t * ptr, uint32_t size);
++-dts/              -- device tree compiler/flat device tree library. May be
+|                      used with xrp-linux-sim when the host version of libfdt
+|                      is missing or too old.
++-xrp-dsp/          -- Xtensa DSP side XRP implementation.
++-xrp-kernel/       -- linux kernel driver for the native XRP implementation.
+| `-test/           -- standalone tests for the driver.
++-xrp-linux-native/ -- linux implementation of the XRP interface for the native
+|                      mode.
++-xrp-linux-sim/    -- linux implementation of the XRP interface for the fast
+|                      simulation mode.
+`-xrp_api.h         -- XRP API definition.
 
-	int32_t xvp_submit_sync(uint32_t cmd, cmd_data *cmd_data);
+Building.
+========
 
-XRP interface is described in the xrp_api.h
+- kernel driver is built using typical kernel module build sequence. Provide
+  the following environment variables/make parameters:
+  - ARCH: target linux architecture;
+  - KSRC: points to the configured kernel tree;
+  - CROSS_COMPILE: path and prefix name of the cross compiler.
+  Makefile supports targets "modules", "clean" and all other standard
+  kernel targets. Example building for xtensa linux:
 
+  $ ARCH=xtensa CROSS_COMPILE=xtensa-dc233c-elf- \
+    KSRC=`pwd`/../kernel/xrp-sim-dc233c make -C xrp-kernel modules
 
-There's the following correspondence between the OpenVX API and XRP API:
+  The result is kernel object xrp-kernel/xrp.ko loadable into the kernel it was
+  built against.
 
-- apk2os_init/apk2os_deinit correspond to xrp_open_device/xrp_release_device.
-- apk2os_shared_alloc/apk2os_shared_free correspond to xrp_create_buffer/xrp_release_buffer.
-- apk2os_share_buffer_with_core/apk2os_share_buffer_from_core don't have XRP
-  equivalents. They are replaced by a combination of buffer mapping/unmapping and
-  buffer_group functions.
-- xvp_submit_sync corresponds to xrp_run_command_sync.
+- Xtensa DSP code needs an xcc-based toolchain. Provide the following
+  environment variables to the make:
+  - DSP_CORE: name of the Xtensa DSP core to build for. It must be the name of
+    the build installed for the used xcc-based toolchain;
+  - LSP: path to the LSP to be used.
+  Makefile supports targets "default" and "clean". Example:
 
+  $ make -C xrp-dsp DSP_CORE=visionp6cnn_ao \
+    LSP=MW-MP/P6_1/xtensa-elf/lib/sim-stack-local
 
-The following code transformation is needed on the host side to move from
-OpenVX API to XRP API:
+  The result is xrp-dsp/xrp-dsp. In order to be loaded as a firmware it needs
+  to be put to the linux file system under /lib/modules/firmware and its name
+  need to be specified in the "firmware" parameter inside xrp device node in
+  the device tree.
 
-int32_t f_host_openvx_api(void)
-{
-	void *data = NULL;
-	void *in = NULL;
-	void *out = NULL;
-	cmd_data *cmd_data;
-	int32_t ret;
+- linux side code needs a toolchain for the target linux. Makefile supports
+  targets "default" and "clean". Examples:
 
-	apk2os_init();
-
-	ret = apk2os_shared_alloc(1, sizeof(cmd_data), &data);
-	if (ret != status_success)
-		return ret;
-	ret = apk2os_shared_alloc(1, 4096, &in);
-	if (ret != status_success)
-		return ret;
-	ret = apk2os_shared_alloc(1, 4096, &out);
-	if (ret != status_success)
-		return ret;
-
-	if (argv[1])
-		strcpy(in, argv[1]);
-	else
-		strcpy(in, "world");
-	cmd_data = data;
-	cmd_data->hello.in = apk2os_share_buffer_with_core(0, in, 4096);
-	cmd_data->hello.out = apk2os_share_buffer_with_core(0, out, 4096);
-
-	ret = xvp_submit_sync(XVP_CMD_HELLO_WORLD, cmd_data);
-	if (ret == status_success) {
-		apk2os_share_buffer_from_core(0, out, 4096);
-		printf("%s\n", out);
-	}
-
-	return ret;
-}
-
-becomes 
-
-int32_t f_host_xrp_api(void)
-{
-	enum xrp_status status;
-	struct xrp_device *device = NULL;
-	struct xrp_queue *queue = NULL;
-	struct xrp_buffer *in = NULL;
-	struct xrp_buffer *out = NULL;
-	void *p;
-	struct xrp_buffer_group *group = xrp_create_buffer_group(NULL);
-	struct cmd_data {
-		int cmd;
-		struct hello {
-			int in;
-			int out;
-		} hello;
-	} cmd_data;
-
-	device = xrp_open_device(0, &status);
-
-	if (status != XRP_STATUS_SUCCESS)
-		goto cleanup;
-
-	queue = xrp_create_queue(device, &status);
-	if (status != XRP_STATUS_SUCCESS)
-		goto cleanup;
-
-	in = xrp_create_buffer(device, 4096, NULL, &status);
-	if (status != XRP_STATUS_SUCCESS)
-		goto cleanup;
-	out = xrp_create_buffer(device, 4096, NULL, &status);
-	if (status != XRP_STATUS_SUCCESS)
-		goto cleanup;
-
-	p = xrp_map_buffer(in, 0, 4096, XRP_READ_WRITE, &status);
-	if (status != XRP_STATUS_SUCCESS)
-		goto cleanup;
-
-	if (argv[1])
-		strcpy(p, argv[1]);
-	else
-		strcpy(p, "world");
-	xrp_unmap_buffer(in, p, NULL);
-
-	cmd_data.cmd = XVP_CMD_HELLO_WORLD;
-	cmd_data.hello.in = xrp_add_buffer_to_group(group, in, XRP_READ, NULL);
-	cmd_data.hello.out = xrp_add_buffer_to_group(group, out, XRP_WRITE, NULL);
-
-	ret = xrp_run_command_sync(queue, &cmd_data, sizeof(cmd_data),
-				   NULL, 0, group, &status);
-	if (status != XRP_STATUS_SUCCESS)
-		goto cleanup;
-
-	p = xrp_map_buffer(out, 0, 4096, XRP_READ, &status);
-	if (status != XRP_STATUS_SUCCESS)
-		goto cleanup;
-	printf("%s\n", p);
-	xrp_unmap_buffer(in, p, NULL);
-
-cleanup:
-	if (in)
-		xrp_release_buffer(in, NULL);
-	if (out)
-		xrp_release_buffer(out, NULL);
-	if (queue)
-		xrp_release_queue(queue, NULL);
-	if (device)
-		xrp_release_device(device, NULL);
-
-	return status;
-}
-
-
-And the following changes are required on the device side:
-
-int32_t apk2os_process_cmd(uint32_t * terminate)
-{
-	cmd_data *cmd_data;
-	uint32_t cmd = xvp_get_cmd(&cmd_data);
-	int32_t ret;
-
-	switch (cmd) {
-	case XVP_CMD_IDLE:
-		return status_success;
-
-	case XVP_CMD_HELLO_WORLD:
-		strcpy(cmd_data->hello.out, "hello ");
-		strcat(cmd_data->hello.out, cmd_data->hello.in);
-		ret = status_success;
-		break;
-
-	default:
-		dprintf("I: %s: unknown command\n", __func__);
-		ret = status_illegal_os_cmd;
-		break;
-	}
-	xvp_complete_cmd(ret);
-	return status_success;
-}
-
-becomes
-
-void xrp_run_command(const void *in_data, size_t in_data_size,
-		     void *out_data, size_t out_data_size,
-		     struct xrp_buffer_group *buffer_group,
-		     enum xrp_status *status)
-{
-	const struct cmd_data *cmd_data = in_data;
-	switch (cmd_data->cmd) {
-	case XVP_CMD_HELLO_WORLD:
-		{
-			struct xrp_buffer *in = NULL;
-			struct xrp_buffer *out = NULL;
-			char *p_in = NULL;
-			char *p_out = NULL;
-
-			in = xrp_get_buffer_from_group(buffer_group,
-						       cmd_data->hello.in,
-						       status);
-			if (*status != XRP_STATUS_SUCCESS)
-				goto hello_world_cleanup;
-
-			out = xrp_get_buffer_from_group(buffer_group,
-							cmd_data->hello.out,
-							status);
-			if (*status != XRP_STATUS_SUCCESS)
-				goto hello_world_cleanup;
-
-			p_in = xrp_map_buffer(in, 0, 4096, XRP_MAP_READ, status);
-			if (*status != XRP_STATUS_SUCCESS)
-				goto hello_world_cleanup;
-
-			p_out = xrp_map_buffer(out, 0, 4096, XRP_MAP_WRITE, status);
-			if (*status != XRP_STATUS_SUCCESS)
-				goto hello_world_cleanup;
-
-			strcpy(p_out, "hello ");
-			strcat(p_out, p_in);
-hello_world_cleanup:
-			if (p_in)
-				xrp_unmap_buffer(in, p_in, NULL);
-			if (p_out)
-				xrp_unmap_buffer(out, p_out, NULL);
-			if (in)
-				xrp_release_buffer(in, NULL);
-			if (out)
-				xrp_release_buffer(out, NULL);
-		}
-		break;
-	default:
-		*status = XRP_STATUS_FAILURE;
-		break;
-	}
-}
+  $ make -C xrp-linux-native
+  $ make -C xrp-linux-sim
