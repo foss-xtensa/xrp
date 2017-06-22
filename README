@@ -6,7 +6,9 @@ Xtensa Remote Processing.
 - Implementations
 - Configuration
 - Code structure
-- Building
+- Building kernel driver
+- Building XRP libraries
+- Building XRP examples
 
 Xtensa Remote Processing (XRP) is a master-slave communication interface for
 linux-based systems containing Xtensa processors. It allows linux userspace
@@ -146,7 +148,7 @@ Fast simulation mode:
   xrp-linux-sim/cdns,sim-shmem.txt for the device tree binding information.
 - DSP firmware bits of the XRP built for fast simulation have the base address
   of the communication area in the shared memory built into it. See how
-  XRP_DSP_COMM_BASE_MAGIC is used.
+  DSP_COMM_BASE is used.
 
 Code structure.
 ==============
@@ -155,6 +157,8 @@ Code structure.
 |                      used with xrp-linux-sim when the host version of libfdt
 |                      is missing or too old.
 +-xrp-dsp/          -- Xtensa DSP side XRP implementation.
++-xrp-example/      -- linux and DSP side example code for both native and fast
+|                      simulation modes.
 +-xrp-kernel/       -- linux kernel driver for the native XRP implementation.
 | `-test/           -- standalone tests for the driver.
 +-xrp-linux-native/ -- linux implementation of the XRP interface for the native
@@ -163,40 +167,115 @@ Code structure.
 |                      simulation mode.
 `-xrp_api.h         -- XRP API definition.
 
-Building.
-========
+Building kernel driver.
+======================
 
-- kernel driver is built using typical kernel module build sequence. Provide
-  the following environment variables/make parameters:
-  - ARCH: target linux architecture;
-  - KSRC: points to the configured kernel tree;
-  - CROSS_COMPILE: path and prefix name of the cross compiler.
-  Makefile supports targets "modules", "clean" and all other standard
-  kernel targets. Example building for xtensa linux:
+Kernel driver is built using typical kernel module build sequence. Provide the
+following environment variables/make parameters:
+- ARCH: target linux architecture;
+- KSRC: points to the configured kernel tree;
+- CROSS_COMPILE: path and prefix name of the cross compiler.
+
+Makefile supports targets "modules", "clean" and all other standard kernel
+targets. Example building for xtensa linux:
 
   $ ARCH=xtensa CROSS_COMPILE=xtensa-dc233c-elf- \
     KSRC=`pwd`/../kernel/xrp-sim-dc233c make -C xrp-kernel modules
 
-  The result is kernel object xrp-kernel/xrp.ko loadable into the kernel it was
-  built against.
+The result is kernel object xrp-kernel/xrp.ko loadable into the kernel it was
+built against.
+
+Building XRP libraries.
+======================
+
+Userspace and firmware code is built using standard autoconf configure + make
+sequence. Generated makefile supports all standard targets, e.g. 'make install'
+would install generated library and header file into selected directory
+structure.
+
+One build directory may be configured to build code either for the host or for
+the DSP, but not for both. This behavior is controlled by the configure switch
+'--enable-dsp'.
+
+Switches '--enable-native' (on by default) and '--enable-sim' (off by default)
+enable building of native variand of library/example or fast simulation variant
+respectively.
 
 - Xtensa DSP code needs an xcc-based toolchain. Provide the following
-  environment variables to the make:
+  environment variable to the configure or to make:
   - DSP_CORE: name of the Xtensa DSP core to build for. It must be the name of
-    the build installed for the used xcc-based toolchain;
-  - LSP: path to the LSP to be used.
-  Makefile supports targets "default" and "clean". Example:
+    the build installed for the used xcc-based toolchain.
+  Without any other options this will produce DSP XRP library
+  xrp-dsp/libxrp-dsp.a
 
-  $ make -C xrp-dsp DSP_CORE=visionp6cnn_ao \
-    LSP=MW-MP/P6_1/xtensa-elf/lib/sim-stack-local
+  $ ./configure --host=xtensa-elf --enable-dsp CC=xt-xcc
+  $ make
 
-  The result is xrp-dsp/xrp-dsp. In order to be loaded as a firmware it needs
-  to be put to the linux file system under /lib/modules/firmware and its name
-  need to be specified in the "firmware" parameter inside xrp device node in
-  the device tree.
+- linux side code needs a toolchain for the target linux. Without additional
+  switches the following will produce linux XRP library for native mode,
+  xrp-linux-native/libxrp-linux-native.a:
 
-- linux side code needs a toolchain for the target linux. Makefile supports
-  targets "default" and "clean". Examples:
+  $ ./configure
+  $ make
 
-  $ make -C xrp-linux-native
-  $ make -C xrp-linux-sim
+  The following will produce linux XRP library for fast simulation mode,
+  xrp-linux-sim/libxrp-linux-sim.a:
+
+  $ ./configure --enable-sim --disable-native
+  $ make
+
+Building XRP examples.
+=====================
+
+An example application may be built in addition to the XRP library. The switch
+'--enable-sim' configures for building fast simulation library or example. Not
+specifying it or specifying '--disable-sim' configures for building native
+library or example.
+
+- adding switch '--enable-example' to the DSP build configuration will produce
+  example firmware for native mode. Provide the following environment variable
+  to the configure or make:
+  - DSP_LSP: path to the LSP to be used.
+
+  $ ./configure --host=xtensa-elf --enable-dsp --enable-example \
+    DSP_CORE=visionp6cnn_ao \
+    DSP_LSP=MW-MP/P6_0/xtensa-elf/lib/sim-stacklocal \
+    CC=xt-xcc
+  $ make
+
+  The result is xrp-example/xrp-dsp-nat. In order to be loaded as a firmware it
+  needs to be put to the linux file system under /lib/modules/firmware and its
+  name need to be specified in the "firmware" parameter inside the xrp device
+  node in the device tree.
+
+- adding switches '--enable-example' '--enable-sim' to the DSP build
+  configuration will produce example firmware for fast simulation mode. Provide
+  the following environment variable to the configure or make:
+  - DSP_COMM_BASE: base address of the DSP communication area.
+
+  $ ./configure --host=xtensa-elf --enable-dsp --enable-example --enable-sim \
+    DSP_CORE=visionp6cnn_ao \
+    DSP_LSP=MW-MP/P6_0/xtensa-elf/lib/sim-stacklocal \
+    DSP_COMM_BASE=0xf0000000 \
+    CC=xt-xcc
+  $ make
+
+  The result is xrp-example/xrp-dsp-sim. In order to be loaded as a firmware a
+  path to it needs to be passed to the XTSC.
+
+- adding switch '--enable-example' to the linux build configuration will
+  produce example linux application for native mode.
+
+  $ ./configure --enable-example
+  $ make
+
+  The result is xrp-example/xrp-linux-nat.
+
+- adding switches '--enable-example' '--enable-sim' to the linux build
+  configuration will produce example linux application for fast simulation
+  mode.
+
+  $ ./configure --enable-example --enable-sim
+  $ make
+
+  The result is xrp-example/xrp-linux-sim.
