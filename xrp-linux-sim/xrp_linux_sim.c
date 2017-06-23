@@ -883,6 +883,8 @@ void xrp_enqueue_command(struct xrp_queue *queue,
 
 void xrp_wait(struct xrp_event *event, enum xrp_status *status)
 {
+	(void)event;
+	(void)status;
 #if 0
 	struct xrp_ioctl_wait ioctl_wait = {
 		.cookie = event->cookie,

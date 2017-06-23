@@ -65,7 +65,7 @@ static void f3(int devid)
 	int i;
 
 	for (sz = 2048; sz < 16384; sz <<= 1) {
-		fprintf(stderr, "%s: sz = %zd\n", __func__, sz);
+		fprintf(stderr, "%s: sz = %zd\n", __func__, (size_t)sz);
 		for (i = 0; i < 4; ++i) {
 			void *p1 = (i & 1) ? malloc(sz) : NULL;
 			void *p2 = (i & 2) ? malloc(sz) : NULL;

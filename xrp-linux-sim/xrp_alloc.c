@@ -59,14 +59,17 @@ static void kfree(void *p)
 
 static void xrp_pool_lock(struct xrp_allocation_pool *pool)
 {
+	(void)pool;
 }
 
 static void xrp_pool_unlock(struct xrp_allocation_pool *pool)
 {
+	(void)pool;
 }
 
 static void xrp_allocation_get(struct xrp_allocation *allocation)
 {
+	(void)allocation;
 }
 
 static void atomic_set(atomic_t *p, uint32_t v)
