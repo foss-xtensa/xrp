@@ -1309,7 +1309,7 @@ static long xrp_unmap_request(struct file *filp, struct xrp_request *rq,
 			rc = __xrp_unshare_block(filp, rq->buffer_mapping + i,
 						 rq->dsp_buffer[i].flags);
 			if (rc < 0) {
-				pr_debug("%s: buffer %d could not be unshared\n",
+				pr_debug("%s: buffer %zd could not be unshared\n",
 					 __func__, i);
 				ret = rc;
 			}
@@ -1410,7 +1410,7 @@ static long xrp_map_request(struct file *filp, struct xrp_request *rq,
 						&buffer_phys,
 						rq->buffer_mapping + i);
 			if (ret < 0) {
-				pr_debug("%s: buffer %d could not be shared\n",
+				pr_debug("%s: buffer %zd could not be shared\n",
 					 __func__, i);
 				goto share_err;
 			}
@@ -1469,7 +1469,7 @@ static void xrp_fill_hw_request(struct xrp_dsp_cmd __iomem *cmd,
 		struct xrp_dsp_cmd dsp_cmd;
 		xrp_comm_read(cmd, &dsp_cmd, sizeof(dsp_cmd));
 		pr_debug("%s: cmd for DSP: %*ph\n",
-			 __func__, sizeof(dsp_cmd), &dsp_cmd);
+			 __func__, (int)sizeof(dsp_cmd), &dsp_cmd);
 	}
 #endif
 
@@ -1886,7 +1886,7 @@ static int xrp_firmware_fixup_symbol(struct xvp *xvp, const char *name,
 
 	if (memcmp(addr, &v32, sz) != 0) {
 		dev_dbg(xvp->dev, "%s: value pointed to by symbol is incorrect: %*ph",
-			__func__, sz, addr);
+			__func__, (int)sz, addr);
 	}
 
 	v32 = v;
