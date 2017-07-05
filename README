@@ -90,6 +90,38 @@ of the XRP interface.
   of firmware on Xtensa DSP implementing DSP subset of the XRP API. It
   receives requests, invokes handler and sends replies back to host.
 
+   ,--------.
+   | System |
+   |        `-----------------------------------------------------------.
+   |  ,-----------.                          ,-------.-------.          |
+   |  | Host CPUS |                          | DSP 0 | DSP 1 | ...      |
+   |  |           `----------------------.   |       `------------.     |
+   |  | ,--------------.                 |   | ,----------------. |     |
+   |  | | User process | ...             |   | |   DSP payload  | |     |
+   |  | |              `---------------. |   | `----------------' |     |
+   |  | | ,--------------------------. | |   |     ^        |     |     |
+   |  | | |  User application code   | | |   |     |        v     |     |
+   |  | | `--------------------------' | |   | ,----------------. |<~.  |
+   |  | |             |       ^        | |   | | DSP XRP library| |<~|  |
+   |  | |             v       |        | |   | `----------------' |<~|  |
+   |  | | ,--------------------------. | |   `---- | ------ ^ ----'  |  |
+   |  | | | Native Linux XRP library | | |         v        |        |  |
+   |  | | `--------------------------' | |   ,-----------.  |        |  |
+   |  | `------------ | ----- ^ -------' |<~~| Host MMIO |  |        |  |
+   |  | ,--------.    |       |          |   `-----------'  |        |  |
+   |  | | Kernel |    |       |          |                  |        |  |
+   |  | |        `--- v ----- | -------. |                  v        |  |
+   |  | | ,--------------------------. | |   ,--------------------.  |  |
+   |  | | |  XRP linux kernel driver |<----->|    Shared memory   |  |  |
+   |  | | `--------------------------' | |   `--------------------'  |  |
+   |  | `---------------- | -----------' |   ,--------------------.  |  |
+   |  |                   |              |   |     DSP 0 MMIO     |~~|  |
+   |  |                   `----------------->|     DSP 1 MMIO     |~~|  |
+   |  |                                  |   |         ...        |~~'  |
+   |  `----------------------------------'   `--------------------'     |
+   |                                                                    |
+   `--------------------------------------------------------------------'
+
 Fast simulation runs linux-side code on a linux-based system and communicates
 with unmodiified Xtensa DSP code running in a simulator on the same linux-based
 system. It consists of the following two parts: fast simulation implementation
@@ -99,6 +131,41 @@ of the XRP interface and the DSP implementation of the XRP interface.
   DSP side XRP code running in simulator;
 - Xtensa DSP side XRP implementation is the same both in native and in fast
   simulation cases.
+
+   ,--------------.                       ,-------------------------.
+   | User process |                       | XTSC simulation process |
+   |              `--------------------.  |                         `---.
+   |                                   |  |  ,-------.-------.          |
+   |                                   |  |  | DSP 0 | DSP 1 | ...      |
+   |                                   |  |  |       `------------.     |
+   |  ,-----------------------------.  |  |  | ,----------------. |     |
+   |  |    User application code    |  |  |  | |   DSP payload  | |     |
+   |  `-----------------------------'  |  |  | `----------------' |     |
+   |              |       ^            |  |  |     ^        |     |     |
+   |              v       |            |  |  |     |        v     |     |
+   |  ,-----------------------------.  |  |  | ,----------------. |<~.  |
+   |  | Fast simulation XRP library |  |  |  | | DSP XRP library| |<~|  |
+   |  `-----------------------------'  |  |  | `----------------' |<~|  |
+   |                  ^                |  |  `--------- ^ --------'  |  |
+   |                  |                |  |             |            |  |
+   |                  v                |  |             v            |  |
+   |  ,-----------------------------------------------------------.  |  |
+   |  |                       Shared memory                       |  |  |
+   |  `-----------------------------------------------------------'  |  |
+   |                                   |  |      |                   |  |
+   `-----------------------------------'  |      v                   |  |
+                                          |  ,--------------------.  |  |
+                                          |  |  Helper LUA script |  |  |
+                                          |  `--------------------'  |  |
+                                          |      |                   |  |
+                                          |      v                   |  |
+                                          |  ,--------------------.  |  |
+                                          |  |     DSP 0 MMIO     |~~|  |
+                                          |  |     DSP 1 MMIO     |~~|  |
+                                          |  |         ...        |~~'  |
+                                          |  `--------------------'     |
+                                          |                             |
+                                          `-----------------------------'
 
 Kernel driver requirements.
 ==========================
