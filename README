@@ -5,6 +5,7 @@ Xtensa Remote Processing.
 - Terminology
 - Implementations
 - Configuration
+- Operation
 - Code structure
 - Building kernel driver
 - Building XRP libraries
@@ -216,6 +217,101 @@ Fast simulation mode:
 - DSP firmware bits of the XRP built for fast simulation have the base address
   of the communication area in the shared memory built into it. See how
   DSP_COMM_BASE is used.
+
+Operation.
+=========
+
+XRP DSP library implements the main function. When it starts it calls optional
+user initialization function, synchronizes with the host and then runs command
+handling loop. During synchronization process host communicates whether host
+and DSP use IRQ and IRQ numbers/MMIO register locations. Then host and DSP
+exchange IRQs in directions where IRQs are used.
+
+DSP payload need to provide the following two functions that XRP DSP library
+will call:
+- void xrp_user_initialize(enum xrp_status *status): this function is
+  optional. When it is provided the XRP DSP library calls it once before
+  synchronization with the host and entering the main loop. Set status to
+  XRP_STATUS_SUCCESS before returning from that function if it's OK to
+  continue. Setting status to any other value will cause immediate exit from
+  the main function returning that status.
+- void xrp_run_command(const void *in_data, size_t in_data_size,
+                       void *out_data, size_t out_data_size,
+                       struct xrp_buffer_group *buffer_group,
+                       enum xrp_status *status): this function is mandatory.
+  It is called from the main loop whenever a command is received. The function
+  takes command description from the in_data buffer and associated buffer group
+  from the buffer_group. It writes command processing results to the out_data
+  buffer and to the relevant buffers of the buffer group. The function may not
+  retain pointers to any buffers passed to it for later use and must release
+  all references to buffers and buffer group it could have made before
+  returning. Status shall reflect whether the command was recognized and
+  processed or not. IOW XRP_STATUS_SUCCESS should be returned in status if
+  out_data is filled in, otherwise there should be XRP_STATUS_FAILURE.
+
+Linux application that uses XRP starts with opening XRP devices with
+xrp_open_device function. XRP devices may have different capabilities and run
+different firmware, there's nothing in the XRP API about it. Linux application
+may need to open XRP device and communicate with it to find its capabilities.
+XRP device is identified by an integer index. After opening the device the
+application need to create a command queue with xrp_create_queue function.
+Once a queue is created an application can send commands through this queue.
+Commands may be sent synchronously with xrp_run_command_sync function or
+asynchronously with xrp_enqueue_command function. xrp_run_command_sync returns
+when the command execution is complete. xrp_enqueue_command returns
+immediately, regardless of the completion of the command that it enqueued. It
+may return a pointer to the event that becomes signaled when the command is
+complete. An application may call xrp_wait function to wait for the event.
+Completion of a command means completion of all preceding commands in the same
+command queue.
+A command may operate on data buffers, however it may not reference them by
+address as the address spaces of the application and DSP payload may be
+different. Instead each contiguous buffer is represented as an xrp_buffer
+object, and a group of buffers related to one command is represented as an
+xrp_buffer_group object. Individual buffers are referenced by index in the
+buffer group.
+xrp_buffer object can be created with the xrp_create_buffer function. It may
+be assigned an ordinary userspace memory or the device specific shared memory
+may be allocated for it. The difference is that the ordinary userspace memory
+may not be the most effective type of memory for communication with the DSP,
+because depending on its location and physical contiguity the driver may need
+to create a bounce buffer that will be presented to the DSP and copy data
+to/from there. Device specific shared memory is guaranteed to be directly
+accessible to the DSP firmware code and not require use of intermediate bounce
+buffers.
+In order to access memory of the xrp_buffer object the buffer or part of it
+must be mapped with the xrp_map_buffer function. A buffer may be mapped for
+read only or read/write access. The host specifies allowed access when it adds
+the buffer to the buffer group, the DSP will not be able to use the buffer in
+a way not enabled by the host. When buffer mapping is no longer needed it may
+be unmapped with the xrp_unmap_bufer function. Each mapping of the buffer must
+be unmapped individually. A buffer is only allowed to cross host/DSP boundary
+when it doesn't have any mappings.
+
+In native mode XRP linux kernel driver manages DSP devices. When the driver
+gets loaded or device binding is added through sysfs the driver's probe
+function is called for each matching device node. It halts and resets the DSP,
+loads the firmware image and sets up the communication area address in shared
+memory. It then releases the DSP from reset and tries to synchronize with the
+firmware through the communication area. When successfull it sends selected IRQ
+parameters to the firmware and tests that chosen IRQs actually work. In case
+of success a new character device is created for that DSP. Linux userspace XRP
+library may then open that device and interact with it by ioctl and mmap system
+calls.
+
+In fast simulation mode XTSC simulator loads firmware images for all simulated
+DSP cores. Each firmware image has its communication area address preconfigured
+(see DSP_COMM_BASE in this document). Shared physical memory simulated by the
+XTSC is implemented as shared memory of the host platform. In case of linux it
+is backed by files in /dev/shm. Fast simulation mode XRP user library uses
+device tree blob linked with it to find names of the shared memory files and
+addresses of the DSP communication areas. It synchronizes with all DSP nodes
+configured in the device tree, the synchronization protocol is the same as in
+native mode. It is possible to use IRQ for communication from host to the DSP.
+A LUA script running in the XTSC polls hardcoded shared memory locations
+designated as software IRQ registers and initiates internal write to the real
+MMIO IRQ register when such location is written to.
+It is not possible to use IRQ for communication from the DSP to the host.
 
 Code structure.
 ==============
