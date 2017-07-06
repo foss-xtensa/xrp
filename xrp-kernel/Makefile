@@ -4,8 +4,8 @@ obj-m += xrp.o
 
 KSRC ?= /lib/modules/$(shell uname -r)/build
 
-all:
-	$(MAKE) -C $(KSRC) M=$(PWD) modules
+modules:
+	$(MAKE) -C $(KSRC) M=`pwd` modules
 
-clean:
-	$(MAKE) -C $(KSRC) M=$(PWD) clean
+%:
+	$(MAKE) -C $(KSRC) M=`pwd` $@
