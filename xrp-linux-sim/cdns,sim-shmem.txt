@@ -4,7 +4,10 @@ Required properties:
 - compatible: shall be "cdns,sim-shmem".
 - reg: register locations of each shared memory block.
 - reg-names: string list, one string per shared memory block: name of the
-             shared memory region usable for opening it with shm_open.
+             shared memory region usable for opening it with shm_open. The
+             name may contain printf-like format specifier for an int
+             parameter, if it's present it's substituted with the PID of the
+             process.
 
 Example:
 
@@ -13,5 +16,5 @@ Example:
 		compatible = "cdns,sim-shmem";
 		reg = <0xf0000000 0x08000000
 		       0x00000000 0x10000000>;
-		reg-names = "SharedRAM_L", "SystemRAM_L";
+		reg-names = "SharedRAM_L.%d", "SystemRAM_L.%d";
 	};

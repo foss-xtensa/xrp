@@ -245,8 +245,18 @@ static void initialize_shmem(void)
 	xrp_shmem = malloc(xrp_shmem_count * sizeof(struct xrp_shmem));
 
 	for (i = 0; i < xrp_shmem_count; ++i) {
+		const char *name_fmt = names + name_offset;
+		char *name = NULL;
+		int sz = strlen(names + name_offset) + sizeof(int) * 3 + 1;
 		int rc;
-		const char *name = names + name_offset;
+
+		for (;;) {
+			name = realloc(name, sz);
+			rc = snprintf(name, sz, name_fmt, (int)getpid());
+			if (rc < sz)
+				break;
+			sz = rc + 1;
+		}
 
 		xrp_shmem[i] = (struct xrp_shmem){
 			.start = getprop_u32(reg, reg_offset),
