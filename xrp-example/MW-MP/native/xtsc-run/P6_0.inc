@@ -1,7 +1,7 @@
 // Build P6_0's components
 
 // Create proc P6_0
---xtensa_core=XRC_Vision_P6_AO_noECC_bigmem
+--xtensa_core=visionp6cnn_ao_exls
 --xtensa_params=
 --set_core_parm=ProcessorID=0
 --set_core_parm=SimStaticVectorSelect=0
@@ -15,8 +15,8 @@
 --set_memory_parm=num_ports=16
 --set_memory_parm=byte_width=16
 --set_memory_parm=immediate_timing=true
---set_memory_parm=start_byte_address=0x3ff00000
---set_memory_parm=memory_byte_size=524288
+--set_memory_parm=start_byte_address=0x3ffe0000
+--set_memory_parm=memory_byte_size=131072
 --create_memory=P6_0_DATARAM0
 
 // Create P6_0 DATARAM0 arbiters
@@ -172,8 +172,8 @@
 --set_memory_parm=num_ports=16
 --set_memory_parm=byte_width=16
 --set_memory_parm=immediate_timing=true
---set_memory_parm=start_byte_address=0x3ff80000
---set_memory_parm=memory_byte_size=524288
+--set_memory_parm=start_byte_address=0x3ffc0000
+--set_memory_parm=memory_byte_size=131072
 --create_memory=P6_0_DATARAM1
 
 // Create P6_0 DATARAM1 arbiters

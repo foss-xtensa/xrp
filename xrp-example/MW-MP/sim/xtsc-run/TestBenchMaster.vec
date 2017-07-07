@@ -3,6 +3,7 @@
 #define INTR_SHMEM_NAME "SharedRAM_L"
 #define DSP_INTR_OFFSET {0x0, 0x4}
 #define DSP_MMIO        {0xfd001000, 0xfd002000}
+#define EXIT_ADDR       0xf0000108
 #define NUM_DSPS        2
 #define BINTR           "0x04 0x00 0x00 0x00"
 
@@ -21,6 +22,11 @@
         xtsc.write("now poke " .. mmio     .. " 4 " .. $(BINTR))
         xtsc.write("now poke " .. intr_off .. " 4 0x00 0x00 0x00 0x00")
       end
+    end
+    exit = xtsc.cmd($(INTR_SHMEM_NAME) .. " peek " .. $(EXIT_ADDR) .. " 4")
+    if (exit == "0xff 0x00 0x00 0x00") then
+      xtsc.write("now poke " .. $(EXIT_ADDR) .. " 4 0x00 0x00 0x00 0x00")
+      xtsc.cmd("sc sc_stop")
     end
   end
 #lua_end

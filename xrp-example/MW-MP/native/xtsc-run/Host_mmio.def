@@ -1,0 +1,23 @@
+/*
+register  <RegisterName>  <BitWidth>  <Address>   {<InitialValue>}
+--------  --------------  ----------  ----------   --------------  */
+register    Host_intr_reg  32       0xfd000000         0
+
+register    Host_BReset          1    0xfd000004     0
+register    Host_RunStall        1    0xfd000008     0
+register    Host_StatVectorSel   1    0xfd00000c     0
+register    Host_BInterrupt13    1    0xfd000010     0
+register    Host_BInterrupt14    1    0xfd000014     0
+
+/*
+output  <PortName>    <RegisterName>  {<HighBit>  {<LowBit>}}
+------  ------------  --------------   ---------   --------  */
+output   Host_intr_reg_0   Host_intr_reg   0     0
+output   Host_intr_reg_1   Host_intr_reg   1     1
+output   Host_intr_reg_2   Host_intr_reg   2     2
+
+output   Host_BReset          Host_BReset          0     0
+output   Host_RunStall        Host_RunStall        0     0
+output   Host_StatVectorSel   Host_StatVectorSel   0     0
+output   Host_BInterrupt13    Host_BInterrupt13    0     0
+output   Host_BInterrupt14    Host_BInterrupt14    0     0
