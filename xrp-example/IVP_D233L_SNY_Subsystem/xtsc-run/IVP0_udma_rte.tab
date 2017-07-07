@@ -1,4 +1,0 @@
-/* <Port>  <LowAddr>   <HighAddr>  <NewBaseAddr>  */
-
-    0      0x00010000  0x0001ffff                    /* PROC0 DATARAM0 */
-    1      0x00030000  0x0003ffff                    /* PROC0 DATARAM1 */
