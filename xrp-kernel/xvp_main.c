@@ -26,6 +26,7 @@
 #include <asm/cacheflush.h>
 #include <asm/mman.h>
 #include <asm/uaccess.h>
+#include "xrp_alloc.h"
 #include "xrp_kernel_defs.h"
 #include "xrp_kernel_dsp_interface.h"
 
@@ -55,14 +56,6 @@ struct xvp_alien_mapping {
 	} type;
 };
 
-struct xvp_allocation {
-	phys_addr_t start;
-	u32 size;
-	atomic_t ref;
-	struct xvp_allocation *next;
-	struct xvp_file *xvp_file;
-};
-
 struct xrp_mapping {
 	enum {
 		XRP_MAPPING_NONE,
@@ -71,7 +64,7 @@ struct xrp_mapping {
 		XRP_MAPPING_KERNEL,
 	} type;
 	union {
-		struct xvp_allocation *xvp_allocation;
+		struct xrp_allocation *xrp_allocation;
 		struct xvp_alien_mapping *xvp_alien_mapping;
 	};
 };
@@ -119,15 +112,14 @@ struct xvp {
 	u32 host_irq[2];
 	struct completion completion;
 
-	struct mutex free_list_lock;
-	struct xvp_allocation *free_list;
+	struct xrp_allocation_pool pool;
 	struct mutex comm_lock;
 };
 
 struct xvp_file {
 	struct xvp *xvp;
 	spinlock_t busy_list_lock;
-	struct xvp_allocation *busy_list;
+	struct xrp_allocation *busy_list;
 };
 
 static int firmware_reboot = 1;
@@ -331,16 +323,6 @@ static irqreturn_t xvp_irq_handler(int irq, void *dev_id)
 	return IRQ_HANDLED;
 }
 
-static inline void xvp_memory_lock(struct xvp *xvp)
-{
-	mutex_lock(&xvp->free_list_lock);
-}
-
-static inline void xvp_memory_unlock(struct xvp *xvp)
-{
-	mutex_unlock(&xvp->free_list_lock);
-}
-
 static inline void xvp_file_lock(struct xvp_file *xvp_file)
 {
 	spin_lock(&xvp_file->busy_list_lock);
@@ -351,192 +333,22 @@ static inline void xvp_file_unlock(struct xvp_file *xvp_file)
 	spin_unlock(&xvp_file->busy_list_lock);
 }
 
-static inline void xvp_allocation_get(struct xvp_allocation *xvp_allocation)
-{
-	atomic_inc(&xvp_allocation->ref);
-}
-
-static void xvp_free(struct xvp_allocation *xvp_allocation)
-{
-	struct xvp_file *xvp_file = xvp_allocation->xvp_file;
-	struct xvp *xvp = xvp_file->xvp;
-	struct xvp_allocation **pcur;
-
-	pr_debug("%s: %pap x %d\n", __func__,
-		 &xvp_allocation->start, xvp_allocation->size);
-
-	xvp_memory_lock(xvp);
-
-	for (pcur = &xvp->free_list; ; pcur = &(*pcur)->next) {
-		struct xvp_allocation *cur = *pcur;
-
-		if (cur && cur->start + cur->size == xvp_allocation->start) {
-			struct xvp_allocation *next = cur->next;
-
-			pr_debug("merging block tail: %pap x 0x%x ->\n",
-				 &cur->start, cur->size);
-			cur->size += xvp_allocation->size;
-			pr_debug("... -> %pap x 0x%x\n",
-				 &cur->start, cur->size);
-			kfree(xvp_allocation);
-
-			if (next && cur->start + cur->size == next->start) {
-				pr_debug("merging with next block: %pap x 0x%x ->\n",
-					 &cur->start, cur->size);
-				cur->size += next->size;
-				cur->next = next->next;
-				pr_debug("... -> %pap x 0x%x\n",
-					 &cur->start, cur->size);
-				kfree(next);
-			}
-			break;
-		}
-
-		if (!cur || xvp_allocation->start < cur->start) {
-			if (cur && xvp_allocation->start + xvp_allocation->size == cur->start) {
-				pr_debug("merging block head: %pap x 0x%x ->\n",
-					 &cur->start, cur->size);
-				cur->size += xvp_allocation->size;
-				cur->start = xvp_allocation->start;
-				pr_debug("... -> %pap x 0x%x\n",
-					 &cur->start, cur->size);
-				kfree(xvp_allocation);
-			} else {
-				pr_debug("inserting new free block\n");
-				xvp_allocation->next = cur;
-				*pcur = xvp_allocation;
-			}
-			break;
-		}
-	}
-
-	xvp_memory_unlock(xvp);
-}
-
-static inline void xvp_allocation_put(struct xvp_allocation *xvp_allocation)
-{
-	if (atomic_dec_and_test(&xvp_allocation->ref))
-		xvp_free(xvp_allocation);
-}
-
-static long xvp_allocate(struct xvp_file *xvp_file,
-			 u32 size, u32 align,
-			 struct xvp_allocation **alloc)
-{
-	struct xvp *xvp = xvp_file->xvp;
-	struct xvp_allocation **pcur;
-	struct xvp_allocation *cur = NULL;
-	struct xvp_allocation *new;
-	phys_addr_t aligned_start = 0;
-	bool found = false;
-
-	if (!size || (align & (align - 1)))
-		return -EINVAL;
-	if (!align)
-		align = 1;
-
-	new = kzalloc(sizeof(struct xvp_allocation), GFP_KERNEL);
-	if (!new)
-		return -ENOMEM;
-
-	align = ALIGN(align, PAGE_SIZE);
-	size = ALIGN(size, PAGE_SIZE);
-
-	xvp_memory_lock(xvp);
-
-	/* on exit free list is fixed */
-	for (pcur = &xvp->free_list; *pcur; pcur = &(*pcur)->next) {
-		cur = *pcur;
-		aligned_start = ALIGN(cur->start, align);
-
-		if (aligned_start >= cur->start &&
-		    aligned_start - cur->start + size <= cur->size) {
-			if (aligned_start == cur->start) {
-				if (aligned_start + size == cur->start + cur->size) {
-					pr_debug("reusing complete block: %pap x %x\n", &cur->start, cur->size);
-					*pcur = cur->next;
-				} else {
-					pr_debug("cutting block head: %pap x %x ->\n", &cur->start, cur->size);
-					cur->size -= aligned_start + size - cur->start;
-					cur->start = aligned_start + size;
-					pr_debug("... -> %pap x %x\n", &cur->start, cur->size);
-					cur = NULL;
-				}
-			} else {
-				if (aligned_start + size == cur->start + cur->size) {
-					pr_debug("cutting block tail: %pap x %x ->\n", &cur->start, cur->size);
-					cur->size = aligned_start - cur->start;
-					pr_debug("... -> %pap x %x\n", &cur->start, cur->size);
-					cur = NULL;
-				} else {
-					pr_debug("splitting block into two: %pap x %x ->\n", &cur->start, cur->size);
-					new->start = aligned_start + size;
-					new->size = cur->start + cur->size - new->start;
-
-					cur->size = aligned_start - cur->start;
-
-					new->next = cur->next;
-					cur->next = new;
-					pr_debug("... -> %pap x %x + %pap x %x\n", &cur->start, cur->size, &new->start, new->size);
-
-					cur = NULL;
-					new = NULL;
-				}
-			}
-			found = true;
-			break;
-		} else {
-			cur = NULL;
-		}
-	}
-
-	xvp_memory_unlock(xvp);
-
-	if (!found) {
-		kfree(cur);
-		kfree(new);
-		return -ENOMEM;
-	}
-
-	if (!cur) {
-		cur = new;
-		new = NULL;
-	}
-	if (!cur) {
-		cur = kzalloc(sizeof(struct xvp_allocation), GFP_KERNEL);
-		if (!cur)
-			return -ENOMEM;
-	}
-	if (new)
-		kfree(new);
-
-	pr_debug("returning: %pap x %x\n", &aligned_start, size);
-	cur->start = aligned_start;
-	cur->size = size;
-	cur->xvp_file = xvp_file;
-	atomic_set(&cur->ref, 0);
-	xvp_allocation_get(cur);
-	*alloc = cur;
-
-	return 0;
-}
-
-static void xvp_allocation_queue(struct xvp_file *xvp_file,
-				 struct xvp_allocation *xvp_allocation)
+static void xrp_allocation_queue(struct xvp_file *xvp_file,
+				 struct xrp_allocation *xrp_allocation)
 {
 	xvp_file_lock(xvp_file);
 
-	xvp_allocation->next = xvp_file->busy_list;
-	xvp_file->busy_list = xvp_allocation;
+	xrp_allocation->next = xvp_file->busy_list;
+	xvp_file->busy_list = xrp_allocation;
 
 	xvp_file_unlock(xvp_file);
 }
 
-static struct xvp_allocation *xvp_allocation_dequeue(struct xvp_file *xvp_file,
+static struct xrp_allocation *xrp_allocation_dequeue(struct xvp_file *xvp_file,
 						     phys_addr_t paddr, u32 size)
 {
-	struct xvp_allocation **pcur;
-	struct xvp_allocation *cur;
+	struct xrp_allocation **pcur;
+	struct xrp_allocation *cur;
 
 	xvp_file_lock(xvp_file);
 
@@ -556,7 +368,7 @@ static long xrp_ioctl_alloc(struct file *filp,
 			    struct xrp_ioctl_alloc __user *p)
 {
 	struct xvp_file *xvp_file = filp->private_data;
-	struct xvp_allocation *xvp_allocation;
+	struct xrp_allocation *xrp_allocation;
 	unsigned long vaddr;
 	struct xrp_ioctl_alloc xrp_ioctl_alloc;
 	long err;
@@ -568,17 +380,18 @@ static long xrp_ioctl_alloc(struct file *filp,
 	pr_debug("%s: size = %d, align = %x\n", __func__,
 		 xrp_ioctl_alloc.size, xrp_ioctl_alloc.align);
 
-	err = xvp_allocate(xvp_file, xrp_ioctl_alloc.size,
+	err = xrp_allocate(&xvp_file->xvp->pool,
+			   xrp_ioctl_alloc.size,
 			   xrp_ioctl_alloc.align,
-			   &xvp_allocation);
+			   &xrp_allocation);
 	if (err)
 		return err;
 
-	xvp_allocation_queue(xvp_file, xvp_allocation);
+	xrp_allocation_queue(xvp_file, xrp_allocation);
 
-	vaddr = vm_mmap(filp, 0, xvp_allocation->size,
+	vaddr = vm_mmap(filp, 0, xrp_allocation->size,
 			PROT_READ | PROT_WRITE, MAP_SHARED,
-			xvp_allocation->start - xvp_file->xvp->pmem);
+			xrp_allocation_offset(xrp_allocation));
 
 	xrp_ioctl_alloc.addr = vaddr;
 
@@ -659,7 +472,7 @@ static void xvp_alien_mapping_destroy(struct xvp_alien_mapping *alien_mapping)
 			put_page(page + i);
 		break;
 	case ALIEN_COPY:
-		xvp_allocation_put(alien_mapping->allocation);
+		xrp_allocation_put(alien_mapping->allocation);
 		break;
 	default:
 		break;
@@ -863,11 +676,12 @@ static long xvp_copy_virt_to_phys(struct xvp_file *xvp_file,
 	unsigned long phys;
 	unsigned long align = clamp(vaddr & -vaddr, PAGE_SIZE, 16ul);
 	unsigned long offset = vaddr & (align - 1);
-	struct xvp_allocation *allocation;
+	struct xrp_allocation *allocation;
 	struct xvp_alien_mapping *alien_mapping;
 	long rc;
 
-	rc = xvp_allocate(xvp_file, size + align, align, &allocation);
+	rc = xrp_allocate(&xvp_file->xvp->pool,
+			  size + align, align, &allocation);
 	if (rc < 0)
 		return rc;
 
@@ -878,7 +692,7 @@ static long xvp_copy_virt_to_phys(struct xvp_file *xvp_file,
 	if (flags & XRP_FLAG_READ) {
 		if (xrp_copy_user_to_phys(xvp_file->xvp,
 					  vaddr, size, phys)) {
-			xvp_allocation_put(allocation);
+			xrp_allocation_put(allocation);
 			return -EFAULT;
 		}
 	}
@@ -892,7 +706,7 @@ static long xvp_copy_virt_to_phys(struct xvp_file *xvp_file,
 						 .type = ALIEN_COPY,
 						 });
 	if (!alien_mapping) {
-		xvp_allocation_put(allocation);
+		xrp_allocation_put(allocation);
 		return -ENOMEM;
 	}
 
@@ -1001,12 +815,12 @@ static long __xrp_share_block(struct file *filp,
 	 * And it need to be allocated from the same file descriptor.
 	 */
 	if (vma && vma->vm_file == filp) {
-		struct xvp_allocation *xvp_allocation =
+		struct xrp_allocation *xrp_allocation =
 			vma->vm_private_data;
 
 		mapping->type = XRP_MAPPING_NATIVE;
-		mapping->xvp_allocation = xvp_allocation;
-		xvp_allocation_get(mapping->xvp_allocation);
+		mapping->xrp_allocation = xrp_allocation;
+		xrp_allocation_get(mapping->xrp_allocation);
 		phys = xvp_file->xvp->pmem + (vma->vm_pgoff << PAGE_SHIFT) +
 			virt - vma->vm_start;
 	} else {
@@ -1117,7 +931,7 @@ static long __xrp_unshare_block(struct file *filp, struct xrp_mapping *mapping,
 
 	switch (mapping->type) {
 	case XRP_MAPPING_NATIVE:
-		xvp_allocation_put(mapping->xvp_allocation);
+		xrp_allocation_put(mapping->xrp_allocation);
 		break;
 
 	case XRP_MAPPING_ALIEN:
@@ -1580,13 +1394,13 @@ static long xvp_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 static void xvp_vm_open(struct vm_area_struct *vma)
 {
 	pr_debug("%s\n", __func__);
-	xvp_allocation_get(vma->vm_private_data);
+	xrp_allocation_get(vma->vm_private_data);
 }
 
 static void xvp_vm_close(struct vm_area_struct *vma)
 {
 	pr_debug("%s\n", __func__);
-	xvp_allocation_put(vma->vm_private_data);
+	xrp_allocation_put(vma->vm_private_data);
 }
 
 static const struct vm_operations_struct xvp_vm_ops = {
@@ -1599,19 +1413,19 @@ static int xvp_mmap(struct file *filp, struct vm_area_struct *vma)
 	int err;
 	struct xvp_file *xvp_file = filp->private_data;
 	unsigned long pfn = vma->vm_pgoff + (xvp_file->xvp->pmem >> PAGE_SHIFT);
-	struct xvp_allocation *xvp_allocation;
+	struct xrp_allocation *xrp_allocation;
 
 	pr_debug("%s\n", __func__);
-	xvp_allocation = xvp_allocation_dequeue(filp->private_data,
+	xrp_allocation = xrp_allocation_dequeue(filp->private_data,
 						pfn << PAGE_SHIFT,
 						vma->vm_end - vma->vm_start);
-	if (xvp_allocation) {
+	if (xrp_allocation) {
 		err = remap_pfn_range(vma, vma->vm_start, pfn,
 				      vma->vm_end - vma->vm_start,
 				      vma->vm_page_prot);
 
 
-		vma->vm_private_data = xvp_allocation;
+		vma->vm_private_data = xrp_allocation;
 		vma->vm_ops = &xvp_vm_ops;
 	} else {
 		err = -EINVAL;
@@ -2038,7 +1852,6 @@ static int xvp_probe(struct platform_device *pdev)
 	xvp->dev = &pdev->dev;
 	platform_set_drvdata(pdev, xvp);
 	mutex_init(&xvp->comm_lock);
-	mutex_init(&xvp->free_list_lock);
 
 	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	if (!mem) {
@@ -2116,14 +1929,10 @@ static int xvp_probe(struct platform_device *pdev)
 	}
 
 	xvp->pmem = mem->start;
-	xvp->free_list = kzalloc(sizeof(struct xvp_allocation), GFP_KERNEL);
-	if (!xvp->free_list) {
-		ret = -ENOMEM;
-		goto err;
-	}
-	xvp->free_list->start = mem->start;
-	xvp->free_list->size = resource_size(mem);
 	pr_debug("%s: xvp->pmem = %pap\n", __func__, &xvp->pmem);
+	ret = xrp_init_pool(&xvp->pool, mem->start, resource_size(mem));
+	if (ret < 0)
+		goto err;
 
 	xvp->hw_control = of_device_get_match_data(xvp->dev);
 	if (xvp->hw_control == NULL) {
@@ -2163,7 +1972,7 @@ static int xvp_probe(struct platform_device *pdev)
 		goto err_free;
 	return 0;
 err_free:
-	kfree(xvp->free_list);
+	xrp_free_pool(&xvp->pool);
 err:
 	dev_err(&pdev->dev, "%s: ret = %d\n", __func__, ret);
 	return ret;
@@ -2176,7 +1985,7 @@ static int xvp_remove(struct platform_device *pdev)
 	xvp_halt_dsp(xvp);
 	misc_deregister(&xvp->miscdev);
 	release_firmware(xvp->firmware);
-	kfree(xvp->free_list);
+	xrp_free_pool(&xvp->pool);
 	--xvp_nodeid;
 	return 0;
 }

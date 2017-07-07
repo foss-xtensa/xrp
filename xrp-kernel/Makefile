@@ -1,4 +1,4 @@
-xrp-y += xvp_main.o
+xrp-y += xvp_main.o xrp_alloc.o
 
 obj-m += xrp.o
 
