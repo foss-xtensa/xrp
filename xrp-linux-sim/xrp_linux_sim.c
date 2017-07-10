@@ -78,6 +78,7 @@ struct xrp_device_description {
 
 static struct xrp_device_description xrp_device_description[4];
 static int xrp_device_count;
+static phys_addr_t xrp_exit_loc;
 
 struct xrp_refcounted {
 	unsigned long count;
@@ -233,12 +234,14 @@ static void initialize_shmem(void)
 	}
 	reg = fdt_getprop(fdt, offset, "reg", &reg_len);
 	if (!reg) {
-		printf("%s: %s\n", __func__, fdt_strerror(reg_len));
+		printf("%s: fdt_getprop \"reg\": %s\n",
+		       __func__, fdt_strerror(reg_len));
 		return;
 	}
 	names = fdt_getprop(fdt, offset, "reg-names", &names_len);
 	if (!names) {
-		printf("%s: %s\n", __func__, fdt_strerror(names_len));
+		printf("%s: fdt_getprop \"reg-names\": %s\n",
+		       __func__, fdt_strerror(names_len));
 		return;
 	}
 	xrp_shmem_count = reg_len / 8;
@@ -285,6 +288,13 @@ static void initialize_shmem(void)
 			break;
 		}
 	}
+	reg = fdt_getprop(fdt, offset, "exit-loc", &reg_len);
+	if (!reg) {
+		printf("%s: fdt_getprop \"exit-loc\": %s\n",
+		       __func__, fdt_strerror(reg_len));
+		return;
+	}
+	xrp_exit_loc = getprop_u32(reg, 0);
 }
 
 static inline void xrp_send_device_irq(struct xrp_device_description *desc)
@@ -908,4 +918,10 @@ void xrp_wait(struct xrp_event *event, enum xrp_status *status)
 	}
 	set_status(status, XRP_STATUS_SUCCESS);
 #endif
+}
+
+void xrp_exit(void)
+{
+	void *exit_loc = p2v(xrp_exit_loc);
+	xrp_comm_write32(exit_loc, 0xff);
 }

@@ -38,6 +38,7 @@
 		compatible = "cdns,sim-shmem";
 		reg = <0xf0000000 0x08000000
 		       0x00000000 0x10000000>;
+		exit-loc = <0xf0000108>;
 		reg-names = "SharedRAM_L", "SystemRAM_L";
 	};
 

@@ -313,4 +313,9 @@ void xrp_run_command(const void *in_data, size_t in_data_size,
 		     struct xrp_buffer_group *buffer_group,
 		     enum xrp_status *status);
 
+/*
+ * Helper function that terminates fast simulation
+ */
+void xrp_exit(void);
+
 #endif
