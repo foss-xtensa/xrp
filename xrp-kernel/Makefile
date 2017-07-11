@@ -1,6 +1,7 @@
-xrp-y += xvp_main.o xrp_alloc.o
+xrp-y += xvp_main.o xrp_address_map.o xrp_alloc.o
 
 obj-m += xrp.o
+obj-$(XRP_HW_SIMPLE) += xrp_hw_simple.o
 
 KSRC ?= /lib/modules/$(shell uname -r)/build
 

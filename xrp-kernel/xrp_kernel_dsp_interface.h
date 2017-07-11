@@ -13,22 +13,9 @@ enum {
 	XRP_DSP_SYNC_DSP_TO_HOST = 0x3,
 };
 
-enum {
-	XRP_DSP_SYNC_IRQ_MODE_NONE = 0x0,
-	XRP_DSP_SYNC_IRQ_MODE_LEVEL = 0x1,
-	XRP_DSP_SYNC_IRQ_MODE_EDGE = 0x2,
-};
-
 struct xrp_dsp_sync {
 	__u32 sync;
-	__u32 device_mmio_base;
-	__u32 host_irq_mode;
-	__u32 host_irq_offset;
-	__u32 host_irq_bit;
-	__u32 device_irq_mode;
-	__u32 device_irq_offset;
-	__u32 device_irq_bit;
-	__u32 device_irq;
+	__u32 hw_sync_data[0];
 };
 
 enum {

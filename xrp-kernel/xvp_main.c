@@ -27,16 +27,12 @@
 #include <asm/mman.h>
 #include <asm/uaccess.h>
 #include "xrp_alloc.h"
+#include "xrp_hw.h"
 #include "xrp_kernel_defs.h"
 #include "xrp_kernel_dsp_interface.h"
 
+#define DRIVER_NAME "xrp"
 #define XVP_TIMEOUT_JIFFIES (HZ * 10)
-
-#define XVP_REG_RESET		(0x00)
-#define XVP_REG_RUNSTALL	(0x04)
-
-#define XRP_REG_RESET		(0x04)
-#define XRP_REG_RUNSTALL	(0x08)
 
 struct xvp;
 struct xvp_file;
@@ -66,47 +62,19 @@ struct xrp_mapping {
 	};
 };
 
-struct xvp_hw_control {
-	void (*reset)(struct xvp *xvp);
-	void (*halt)(struct xvp *xvp);
-	void (*release)(struct xvp *xvp);
-};
-
-enum xrp_irq_mode {
-	XRP_IRQ_NONE,
-	XRP_IRQ_LEVEL,
-	XRP_IRQ_EDGE,
-	XRP_IRQ_MAX,
-};
-
 struct xvp {
 	struct device *dev;
 	const char *firmware_name;
 	const struct firmware *firmware;
 	struct miscdevice miscdev;
-	const struct xvp_hw_control *hw_control;
+	const struct xrp_hw_ops *hw_ops;
+	void *hw_arg;
 
-	void __iomem *regs;
 	void __iomem *comm;
 	phys_addr_t pmem;
-	phys_addr_t regs_phys;
 	phys_addr_t comm_phys;
 
-	/* how IRQ is used to notify the device of incoming data */
-	enum xrp_irq_mode device_irq_mode;
-	/*
-	 * offset of IRQ register in MMIO region (host side)
-	 * bit number
-	 * device IRQ#
-	 */
-	u32 device_irq[3];
-	/* how IRQ is used to notify the host of incoming data */
-	enum xrp_irq_mode host_irq_mode;
-	/*
-	 * offset of IRQ register (device side)
-	 * bit number
-	 */
-	u32 host_irq[2];
+	bool host_irq_mode;
 	struct completion completion;
 
 	struct xrp_allocation_pool pool;
@@ -135,19 +103,7 @@ MODULE_PARM_DESC(loopback, "Don't use actual DSP, perform everything locally.");
 
 static unsigned xvp_nodeid;
 
-#define DRIVER_NAME "xrp"
-
 static int xvp_boot_firmware(struct xvp *xvp);
-
-static inline void xvp_reg_write32(struct xvp *xvp, unsigned addr, u32 v)
-{
-	__raw_writel(v, xvp->regs + addr);
-}
-
-static inline u32 xvp_reg_read32(struct xvp *xvp, unsigned addr)
-{
-	return __raw_readl(xvp->regs + addr);
-}
 
 static inline void xrp_comm_write32(volatile void __iomem *addr, u32 v)
 {
@@ -202,32 +158,25 @@ static inline void xrp_comm_read(volatile void __iomem *addr, void *p,
 
 static inline void xrp_send_device_irq(struct xvp *xvp)
 {
-	switch (xvp->device_irq_mode) {
-	case XRP_IRQ_EDGE:
-		xvp_reg_write32(xvp, xvp->device_irq[0], 0);
-		/* fallthrough */
-	case XRP_IRQ_LEVEL:
-		wmb();
-		xvp_reg_write32(xvp, xvp->device_irq[0],
-				BIT(xvp->device_irq[1]));
-		break;
-	default:
-		break;
-	}
+	if (xvp->hw_ops->send_irq)
+		xvp->hw_ops->send_irq(xvp->hw_arg);
 }
 
 static int xvp_synchronize(struct xvp *xvp)
 {
-	static const int irq_mode[] = {
-		[XRP_IRQ_NONE] = XRP_DSP_SYNC_IRQ_MODE_NONE,
-		[XRP_IRQ_LEVEL] = XRP_DSP_SYNC_IRQ_MODE_LEVEL,
-		[XRP_IRQ_EDGE] = XRP_DSP_SYNC_IRQ_MODE_EDGE,
-	};
+	size_t sz;
+	void *hw_sync_data;
 	unsigned long deadline = jiffies + XVP_TIMEOUT_JIFFIES;
 	struct xrp_dsp_sync __iomem *shared_sync = xvp->comm;
-	int ret = -ENODEV;
+	int ret;
 	u32 v;
 
+	hw_sync_data = xvp->hw_ops->get_hw_sync_data(xvp->hw_arg, &sz);
+	if (!hw_sync_data) {
+		ret = -ENOMEM;
+		goto err;
+	}
+	ret = -ENODEV;
 	xrp_comm_write32(&shared_sync->sync, XRP_DSP_SYNC_START);
 	mb();
 	do {
@@ -242,22 +191,7 @@ static int xvp_synchronize(struct xvp *xvp)
 		goto err;
 	}
 
-	xrp_comm_write32(&shared_sync->device_mmio_base,
-			 xvp->regs_phys);
-	xrp_comm_write32(&shared_sync->host_irq_mode,
-			 irq_mode[xvp->host_irq_mode]);
-	xrp_comm_write32(&shared_sync->host_irq_offset,
-			 xvp->host_irq[0]);
-	xrp_comm_write32(&shared_sync->host_irq_bit,
-			 xvp->host_irq[1]);
-	xrp_comm_write32(&shared_sync->device_irq_mode,
-			 irq_mode[xvp->device_irq_mode]);
-	xrp_comm_write32(&shared_sync->device_irq_offset,
-			 xvp->device_irq[0]);
-	xrp_comm_write32(&shared_sync->device_irq_bit,
-			 xvp->device_irq[1]);
-	xrp_comm_write32(&shared_sync->device_irq,
-			 xvp->device_irq[2]);
+	xrp_comm_write(&shared_sync->hw_sync_data, hw_sync_data, sz);
 	mb();
 	xrp_comm_write32(&shared_sync->sync, XRP_DSP_SYNC_HOST_TO_DSP);
 	mb();
@@ -277,7 +211,7 @@ static int xvp_synchronize(struct xvp *xvp)
 
 	xrp_send_device_irq(xvp);
 
-	if (xvp->host_irq_mode != XRP_IRQ_NONE) {
+	if (xvp->host_irq_mode) {
 		int res = wait_for_completion_timeout(&xvp->completion,
 						      XVP_TIMEOUT_JIFFIES);
 		if (res == 0) {
@@ -288,6 +222,7 @@ static int xvp_synchronize(struct xvp *xvp)
 	}
 	ret = 0;
 err:
+	kfree(hw_sync_data);
 	xrp_comm_write32(&shared_sync->sync, XRP_DSP_SYNC_IDLE);
 	return ret;
 }
@@ -305,20 +240,16 @@ static bool xrp_cmd_complete(void *p)
 		 XRP_DSP_CMD_FLAG_RESPONSE_VALID);
 }
 
-static irqreturn_t xvp_irq_handler(int irq, void *dev_id)
+irqreturn_t xrp_irq_handler(int irq, struct xvp *xvp)
 {
-	struct xvp *xvp = dev_id;
-
-	if (!xrp_cmd_complete(xvp))
+	if (!xvp->comm || !xrp_cmd_complete(xvp))
 		return IRQ_NONE;
-
-	if (xvp->host_irq_mode == XRP_IRQ_LEVEL)
-		xvp_reg_write32(xvp, xvp->host_irq[0], 0);
 
 	complete(&xvp->completion);
 
 	return IRQ_HANDLED;
 }
+EXPORT_SYMBOL(xrp_irq_handler);
 
 static inline void xvp_file_lock(struct xvp_file *xvp_file)
 {
@@ -399,45 +330,6 @@ static long xrp_ioctl_alloc(struct file *filp,
 	return 0;
 }
 
-#if defined(__XTENSA__)
-static inline void xvp_clean_cache(void *vaddr, phys_addr_t paddr,
-				   unsigned long sz)
-{
-	__flush_dcache_range((unsigned long)vaddr, sz);
-}
-static inline void xvp_flush_cache(void *vaddr, phys_addr_t paddr,
-				   unsigned long sz)
-{
-	__flush_dcache_range((unsigned long)vaddr, sz);
-	__invalidate_dcache_range((unsigned long)vaddr, sz);
-}
-static inline void xvp_invalidate_cache(void *vaddr, phys_addr_t paddr,
-				 unsigned long sz)
-{
-	__invalidate_dcache_range((unsigned long)vaddr, sz);
-}
-#elif defined(__arm__)
-static inline void xvp_clean_cache(void *vaddr, phys_addr_t paddr,
-				   unsigned long sz)
-{
-	__cpuc_flush_dcache_area(vaddr, sz);
-	outer_clean_range(paddr, paddr + sz);
-}
-static inline void xvp_flush_cache(void *vaddr, phys_addr_t paddr,
-				   unsigned long sz)
-{
-	__cpuc_flush_dcache_area(vaddr, sz);
-	outer_flush_range(paddr, paddr + sz);
-}
-static inline void xvp_invalidate_cache(void *vaddr, phys_addr_t paddr,
-				 unsigned long sz)
-{
-	__cpuc_flush_dcache_area(vaddr, sz);
-	outer_inv_range(paddr, paddr + sz);
-}
-#else
-#error "cache operations are not implemented for this architecture"
-#endif
 
 static struct xvp_alien_mapping *
 xvp_alien_mapping_create(struct xvp_alien_mapping mapping)
@@ -744,6 +636,8 @@ static long xrp_share_kernel(struct file *filp,
 			     unsigned long flags, unsigned long *paddr,
 			     struct xrp_mapping *mapping)
 {
+	struct xvp_file *xvp_file = filp->private_data;
+	struct xvp *xvp = xvp_file->xvp;
 	unsigned long phys = __pa(virt);
 
 	mapping->type = XRP_MAPPING_KERNEL;
@@ -753,9 +647,9 @@ static long xrp_share_kernel(struct file *filp,
 		 __func__, mapping, mapping->type);
 
 	if (flags & XRP_FLAG_WRITE) {
-		xvp_flush_cache((void *)virt, phys, size);
+		xvp->hw_ops->flush_cache((void *)virt, phys, size);
 	} else if (flags & XRP_FLAG_READ) {
-		xvp_clean_cache((void *)virt, phys, size);
+		xvp->hw_ops->clean_cache((void *)virt, phys, size);
 	}
 	return 0;
 }
@@ -870,10 +764,13 @@ static long __xrp_share_block(struct file *filp,
 		 __func__, mapping, mapping->type);
 
 	if (do_cache) {
+		struct xvp_file *xvp_file = filp->private_data;
+		struct xvp *xvp = xvp_file->xvp;
+
 		if (flags & XRP_FLAG_WRITE) {
-			xvp_flush_cache((void *)virt, phys, size);
+			xvp->hw_ops->flush_cache((void *)virt, phys, size);
 		} else if (flags & XRP_FLAG_READ) {
-			xvp_clean_cache((void *)virt, phys, size);
+			xvp->hw_ops->clean_cache((void *)virt, phys, size);
 		}
 	}
 	return 0;
@@ -1329,7 +1226,7 @@ static long xrp_ioctl_submit_sync(struct file *filp,
 
 		xrp_send_device_irq(xvp);
 
-		if (xvp->host_irq_mode != XRP_IRQ_NONE) {
+		if (xvp->host_irq_mode) {
 			ret = xvp_complete_cmd_irq(&xvp->completion,
 						   xrp_cmd_complete, xvp);
 		} else {
@@ -1458,22 +1355,38 @@ static int xvp_close(struct inode *inode, struct file *filp)
 	return 0;
 }
 
+static inline int xvp_enable_dsp(struct xvp *xvp)
+{
+	if (loopback < LOOPBACK_NOMMIO &&
+	    xvp->hw_ops->enable)
+		return xvp->hw_ops->enable(xvp->hw_arg);
+	else
+		return 0;
+}
+
+static inline void xvp_disable_dsp(struct xvp *xvp)
+{
+	if (loopback < LOOPBACK_NOMMIO &&
+	    xvp->hw_ops->disable)
+		xvp->hw_ops->disable(xvp->hw_arg);
+}
+
 static inline void xvp_reset_dsp(struct xvp *xvp)
 {
 	if (loopback < LOOPBACK_NOMMIO)
-		xvp->hw_control->reset(xvp);
+		xvp->hw_ops->reset(xvp->hw_arg);
 }
 
 static inline void xvp_halt_dsp(struct xvp *xvp)
 {
 	if (loopback < LOOPBACK_NOMMIO)
-		xvp->hw_control->halt(xvp);
+		xvp->hw_ops->halt(xvp->hw_arg);
 }
 
 static inline void xvp_release_dsp(struct xvp *xvp)
 {
 	if (loopback < LOOPBACK_NOMMIO)
-		xvp->hw_control->release(xvp);
+		xvp->hw_ops->release(xvp->hw_arg);
 }
 
 static phys_addr_t xvp_translate_addr(struct xvp *xvp, Elf32_Phdr *phdr)
@@ -1834,31 +1747,19 @@ static const struct file_operations xvp_fops = {
 	.release = xvp_close,
 };
 
-static int xvp_probe(struct platform_device *pdev)
+int xrp_init(struct platform_device *pdev, struct xvp *xvp,
+	     const struct xrp_hw_ops *hw_ops, void *hw_arg)
 {
-	struct xvp *xvp;
 	int ret;
 	struct resource *mem;
-	int irq;
 	char nodename[sizeof("xvp") + 3 * sizeof(int)];
 
-	xvp = devm_kzalloc(&pdev->dev, sizeof(*xvp), GFP_KERNEL);
-	if (!xvp) {
-		ret = -ENOMEM;
-		goto err;
-	}
 	xvp->dev = &pdev->dev;
+	xvp->hw_ops = hw_ops;
+	xvp->hw_arg = hw_arg;
 	platform_set_drvdata(pdev, xvp);
 	mutex_init(&xvp->comm_lock);
-
-	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-	if (!mem) {
-		ret = -ENODEV;
-		goto err;
-	}
-	xvp->regs_phys = mem->start;
-	xvp->regs = devm_ioremap_resource(&pdev->dev, mem);
-	pr_debug("%s: regs = %pap/%p\n", __func__, &mem->start, xvp->regs);
+	init_completion(&xvp->completion);
 
 	mem = platform_get_resource(pdev, IORESOURCE_MEM, 1);
 	if (!mem) {
@@ -1875,69 +1776,12 @@ static int xvp_probe(struct platform_device *pdev)
 		goto err;
 	}
 
-	ret = of_property_read_u32_array(pdev->dev.of_node, "device-irq",
-					 xvp->device_irq,
-					 ARRAY_SIZE(xvp->device_irq));
-	if (ret == 0) {
-		u32 device_irq_mode;
-
-		ret = of_property_read_u32(pdev->dev.of_node,
-					   "device-irq-mode",
-					   &device_irq_mode);
-		if (device_irq_mode < XRP_IRQ_MAX)
-			xvp->device_irq_mode = device_irq_mode;
-		else
-			ret = -ENOENT;
-	}
-	if (ret == 0) {
-		dev_dbg(xvp->dev,
-			"%s: device IRQ MMIO offset = 0x%08x, bit = %d, device IRQ = %d, IRQ mode = %d",
-			__func__, xvp->device_irq[0], xvp->device_irq[1],
-			xvp->device_irq[2], xvp->device_irq_mode);
-	} else {
-		dev_info(xvp->dev, "using polling mode on the device side\n");
-	}
-
-	ret = of_property_read_u32_array(pdev->dev.of_node, "host-irq",
-					 xvp->host_irq,
-					 ARRAY_SIZE(xvp->host_irq));
-	if (ret == 0) {
-		u32 host_irq_mode;
-
-		ret = of_property_read_u32(pdev->dev.of_node,
-					   "host-irq-mode",
-					   &host_irq_mode);
-		if (host_irq_mode < XRP_IRQ_MAX)
-			xvp->host_irq_mode = host_irq_mode;
-		else
-			ret = -ENOENT;
-	}
-	irq = platform_get_irq(pdev, 0);
-	if (ret == 0 && irq >= 0) {
-		dev_dbg(xvp->dev, "%s: host IRQ = %d, ", __func__, irq);
-		init_completion(&xvp->completion);
-		ret = devm_request_irq(&pdev->dev, irq, xvp_irq_handler,
-				       IRQF_SHARED, pdev->name, xvp);
-		if (ret < 0) {
-			dev_err(&pdev->dev, "request_irq %d failed\n", irq);
-			goto err;
-		}
-	} else {
-		dev_info(xvp->dev, "using polling mode on the host side\n");
-	}
-
 	xvp->pmem = mem->start;
 	pr_debug("%s: xvp->pmem = %pap\n", __func__, &xvp->pmem);
 	ret = xrp_init_pool(&xvp->pool, mem->start, resource_size(mem));
 	if (ret < 0)
 		goto err;
 
-	xvp->hw_control = of_device_get_match_data(xvp->dev);
-	if (xvp->hw_control == NULL) {
-		dev_err(xvp->dev, "couldn't get hw_control for this device");
-		ret = -EINVAL;
-		goto err_free;
-	}
 	ret = of_property_read_string(pdev->dev.of_node, "firmware-name",
 				      &xvp->firmware_name);
 	if (ret == -EINVAL) {
@@ -1948,11 +1792,17 @@ static int xvp_probe(struct platform_device *pdev)
 		goto err_free;
 	}
 
+	ret = xvp_enable_dsp(xvp);
+	if (ret < 0) {
+		dev_err(xvp->dev, "couldn't enable DSP\n");
+		goto err_free;
+	}
+
 	xvp_reset_dsp(xvp);
 
 	ret = xvp_boot_firmware(xvp);
 	if (ret < 0)
-		goto err_free;
+		goto err_disable;
 
 	sprintf(nodename, "xvp%u", xvp_nodeid++);
 
@@ -1965,92 +1815,93 @@ static int xvp_probe(struct platform_device *pdev)
 
 	ret = misc_register(&xvp->miscdev);
 	if (ret < 0)
-		goto err_free;
+		goto err_disable;
 	return 0;
+err_disable:
+	xvp_disable_dsp(xvp);
 err_free:
 	xrp_free_pool(&xvp->pool);
 err:
 	dev_err(&pdev->dev, "%s: ret = %d\n", __func__, ret);
 	return ret;
 }
+EXPORT_SYMBOL(xrp_init);
 
-static int xvp_remove(struct platform_device *pdev)
+int xrp_deinit(struct platform_device *pdev)
 {
 	struct xvp *xvp = platform_get_drvdata(pdev);
 
 	xvp_halt_dsp(xvp);
+	xvp_disable_dsp(xvp);
 	misc_deregister(&xvp->miscdev);
 	release_firmware(xvp->firmware);
 	xrp_free_pool(&xvp->pool);
 	--xvp_nodeid;
 	return 0;
 }
+EXPORT_SYMBOL(xrp_deinit);
 
-static void xvp_reset_hw(struct xvp *xvp)
+static void *get_hw_sync_data(void *hw_arg, size_t *sz)
 {
-	xvp_reg_write32(xvp, XVP_REG_RESET, 1);
-	udelay(1);
-	xvp_reg_write32(xvp, XVP_REG_RESET, 0);
+	void *p = kzalloc(64, GFP_KERNEL);
+
+	*sz = 64;
+	return p;
 }
 
-static void xvp_halt_hw(struct xvp *xvp)
+void clean_cache(void *vaddr, phys_addr_t paddr, unsigned long sz)
 {
-	xvp_reg_write32(xvp, XVP_REG_RUNSTALL, 1);
 }
 
-static void xvp_release_hw(struct xvp *xvp)
+void flush_cache(void *vaddr, phys_addr_t paddr, unsigned long sz)
 {
-	xvp_reg_write32(xvp, XVP_REG_RUNSTALL, 0);
 }
 
-static void xrp_reset_hw(struct xvp *xvp)
+void invalidate_cache(void *vaddr, phys_addr_t paddr, unsigned long sz)
 {
-	xvp_reg_write32(xvp, XRP_REG_RESET, 1);
-	udelay(1);
-	xvp_reg_write32(xvp, XRP_REG_RESET, 0);
 }
 
-static void xrp_halt_hw(struct xvp *xvp)
+static const struct xrp_hw_ops hw_ops = {
+	.get_hw_sync_data = get_hw_sync_data,
+	.clean_cache = clean_cache,
+	.flush_cache = flush_cache,
+	.invalidate_cache = invalidate_cache,
+};
+
+static int xrp_probe(struct platform_device *pdev)
 {
-	xvp_reg_write32(xvp, XRP_REG_RUNSTALL, 1);
+	struct xvp *xvp = devm_kzalloc(&pdev->dev, sizeof(*xvp), GFP_KERNEL);
+
+	if (!xvp)
+		return -ENOMEM;
+
+	return xrp_init(pdev, xvp, &hw_ops, NULL);
 }
 
-static void xrp_release_hw(struct xvp *xvp)
+static int xrp_remove(struct platform_device *pdev)
 {
-	xvp_reg_write32(xvp, XRP_REG_RUNSTALL, 0);
+	return xrp_deinit(pdev);
 }
 
 #ifdef CONFIG_OF
-static const struct of_device_id xvp_match[] = {
+static const struct of_device_id xrp_match[] = {
 	{
-		.compatible = "cdns,xvp",
-		.data = &(struct xvp_hw_control){
-			.reset = xvp_reset_hw,
-			.halt = xvp_halt_hw,
-			.release = xvp_release_hw,
-		},
-	}, {
 		.compatible = "cdns,xrp",
-		.data = &(struct xvp_hw_control){
-			.reset = xrp_reset_hw,
-			.halt = xrp_halt_hw,
-			.release = xrp_release_hw,
-		},
 	}, {},
 };
-MODULE_DEVICE_TABLE(of, xvp_match);
+MODULE_DEVICE_TABLE(of, xrp_match);
 #endif
 
-static struct platform_driver xvp_driver = {
-	.probe   = xvp_probe,
-	.remove  = xvp_remove,
+static struct platform_driver xrp_driver = {
+	.probe   = xrp_probe,
+	.remove  = xrp_remove,
 	.driver  = {
 		.name = DRIVER_NAME,
-		.of_match_table = of_match_ptr(xvp_match),
+		.of_match_table = of_match_ptr(xrp_match),
 	},
 };
 
-module_platform_driver(xvp_driver);
+module_platform_driver(xrp_driver);
 
 MODULE_AUTHOR("Takayuki Sugawara");
 MODULE_AUTHOR("Max Filippov");

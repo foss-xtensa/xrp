@@ -32,6 +32,7 @@
 typedef uint8_t __u8;
 typedef uint32_t __u32;
 #include "xrp_kernel_dsp_interface.h"
+#include "xrp_hw_simple_dsp_interface.h"
 
 #ifdef DEBUG
 #define pr_debug printf
@@ -249,6 +250,9 @@ static void do_handshake(struct xrp_dsp_sync *shared_sync)
 		[XRP_DSP_SYNC_IRQ_MODE_LEVEL] = XRP_IRQ_LEVEL,
 		[XRP_DSP_SYNC_IRQ_MODE_EDGE] = XRP_IRQ_EDGE,
 	};
+	struct xrp_hw_simple_sync_data *hw_sync =
+		(struct xrp_hw_simple_sync_data *)&shared_sync->hw_sync_data;
+
 
 	pr_debug("%s, shared_sync = %p\n", __func__, shared_sync);
 start:
@@ -271,14 +275,14 @@ start:
 			goto start;
 	}
 
-	mmio_base = shared_sync->device_mmio_base;
+	mmio_base = hw_sync->device_mmio_base;
 	pr_debug("%s: mmio_base: 0x%08x\n", __func__, mmio_base);
 
-	if (shared_sync->device_irq_mode < sizeof(irq_mode) / sizeof(*irq_mode)) {
-		device_irq_mode = irq_mode[shared_sync->device_irq_mode];
-		device_irq_offset = shared_sync->device_irq_offset;
-		device_irq_bit = shared_sync->device_irq_bit;
-		device_irq = shared_sync->device_irq;
+	if (hw_sync->device_irq_mode < sizeof(irq_mode) / sizeof(*irq_mode)) {
+		device_irq_mode = irq_mode[hw_sync->device_irq_mode];
+		device_irq_offset = hw_sync->device_irq_offset;
+		device_irq_bit = hw_sync->device_irq_bit;
+		device_irq = hw_sync->device_irq;
 		pr_debug("%s: device_irq_mode = %d, device_irq_offset = %d, device_irq_bit = %d, device_irq = %d\n",
 			__func__, device_irq_mode,
 			device_irq_offset, device_irq_bit, device_irq);
@@ -286,10 +290,10 @@ start:
 		device_irq_mode = XRP_IRQ_NONE;
 	}
 
-	if (shared_sync->host_irq_mode < sizeof(irq_mode) / sizeof(*irq_mode)) {
-		host_irq_mode = irq_mode[shared_sync->host_irq_mode];
-		host_irq_offset = shared_sync->host_irq_offset;
-		host_irq_bit = shared_sync->host_irq_bit;
+	if (hw_sync->host_irq_mode < sizeof(irq_mode) / sizeof(*irq_mode)) {
+		host_irq_mode = irq_mode[hw_sync->host_irq_mode];
+		host_irq_offset = hw_sync->host_irq_offset;
+		host_irq_bit = hw_sync->host_irq_bit;
 		pr_debug("%s: host_irq_mode = %d, host_irq_offset = %d, host_irq_bit = %d\n",
 			__func__, host_irq_mode, host_irq_offset, host_irq_bit);
 	} else {

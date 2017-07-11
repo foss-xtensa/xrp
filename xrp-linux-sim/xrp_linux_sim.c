@@ -49,6 +49,7 @@ typedef uint64_t __u64;
 
 #include "xrp_api.h"
 #include "../xrp-kernel/xrp_kernel_dsp_interface.h"
+#include "../xrp-kernel/xrp_hw_simple_dsp_interface.h"
 #include "xrp_alloc.h"
 
 #if defined(__STDC_NO_ATOMICS__)
@@ -365,6 +366,8 @@ static void synchronize(struct xrp_device_description *desc)
 	};
 
 	struct xrp_dsp_sync *shared_sync = desc->comm_ptr;
+	struct xrp_hw_simple_sync_data *hw_sync =
+		(struct xrp_hw_simple_sync_data *)&shared_sync->hw_sync_data;
 
 	xrp_comm_write32(&shared_sync->sync, XRP_DSP_SYNC_START);
 	mb();
@@ -375,21 +378,21 @@ static void synchronize(struct xrp_device_description *desc)
 		schedule();
 	} while (1);
 
-	xrp_comm_write32(&shared_sync->device_mmio_base,
+	xrp_comm_write32(&hw_sync->device_mmio_base,
 			 desc->io_base);
-	xrp_comm_write32(&shared_sync->host_irq_mode,
+	xrp_comm_write32(&hw_sync->host_irq_mode,
 			 irq_mode[0]);
-	xrp_comm_write32(&shared_sync->host_irq_offset,
+	xrp_comm_write32(&hw_sync->host_irq_offset,
 			 0);
-	xrp_comm_write32(&shared_sync->host_irq_bit,
+	xrp_comm_write32(&hw_sync->host_irq_bit,
 			 0);
-	xrp_comm_write32(&shared_sync->device_irq_mode,
+	xrp_comm_write32(&hw_sync->device_irq_mode,
 			 irq_mode[desc->device_irq_mode]);
-	xrp_comm_write32(&shared_sync->device_irq_offset,
+	xrp_comm_write32(&hw_sync->device_irq_offset,
 			 desc->device_irq[0]);
-	xrp_comm_write32(&shared_sync->device_irq_bit,
+	xrp_comm_write32(&hw_sync->device_irq_bit,
 			 desc->device_irq[1]);
-	xrp_comm_write32(&shared_sync->device_irq,
+	xrp_comm_write32(&hw_sync->device_irq,
 			 desc->device_irq[2]);
 	mb();
 	xrp_comm_write32(&shared_sync->sync, XRP_DSP_SYNC_HOST_TO_DSP);
