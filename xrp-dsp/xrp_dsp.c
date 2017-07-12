@@ -63,6 +63,8 @@ static uint32_t device_irq;
 static uint32_t host_irq_offset;
 static uint32_t host_irq_bit;
 
+static int manage_cache;
+
 #define device_mmio(off) ((volatile void *)mmio_base + off)
 #define host_mmio(off) ((volatile void *)mmio_base + off)
 
@@ -87,6 +89,18 @@ struct xrp_buffer_group {
 	struct xrp_buffer *buffer;
 };
 
+
+static inline void dcache_region_invalidate(void *p, size_t sz)
+{
+	if (manage_cache)
+		xthal_dcache_region_invalidate(p, sz);
+}
+
+static inline void dcache_region_writeback(void *p, size_t sz)
+{
+	if (manage_cache)
+		xthal_dcache_region_writeback(p, sz);
+}
 
 static inline void set_status(enum xrp_status *status, enum xrp_status v)
 {
@@ -239,11 +253,17 @@ static void do_handshake(struct xrp_dsp_sync *shared_sync)
 	pr_debug("%s, shared_sync = %p\n", __func__, shared_sync);
 start:
 	while (XT_L32AI(&shared_sync->sync, 0) != XRP_DSP_SYNC_START) {
+		dcache_region_invalidate(&shared_sync->sync,
+					 sizeof(shared_sync->sync));
 	}
 
 	XT_S32RI(XRP_DSP_SYNC_DSP_READY, &shared_sync->sync, 0);
+	dcache_region_writeback(&shared_sync->sync,
+				sizeof(shared_sync->sync));
 
 	for (;;) {
+		dcache_region_invalidate(&shared_sync->sync,
+					 sizeof(shared_sync->sync));
 		v = XT_L32AI(&shared_sync->sync, 0);
 		if (v == XRP_DSP_SYNC_HOST_TO_DSP)
 			break;
@@ -283,6 +303,8 @@ start:
 		XTOS_SET_INTLEVEL(15);
 
 		XT_S32RI(XRP_DSP_SYNC_DSP_TO_HOST, &shared_sync->sync, 0);
+		dcache_region_writeback(&shared_sync->sync,
+					sizeof(shared_sync->sync));
 
 		pr_debug("%s: waiting for device IRQ...\n", __func__);
 		_xtos_ints_on(1u << device_irq);
@@ -291,6 +313,8 @@ start:
 		_xtos_ints_off(1u << device_irq);
 	} else {
 		XT_S32RI(XRP_DSP_SYNC_DSP_TO_HOST, &shared_sync->sync, 0);
+		dcache_region_writeback(&shared_sync->sync,
+					sizeof(shared_sync->sync));
 	}
 	xrp_send_host_irq();
 
@@ -315,6 +339,8 @@ static void wait_for_request(struct xrp_dsp_cmd *dsp_cmd)
 			if (device_irq_mode == XRP_IRQ_LEVEL)
 				XT_S32RI(0, device_mmio(device_irq_offset), 0);
 
+			dcache_region_invalidate(dsp_cmd,
+						 sizeof(*dsp_cmd));
 			if (xrp_request_valid(dsp_cmd))
 				break;
 
@@ -326,6 +352,8 @@ static void wait_for_request(struct xrp_dsp_cmd *dsp_cmd)
 		XTOS_RESTORE_INTLEVEL(level);
 	} else {
 		for (;;) {
+			dcache_region_invalidate(dsp_cmd,
+						 sizeof(*dsp_cmd));
 			if (xrp_request_valid(dsp_cmd))
 				break;
 		}
@@ -336,7 +364,11 @@ static void complete_request(struct xrp_dsp_cmd *dsp_cmd)
 {
 	uint32_t flags = dsp_cmd->flags | XRP_DSP_CMD_FLAG_RESPONSE_VALID;
 
+	dcache_region_writeback(dsp_cmd,
+				sizeof(*dsp_cmd));
 	XT_S32RI(flags, &dsp_cmd->flags, 0);
+	dcache_region_writeback(&dsp_cmd->flags,
+				sizeof(dsp_cmd->flags));
 	xrp_send_host_irq();
 }
 
@@ -350,13 +382,23 @@ static enum xrp_status process_command(struct xrp_dsp_cmd *dsp_cmd)
 {
 	enum xrp_status status;
 	size_t n_buffers = dsp_cmd->buffer_size / sizeof(struct xrp_dsp_buffer);
-	struct xrp_dsp_buffer *dsp_buffer =
-		n_buffers > XRP_DSP_CMD_INLINE_BUFFER_COUNT ?
-		(void *)dsp_cmd->buffer_addr : &dsp_cmd->buffer_data;
+	struct xrp_dsp_buffer *dsp_buffer;
 	struct xrp_buffer_group buffer_group;
 	struct xrp_buffer buffer[n_buffers]; /* TODO */
 	size_t i;
 
+	if (n_buffers > XRP_DSP_CMD_INLINE_BUFFER_COUNT) {
+		dsp_buffer = (void *)dsp_cmd->buffer_addr;
+		dcache_region_invalidate(dsp_buffer,
+					 n_buffers * sizeof(*dsp_buffer));
+
+	} else {
+		dsp_buffer = (void *)&dsp_cmd->buffer_data;
+	}
+	if (dsp_cmd->in_data_size > sizeof(dsp_cmd->in_data)) {
+		dcache_region_invalidate((void *)dsp_cmd->in_data_addr,
+					 dsp_cmd->in_data_size);
+	}
 	/* Create buffers from incoming buffer data, put them to group.
 	 * Passed flags add some restrictions to possible buffer mapping
 	 * modes:
@@ -372,6 +414,10 @@ static enum xrp_status process_command(struct xrp_dsp_cmd *dsp_cmd)
 			.ptr = (void *)dsp_buffer[i].addr,
 			.size = dsp_buffer[i].size,
 		};
+		if (buffer[i].allowed_access & XRP_READ) {
+			dcache_region_invalidate(buffer[i].ptr,
+						 buffer[i].size);
+		}
 	}
 
 	buffer_group = (struct xrp_buffer_group){
@@ -411,11 +457,22 @@ static enum xrp_status process_command(struct xrp_dsp_cmd *dsp_cmd)
 			pr_debug("%s: map_count leak on buffer %d\n",
 				__func__, i);
 		}
+		if (buffer[i].map_flags & XRP_WRITE) {
+			dcache_region_writeback(buffer[i].ptr,
+						buffer[i].size);
+		}
 	}
 	if (buffer_group.ref.count) {
 		pr_debug("%s: refcount leak on buffer group\n", __func__);
 	}
-
+	if (dsp_cmd->out_data_size > sizeof(dsp_cmd->out_data)) {
+		dcache_region_writeback((void *)dsp_cmd->out_data_addr,
+					dsp_cmd->out_data_size);
+	}
+	if (n_buffers > XRP_DSP_CMD_INLINE_BUFFER_COUNT) {
+		dcache_region_writeback(dsp_buffer,
+					n_buffers * sizeof(*dsp_buffer));
+	}
 	complete_request(dsp_cmd);
 	return status;
 }
