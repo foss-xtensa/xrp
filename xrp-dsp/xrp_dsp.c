@@ -34,9 +34,9 @@ typedef uint32_t __u32;
 #include "xrp_kernel_dsp_interface.h"
 
 #ifdef DEBUG
-#define dprintf printf
+#define pr_debug printf
 #else
-static inline int dprintf(const char *p, ...)
+static inline int pr_debug(const char *p, ...)
 {
 	(void)p;
 	return 0;
@@ -208,7 +208,7 @@ struct xrp_buffer *xrp_get_buffer_from_group(struct xrp_buffer_group *group,
 
 static void xrp_irq_handler(void)
 {
-	dprintf("%s\n", __func__);
+	pr_debug("%s\n", __func__);
 	if (device_irq_mode == XRP_IRQ_LEVEL)
 		XT_S32RI(0, device_mmio(device_irq_offset), 0);
 }
@@ -236,7 +236,7 @@ static void do_handshake(struct xrp_dsp_sync *shared_sync)
 		[XRP_DSP_SYNC_IRQ_MODE_EDGE] = XRP_IRQ_EDGE,
 	};
 
-	dprintf("%s, shared_sync = %p\n", __func__, shared_sync);
+	pr_debug("%s, shared_sync = %p\n", __func__, shared_sync);
 start:
 	while (XT_L32AI(&shared_sync->sync, 0) != XRP_DSP_SYNC_START) {
 	}
@@ -252,14 +252,14 @@ start:
 	}
 
 	mmio_base = shared_sync->device_mmio_base;
-	dprintf("%s: mmio_base: 0x%08x\n", __func__, mmio_base);
+	pr_debug("%s: mmio_base: 0x%08x\n", __func__, mmio_base);
 
 	if (shared_sync->device_irq_mode < sizeof(irq_mode) / sizeof(*irq_mode)) {
 		device_irq_mode = irq_mode[shared_sync->device_irq_mode];
 		device_irq_offset = shared_sync->device_irq_offset;
 		device_irq_bit = shared_sync->device_irq_bit;
 		device_irq = shared_sync->device_irq;
-		dprintf("%s: device_irq_mode = %d, device_irq_offset = %d, device_irq_bit = %d, device_irq = %d\n",
+		pr_debug("%s: device_irq_mode = %d, device_irq_offset = %d, device_irq_bit = %d, device_irq = %d\n",
 			__func__, device_irq_mode,
 			device_irq_offset, device_irq_bit, device_irq);
 	} else {
@@ -270,7 +270,7 @@ start:
 		host_irq_mode = irq_mode[shared_sync->host_irq_mode];
 		host_irq_offset = shared_sync->host_irq_offset;
 		host_irq_bit = shared_sync->host_irq_bit;
-		dprintf("%s: host_irq_mode = %d, host_irq_offset = %d, host_irq_bit = %d\n",
+		pr_debug("%s: host_irq_mode = %d, host_irq_offset = %d, host_irq_bit = %d\n",
 			__func__, host_irq_mode, host_irq_offset, host_irq_bit);
 	} else {
 		host_irq_mode = XRP_IRQ_NONE;
@@ -284,7 +284,7 @@ start:
 
 		XT_S32RI(XRP_DSP_SYNC_DSP_TO_HOST, &shared_sync->sync, 0);
 
-		dprintf("%s: waiting for device IRQ...\n", __func__);
+		pr_debug("%s: waiting for device IRQ...\n", __func__);
 		_xtos_ints_on(1u << device_irq);
 		XT_WAITI(0);
 		XTOS_SET_INTLEVEL(15);
@@ -294,7 +294,7 @@ start:
 	}
 	xrp_send_host_irq();
 
-	dprintf("%s: done\n", __func__);
+	pr_debug("%s: done\n", __func__);
 }
 
 static inline int xrp_request_valid(struct xrp_dsp_cmd *dsp_cmd)
@@ -400,20 +400,20 @@ static enum xrp_status process_command(struct xrp_dsp_cmd *dsp_cmd)
 		if (buffer[i].map_flags & XRP_WRITE)
 			flags |= XRP_DSP_BUFFER_FLAG_WRITE;
 
-		dprintf("%s: dsp_buffer[%d].flags = %d\n", __func__, i, flags);
+		pr_debug("%s: dsp_buffer[%d].flags = %d\n", __func__, i, flags);
 		dsp_buffer[i].flags = flags;
 
 		if (buffer[i].ref.count) {
-			dprintf("%s: refcount leak on buffer %d\n",
+			pr_debug("%s: refcount leak on buffer %d\n",
 				__func__, i);
 		}
 		if (buffer[i].map_count) {
-			dprintf("%s: map_count leak on buffer %d\n",
+			pr_debug("%s: map_count leak on buffer %d\n",
 				__func__, i);
 		}
 	}
 	if (buffer_group.ref.count) {
-		dprintf("%s: refcount leak on buffer group\n", __func__);
+		pr_debug("%s: refcount leak on buffer group\n", __func__);
 	}
 
 	complete_request(dsp_cmd);
