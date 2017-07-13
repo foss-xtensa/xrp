@@ -30,9 +30,6 @@
 #include "xrp_kernel_defs.h"
 #include "xrp_kernel_dsp_interface.h"
 
-#define DEFAULT_FIRMWARE_NAME "xvp.elf"
-MODULE_FIRMWARE(DEFAULT_FIRMWARE_NAME);
-
 #define XVP_TIMEOUT_JIFFIES (HZ * 10)
 
 #define XVP_REG_RESET		(0x00)
@@ -1803,6 +1800,9 @@ static int xvp_boot_firmware(struct xvp *xvp)
 	int ret;
 	struct xrp_dsp_sync __iomem *shared_sync = xvp->comm;
 
+	if (!xvp->firmware_name)
+		return 0;
+
 	if (loopback < LOOPBACK_NOFIRMWARE) {
 		ret = xvp_request_firmware(xvp);
 		if (ret < 0)
@@ -1943,10 +1943,8 @@ static int xvp_probe(struct platform_device *pdev)
 	ret = of_property_read_string(pdev->dev.of_node, "firmware-name",
 				      &xvp->firmware_name);
 	if (ret == -EINVAL) {
-		xvp->firmware_name = DEFAULT_FIRMWARE_NAME;
 		dev_dbg(xvp->dev,
-			"no firmware-name property, defaulting to \"%s\"",
-			xvp->firmware_name);
+			"no firmware-name property, not loading firmware");
 	} else if (ret < 0) {
 		dev_err(xvp->dev, "invalid firmware name (%d)", ret);
 		goto err_free;

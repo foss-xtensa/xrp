@@ -21,8 +21,8 @@ Optional properties:
 - host-irq-mode: 0 for none (polling), 1 for level, 2 for edge.
 - interrupts: host IRQ number controlled by this register/bit.
 
-- firmware-name: string identifying firmware name. If missing "xvp.elf" is
-  used.
+- firmware-name: string identifying firmware name. If missing the driver
+  doesn't load the firmware.
 
 - #address-cells: number of cells DSP physical address takes in the ranges.
 - #size-cells: number of cells each size takes in the ranges.
