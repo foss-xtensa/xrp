@@ -23,6 +23,7 @@
 #include <linux/slab.h>
 #include <asm/mman.h>
 #include <asm/uaccess.h>
+#include "xrp_firmware.h"
 #include "xrp_hw.h"
 #include "xrp_internal.h"
 #include "xrp_kernel_defs.h"
@@ -78,7 +79,7 @@ MODULE_PARM_DESC(loopback, "Don't use actual DSP, perform everything locally.");
 
 static unsigned xvp_nodeid;
 
-static int xvp_boot_firmware(struct xvp *xvp);
+static int xrp_boot_firmware(struct xvp *xvp);
 
 static inline void xrp_comm_write32(volatile void __iomem *addr, u32 v)
 {
@@ -137,7 +138,7 @@ static inline void xrp_send_device_irq(struct xvp *xvp)
 		xvp->hw_ops->send_irq(xvp->hw_arg);
 }
 
-static int xvp_synchronize(struct xvp *xvp)
+static int xrp_synchronize(struct xvp *xvp)
 {
 	size_t sz;
 	void *hw_sync_data;
@@ -1250,7 +1251,7 @@ static long xrp_ioctl_submit_sync(struct file *filp,
 			int rc;
 
 			pr_debug("%s: restarting firmware...\n", __func__);
-			rc = xvp_boot_firmware(xvp);
+			rc = xrp_boot_firmware(xvp);
 			if (rc < 0)
 				ret = rc;
 		}
@@ -1381,351 +1382,35 @@ static inline void xvp_disable_dsp(struct xvp *xvp)
 		xvp->hw_ops->disable(xvp->hw_arg);
 }
 
-static inline void xvp_reset_dsp(struct xvp *xvp)
+static inline void xrp_reset_dsp(struct xvp *xvp)
 {
 	if (loopback < LOOPBACK_NOMMIO)
 		xvp->hw_ops->reset(xvp->hw_arg);
 }
 
-static inline void xvp_halt_dsp(struct xvp *xvp)
+static inline void xrp_halt_dsp(struct xvp *xvp)
 {
 	if (loopback < LOOPBACK_NOMMIO)
 		xvp->hw_ops->halt(xvp->hw_arg);
 }
 
-static inline void xvp_release_dsp(struct xvp *xvp)
+static inline void xrp_release_dsp(struct xvp *xvp)
 {
 	if (loopback < LOOPBACK_NOMMIO)
 		xvp->hw_ops->release(xvp->hw_arg);
 }
 
-static phys_addr_t xvp_translate_addr(struct xvp *xvp, Elf32_Phdr *phdr)
-{
-	__be32 addr = cpu_to_be32((u32)phdr->p_paddr);
-
-	return of_translate_address(xvp->dev->of_node, &addr);
-}
-
-static int xvp_load_segment_to_sysmem(struct xvp *xvp, Elf32_Phdr *phdr)
-{
-	phys_addr_t pa = xvp_translate_addr(xvp, phdr);
-	struct page *page = pfn_to_page(__phys_to_pfn(pa));
-	size_t page_offs = pa & ~PAGE_MASK;
-	size_t offs;
-
-	for (offs = 0; offs < phdr->p_memsz; ++page) {
-		void *p = kmap(page);
-		size_t sz = PAGE_SIZE - page_offs;
-
-		if (!p)
-			return -ENOMEM;
-
-		page_offs &= ~PAGE_MASK;
-
-		if (offs < phdr->p_filesz) {
-			size_t copy_sz = sz;
-
-			if (phdr->p_filesz - offs < copy_sz)
-				copy_sz = phdr->p_filesz - offs;
-
-			copy_sz = ALIGN(copy_sz, 4);
-			memcpy(p + page_offs,
-			       (void *)xvp->firmware->data +
-			       phdr->p_offset + offs,
-			       copy_sz);
-			page_offs += copy_sz;
-			offs += copy_sz;
-			sz -= copy_sz;
-		}
-
-		if (offs < phdr->p_memsz && sz) {
-			if (phdr->p_memsz - offs < sz)
-				sz = phdr->p_memsz - offs;
-
-			sz = ALIGN(sz, 4);
-			memset(p + page_offs, 0, sz);
-			page_offs += sz;
-			offs += sz;
-		}
-		kunmap(page);
-	}
-	dma_sync_single_for_device(xvp->dev, pa, phdr->p_memsz, DMA_TO_DEVICE);
-	return 0;
-}
-
-static int xvp_load_segment_to_iomem(struct xvp *xvp, Elf32_Phdr *phdr)
-{
-	phys_addr_t pa = xvp_translate_addr(xvp, phdr);
-	void __iomem *p = ioremap(pa, phdr->p_memsz);
-
-	if (!p) {
-		dev_err(xvp->dev,
-			"couldn't ioremap %pap x 0x%08x\n",
-			&pa, (u32)phdr->p_memsz);
-		return -EINVAL;
-	}
-	memcpy_toio(p, (void *)xvp->firmware->data + phdr->p_offset,
-		    ALIGN(phdr->p_filesz, 4));
-	memset_io(p + ALIGN(phdr->p_filesz, 4), 0,
-		  ALIGN(phdr->p_memsz - ALIGN(phdr->p_filesz, 4), 4));
-	iounmap(p);
-	return 0;
-}
-
-static inline bool xrp_section_bad(struct xvp *xvp, const Elf32_Shdr *shdr)
-{
-	return shdr->sh_offset > xvp->firmware->size ||
-		shdr->sh_size > xvp->firmware->size - shdr->sh_offset;
-}
-
-static int xrp_firmware_find_symbol(struct xvp *xvp, const char *name,
-				    void **paddr, size_t *psize)
-{
-	const Elf32_Ehdr *ehdr = (Elf32_Ehdr *)xvp->firmware->data;
-	const void *shdr_data = xvp->firmware->data + ehdr->e_shoff;
-	const Elf32_Shdr *sh_symtab = NULL;
-	const Elf32_Shdr *sh_strtab = NULL;
-	const void *sym_data;
-	const void *str_data;
-	const Elf32_Sym *esym;
-	void *addr = NULL;
-	unsigned i;
-
-	if (ehdr->e_shoff == 0) {
-		dev_dbg(xvp->dev, "%s: no section header in the firmware image",
-			__func__);
-		return -ENOENT;
-	}
-	if (ehdr->e_shoff > xvp->firmware->size ||
-	    ehdr->e_shnum * ehdr->e_shentsize > xvp->firmware->size - ehdr->e_shoff) {
-		dev_err(xvp->dev, "%s: bad firmware SHDR information",
-			__func__);
-		return -EINVAL;
-	}
-
-	/* find symbols and string sections */
-
-	for (i = 0; i < ehdr->e_shnum; ++i) {
-		const Elf32_Shdr *shdr = shdr_data + i * ehdr->e_shentsize;
-
-		switch (shdr->sh_type) {
-		case SHT_SYMTAB:
-			sh_symtab = shdr;
-			break;
-		case SHT_STRTAB:
-			sh_strtab = shdr;
-			break;
-		default:
-			break;
-		}
-	}
-
-	if (!sh_symtab || !sh_strtab) {
-		dev_dbg(xvp->dev, "%s: no symtab or strtab in the firmware image",
-			__func__);
-		return -ENOENT;
-	}
-
-	if (xrp_section_bad(xvp, sh_symtab)) {
-		dev_err(xvp->dev, "%s: bad firmware SYMTAB section information",
-			__func__);
-		return -EINVAL;
-	}
-
-	if (xrp_section_bad(xvp, sh_strtab)) {
-		dev_err(xvp->dev, "%s: bad firmware STRTAB section information",
-			__func__);
-		return -EINVAL;
-	}
-
-	/* iterate through all symbols, searching for the name */
-
-	sym_data = xvp->firmware->data + sh_symtab->sh_offset;
-	str_data = xvp->firmware->data + sh_strtab->sh_offset;
-
-	for (i = 0; i < sh_symtab->sh_size; i += sh_symtab->sh_entsize) {
-		esym = sym_data + i;
-
-		if (!(ELF_ST_TYPE(esym->st_info) == STT_OBJECT &&
-		      esym->st_name < sh_strtab->sh_size &&
-		      strncmp(str_data + esym->st_name, name,
-			      sh_strtab->sh_size - esym->st_name) == 0))
-			continue;
-
-		if (esym->st_shndx > 0 && esym->st_shndx < ehdr->e_shnum) {
-			const Elf32_Shdr *shdr = shdr_data +
-				esym->st_shndx * ehdr->e_shentsize;
-			Elf32_Off in_section_off = esym->st_value - shdr->sh_addr;
-
-			if (xrp_section_bad(xvp, shdr)) {
-				dev_err(xvp->dev, "%s: bad firmware section #%d information",
-					__func__, esym->st_shndx);
-				return -EINVAL;
-			}
-
-			if (esym->st_value < shdr->sh_addr ||
-			    in_section_off > shdr->sh_size ||
-			    esym->st_size > shdr->sh_size - in_section_off) {
-				dev_err(xvp->dev, "%s: bad symbol information",
-					__func__);
-				return -EINVAL;
-			}
-			addr = (void *)xvp->firmware->data + shdr->sh_offset +
-				in_section_off;
-
-			dev_dbg(xvp->dev, "%s: found symbol, st_shndx = %d, "
-				"sh_offset = 0x%08x, sh_addr = 0x%08x, "
-				"st_value = 0x%08x, address = %p",
-				__func__, esym->st_shndx, shdr->sh_offset,
-				shdr->sh_addr, esym->st_value, addr);
-		} else {
-			dev_dbg(xvp->dev, "%s: unsupported section index in found symbol: 0x%x",
-				__func__, esym->st_shndx);
-			return -EINVAL;
-		}
-		break;
-	}
-
-	if (!addr)
-		return -ENOENT;
-
-	*paddr = addr;
-	*psize = esym->st_size;
-
-	return 0;
-}
-
-static int xrp_firmware_fixup_symbol(struct xvp *xvp, const char *name,
-				     phys_addr_t v)
-{
-	u32 v32 = XRP_DSP_COMM_BASE_MAGIC;
-	void *addr;
-	size_t sz;
-	int rc;
-
-	rc = xrp_firmware_find_symbol(xvp, name, &addr, &sz);
-	if (rc < 0) {
-		dev_err(xvp->dev, "%s: symbol \"%s\" is not found",
-			__func__, name);
-		return rc;
-	}
-
-	if (sz != sizeof(u32)) {
-		dev_err(xvp->dev, "%s: symbol \"%s\" has wrong size: %zu",
-			__func__, name, sz);
-		return -EINVAL;
-	}
-
-	/* update data associated with symbol */
-
-	if (memcmp(addr, &v32, sz) != 0) {
-		dev_dbg(xvp->dev, "%s: value pointed to by symbol is incorrect: %*ph",
-			__func__, (int)sz, addr);
-	}
-
-	v32 = v;
-	memcpy(addr, &v32, sz);
-
-	return 0;
-}
-
-static int xvp_load_firmware(struct xvp *xvp)
-{
-	Elf32_Ehdr *ehdr = (Elf32_Ehdr *)xvp->firmware->data;
-	int i;
-
-	if (memcmp(ehdr->e_ident, ELFMAG, SELFMAG)) {
-		dev_err(xvp->dev, "bad firmware ELF magic\n");
-		return -EINVAL;
-	}
-
-	if (ehdr->e_type != ET_EXEC) {
-		dev_err(xvp->dev, "bad firmware ELF type\n");
-		return -EINVAL;
-	}
-
-	if (ehdr->e_machine != 94 /*EM_XTENSA*/) {
-		dev_err(xvp->dev, "bad firmware ELF machine\n");
-		return -EINVAL;
-	}
-
-	if (ehdr->e_phoff >= xvp->firmware->size ||
-	    ehdr->e_phoff +
-	    ehdr->e_phentsize * ehdr->e_phnum > xvp->firmware->size) {
-		dev_err(xvp->dev, "bad firmware ELF PHDR information\n");
-		return -EINVAL;
-	}
-
-	xvp_halt_dsp(xvp);
-	xvp_reset_dsp(xvp);
-
-	xrp_firmware_fixup_symbol(xvp, "xrp_dsp_comm_base", xvp->comm_phys);
-
-	for (i = 0; i < ehdr->e_phnum; ++i) {
-		Elf32_Phdr *phdr = (void *)xvp->firmware->data +
-			ehdr->e_phoff + i * ehdr->e_phentsize;
-		phys_addr_t pa;
-		int rc;
-
-		/* Only load non-empty loadable segments, R/W/X */
-		if (!(phdr->p_type == PT_LOAD &&
-		      (phdr->p_flags & (PF_X | PF_R | PF_W)) &&
-		      phdr->p_memsz > 0))
-			continue;
-
-		if (phdr->p_offset >= xvp->firmware->size ||
-		    phdr->p_offset + phdr->p_filesz > xvp->firmware->size) {
-			dev_err(xvp->dev,
-				"bad firmware ELF program header entry %d\n",
-				i);
-			return -EINVAL;
-		}
-
-		pa = xvp_translate_addr(xvp, phdr);
-		if (pa == OF_BAD_ADDR) {
-			dev_err(xvp->dev,
-				"device address 0x%08x could not be mapped to host physical address",
-				(u32)phdr->p_paddr);
-			return -EINVAL;
-		}
-		dev_dbg(xvp->dev, "loading segment %d (device 0x%08x) to physical %pap\n",
-			i, (u32)phdr->p_paddr, &pa);
-
-		if (pfn_valid(__phys_to_pfn(pa)))
-			rc = xvp_load_segment_to_sysmem(xvp, phdr);
-		else
-			rc = xvp_load_segment_to_iomem(xvp, phdr);
-
-		if (rc < 0)
-			return rc;
-	}
-
-	return 0;
-}
-
-static int xvp_request_firmware(struct xvp *xvp)
-{
-	int ret = request_firmware(&xvp->firmware, xvp->firmware_name,
-				   xvp->dev);
-
-	if (ret < 0)
-		return ret;
-
-	ret = xvp_load_firmware(xvp);
-	if (ret < 0) {
-		release_firmware(xvp->firmware);
-	}
-	return ret;
-}
-
-static int xvp_boot_firmware(struct xvp *xvp)
+static int xrp_boot_firmware(struct xvp *xvp)
 {
 	int ret;
 	struct xrp_dsp_sync __iomem *shared_sync = xvp->comm;
 
 	if (xvp->firmware_name) {
+		xrp_halt_dsp(xvp);
+		xrp_reset_dsp(xvp);
+
 		if (loopback < LOOPBACK_NOFIRMWARE) {
-			ret = xvp_request_firmware(xvp);
+			ret = xrp_request_firmware(xvp);
 			if (ret < 0)
 				return ret;
 		}
@@ -1734,12 +1419,12 @@ static int xvp_boot_firmware(struct xvp *xvp)
 			xrp_comm_write32(&shared_sync->sync, XRP_DSP_SYNC_IDLE);
 			mb();
 		}
-		xvp_release_dsp(xvp);
+		xrp_release_dsp(xvp);
 	}
 	if (loopback < LOOPBACK_NOIO) {
-		ret = xvp_synchronize(xvp);
+		ret = xrp_synchronize(xvp);
 		if (ret < 0) {
-			xvp_halt_dsp(xvp);
+			xrp_halt_dsp(xvp);
 			pr_err("%s: couldn't synchronize with IVP core\n",
 			       __func__);
 			return ret;
@@ -1812,9 +1497,9 @@ int xrp_init(struct platform_device *pdev, struct xvp *xvp,
 		goto err_free_map;
 	}
 
-	xvp_reset_dsp(xvp);
+	xrp_reset_dsp(xvp);
 
-	ret = xvp_boot_firmware(xvp);
+	ret = xrp_boot_firmware(xvp);
 	if (ret < 0)
 		goto err_disable;
 
@@ -1847,7 +1532,7 @@ int xrp_deinit(struct platform_device *pdev)
 {
 	struct xvp *xvp = platform_get_drvdata(pdev);
 
-	xvp_halt_dsp(xvp);
+	xrp_halt_dsp(xvp);
 	xvp_disable_dsp(xvp);
 	misc_deregister(&xvp->miscdev);
 	release_firmware(xvp->firmware);
