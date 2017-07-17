@@ -26,6 +26,7 @@
 #include <asm/cacheflush.h>
 #include <asm/mman.h>
 #include <asm/uaccess.h>
+#include "xrp_address_map.h"
 #include "xrp_alloc.h"
 #include "xrp_hw.h"
 #include "xrp_kernel_defs.h"
@@ -73,6 +74,8 @@ struct xvp {
 	void __iomem *comm;
 	phys_addr_t pmem;
 	phys_addr_t comm_phys;
+
+	struct xrp_address_map address_map;
 
 	bool host_irq_mode;
 	struct completion completion;
@@ -1782,6 +1785,10 @@ int xrp_init(struct platform_device *pdev, struct xvp *xvp,
 	if (ret < 0)
 		goto err;
 
+	ret = xrp_init_address_map(xvp->dev, &xvp->address_map);
+	if (ret < 0)
+		goto err_free_pool;
+
 	ret = of_property_read_string(pdev->dev.of_node, "firmware-name",
 				      &xvp->firmware_name);
 	if (ret == -EINVAL) {
@@ -1789,13 +1796,13 @@ int xrp_init(struct platform_device *pdev, struct xvp *xvp,
 			"no firmware-name property, not loading firmware");
 	} else if (ret < 0) {
 		dev_err(xvp->dev, "invalid firmware name (%d)", ret);
-		goto err_free;
+		goto err_free_map;
 	}
 
 	ret = xvp_enable_dsp(xvp);
 	if (ret < 0) {
 		dev_err(xvp->dev, "couldn't enable DSP\n");
-		goto err_free;
+		goto err_free_map;
 	}
 
 	xvp_reset_dsp(xvp);
@@ -1819,7 +1826,9 @@ int xrp_init(struct platform_device *pdev, struct xvp *xvp,
 	return 0;
 err_disable:
 	xvp_disable_dsp(xvp);
-err_free:
+err_free_map:
+	xrp_free_address_map(&xvp->address_map);
+err_free_pool:
 	xrp_free_pool(&xvp->pool);
 err:
 	dev_err(&pdev->dev, "%s: ret = %d\n", __func__, ret);
@@ -1836,6 +1845,7 @@ int xrp_deinit(struct platform_device *pdev)
 	misc_deregister(&xvp->miscdev);
 	release_firmware(xvp->firmware);
 	xrp_free_pool(&xvp->pool);
+	xrp_free_address_map(&xvp->address_map);
 	--xvp_nodeid;
 	return 0;
 }

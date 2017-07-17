@@ -34,9 +34,13 @@ Optional properties:
     region;
   - cells with the size of the region.
 
+XRP node may have an optional subnode when there's non-identity mapping set
+up in the ranges property. Both subnode and ranges property are required in
+order for the address translation to work.
+
 Example:
 
-	xvp@0 {
+	xrp@0 {
 		#address-cells = <1>;
 		#size-cells = <1>;
 		compatible = "cdns,xrp";
@@ -55,4 +59,6 @@ Example:
 			  0x50000000 0x50000000 0x01000000
 			  0x60000000 0x60000000 0x20000000
 			  0xf0000000 0xf0000000 0x0d000000>;
+		dsp@0 {
+		};
 	};
