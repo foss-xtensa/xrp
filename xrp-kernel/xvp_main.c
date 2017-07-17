@@ -384,6 +384,7 @@ static long xvp_pfn_virt_to_phys(struct xvp_file *xvp_file,
 		((vaddr + size + PAGE_SIZE - 1) >> PAGE_SHIFT) -
 		(vaddr >> PAGE_SHIFT);
 	unsigned long pfn;
+	const struct xrp_address_map_entry *address_map;
 	struct xvp_alien_mapping *alien_mapping;
 
 	ret = follow_pfn(vma, vaddr, &pfn);
@@ -391,8 +392,16 @@ static long xvp_pfn_virt_to_phys(struct xvp_file *xvp_file,
 		return ret;
 
 	*paddr = __pfn_to_phys(pfn) + (vaddr & ~PAGE_MASK);
+	address_map = xrp_get_address_mapping(&xvp_file->xvp->address_map,
+					      *paddr);
+	if (!address_map) {
+		pr_debug("%s: untranslatable addr: %pap\n", __func__, paddr);
+		return -EINVAL;
+	}
+
 	for (i = 1; i < nr_pages; ++i) {
 		unsigned long next_pfn;
+		phys_addr_t next_phys;
 
 		ret = follow_pfn(vma, vaddr + (i << PAGE_SHIFT), &next_pfn);
 		if (ret)
@@ -400,6 +409,12 @@ static long xvp_pfn_virt_to_phys(struct xvp_file *xvp_file,
 		if (next_pfn != pfn + 1) {
 			pr_debug("%s: non-contiguous physical memory\n",
 				 __func__);
+			return -EINVAL;
+		}
+		next_phys = __pfn_to_phys(next_pfn);
+		if (xrp_compare_address(next_phys, address_map)) {
+			pr_debug("%s: untranslatable addr: %pap\n",
+				 __func__, &next_phys);
 			return -EINVAL;
 		}
 		pfn = next_pfn;
@@ -429,6 +444,7 @@ static long xvp_gup_virt_to_phys(struct xvp_file *xvp_file,
 		((vaddr + size + PAGE_SIZE - 1) >> PAGE_SHIFT) -
 		(vaddr >> PAGE_SHIFT);
 	struct page **page = kmalloc(nr_pages * sizeof(void *), GFP_KERNEL);
+	const struct xrp_address_map_entry *address_map;
 	struct xvp_alien_mapping *alien_mapping;
 
 	if (!page)
@@ -446,10 +462,29 @@ static long xvp_gup_virt_to_phys(struct xvp_file *xvp_file,
 		goto out_put;
 	}
 
+	address_map = xrp_get_address_mapping(&xvp_file->xvp->address_map,
+					      page_to_phys(page[0]));
+	if (!address_map) {
+		phys_addr_t addr = page_to_phys(page[0]);
+		pr_debug("%s: untranslatable addr: %pap\n",
+			 __func__, &addr);
+		ret = -EINVAL;
+		goto out_put;
+	}
+
 	for (i = 1; i < nr_pages; ++i) {
+		phys_addr_t addr;
+
 		if (page[i] != page[i - 1] + 1) {
 			pr_debug("%s: non-contiguous physical memory\n",
 				 __func__);
+			ret = -EINVAL;
+			goto out_put;
+		}
+		addr = page_to_phys(page[i]);
+		if (xrp_compare_address(addr, address_map)) {
+			pr_debug("%s: untranslatable addr: %pap\n",
+				 __func__, &addr);
 			ret = -EINVAL;
 			goto out_put;
 		}
