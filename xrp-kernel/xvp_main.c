@@ -1051,6 +1051,8 @@ static long xrp_unmap_request(struct file *filp, struct xrp_request *rq,
 static long xrp_map_request(struct file *filp, struct xrp_request *rq,
 			    struct mm_struct *mm)
 {
+	struct xvp_file *xvp_file = filp->private_data;
+	struct xvp *xvp = xvp_file->xvp;
 	struct xrp_ioctl_buffer __user *buffer;
 	size_t n_buffers = rq->ioctl_queue.buffer_size /
 		sizeof(struct xrp_ioctl_buffer);
@@ -1138,7 +1140,8 @@ static long xrp_map_request(struct file *filp, struct xrp_request *rq,
 		rq->dsp_buffer[i] = (struct xrp_dsp_buffer){
 			.flags = ioctl_buffer.flags,
 			.size = ioctl_buffer.size,
-			.addr = buffer_phys,
+			.addr = xrp_translate_to_dsp(&xvp->address_map,
+						     buffer_phys),
 		};
 	}
 
@@ -1161,7 +1164,8 @@ share_err:
 }
 
 static void xrp_fill_hw_request(struct xrp_dsp_cmd __iomem *cmd,
-				struct xrp_request *rq)
+				struct xrp_request *rq,
+				const struct xrp_address_map *map)
 {
 	xrp_comm_write32(&cmd->in_data_size, rq->ioctl_queue.in_data_size);
 	xrp_comm_write32(&cmd->out_data_size, rq->ioctl_queue.out_data_size);
@@ -1169,16 +1173,19 @@ static void xrp_fill_hw_request(struct xrp_dsp_cmd __iomem *cmd,
 			 rq->n_buffers * sizeof(struct xrp_dsp_buffer));
 
 	if (rq->ioctl_queue.in_data_size > XRP_DSP_CMD_INLINE_DATA_SIZE)
-		xrp_comm_write32(&cmd->in_data_addr, rq->in_data_phys);
+		xrp_comm_write32(&cmd->in_data_addr,
+				 xrp_translate_to_dsp(map, rq->in_data_phys));
 	else
 		xrp_comm_write(&cmd->in_data, rq->in_data,
 			       rq->ioctl_queue.in_data_size);
 
 	if (rq->ioctl_queue.out_data_size > XRP_DSP_CMD_INLINE_DATA_SIZE)
-		xrp_comm_write32(&cmd->out_data_addr, rq->out_data_phys);
+		xrp_comm_write32(&cmd->out_data_addr,
+				 xrp_translate_to_dsp(map, rq->out_data_phys));
 
 	if (rq->n_buffers > XRP_DSP_CMD_INLINE_BUFFER_COUNT)
-		xrp_comm_write32(&cmd->buffer_addr, rq->dsp_buffer_phys);
+		xrp_comm_write32(&cmd->buffer_addr,
+				 xrp_translate_to_dsp(map, rq->dsp_buffer_phys));
 	else
 		xrp_comm_write(&cmd->buffer_data, rq->dsp_buffer,
 			       rq->n_buffers * sizeof(struct xrp_dsp_buffer));
@@ -1233,7 +1240,7 @@ static long xrp_ioctl_submit_sync(struct file *filp,
 	if (loopback < LOOPBACK_NOIO) {
 		mutex_lock(&xvp->comm_lock);
 
-		xrp_fill_hw_request(xvp->comm, rq);
+		xrp_fill_hw_request(xvp->comm, rq, &xvp->address_map);
 
 		xrp_send_device_irq(xvp);
 
