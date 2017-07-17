@@ -375,7 +375,7 @@ static void xvp_alien_mapping_destroy(struct xvp_alien_mapping *alien_mapping)
 static long xvp_pfn_virt_to_phys(struct xvp_file *xvp_file,
 				 struct vm_area_struct *vma,
 				 unsigned long vaddr, unsigned long size,
-				 unsigned long *paddr,
+				 phys_addr_t *paddr,
 				 struct xvp_alien_mapping **mapping)
 {
 	int i;
@@ -429,13 +429,13 @@ static long xvp_pfn_virt_to_phys(struct xvp_file *xvp_file,
 		return -ENOMEM;
 
 	*mapping = alien_mapping;
-	pr_debug("%s: success, paddr: 0x%08lx\n", __func__, *paddr);
+	pr_debug("%s: success, paddr: %pap\n", __func__, paddr);
 	return 0;
 }
 
 static long xvp_gup_virt_to_phys(struct xvp_file *xvp_file,
 				 unsigned long vaddr, unsigned long size,
-				 unsigned long *paddr,
+				 phys_addr_t *paddr,
 				 struct xvp_alien_mapping **mapping)
 {
 	int ret;
@@ -504,7 +504,7 @@ static long xvp_gup_virt_to_phys(struct xvp_file *xvp_file,
 
 	*mapping = alien_mapping;
 	ret = 0;
-	pr_debug("%s: success, paddr: 0x%08lx\n", __func__, *paddr);
+	pr_debug("%s: success, paddr: %pap\n", __func__, paddr);
 
 out_put:
 	if (ret < 0)
@@ -597,10 +597,10 @@ static long xrp_copy_user_from_phys(struct xvp *xvp,
 static long xvp_copy_virt_to_phys(struct xvp_file *xvp_file,
 				  unsigned long flags,
 				  unsigned long vaddr, unsigned long size,
-				  unsigned long *paddr,
+				  phys_addr_t *paddr,
 				  struct xvp_alien_mapping **mapping)
 {
-	unsigned long phys;
+	phys_addr_t phys;
 	unsigned long align = clamp(vaddr & -vaddr, PAGE_SIZE, 16ul);
 	unsigned long offset = vaddr & (align - 1);
 	struct xrp_allocation *allocation;
@@ -638,7 +638,7 @@ static long xvp_copy_virt_to_phys(struct xvp_file *xvp_file,
 	}
 
 	*mapping = alien_mapping;
-	pr_debug("%s: copying to pa: 0x%08lx\n", __func__, phys);
+	pr_debug("%s: copying to pa: %pap\n", __func__, paddr);
 
 	return 0;
 }
@@ -671,16 +671,16 @@ static unsigned xvp_get_region_vma_count(unsigned long virt,
 
 static long xrp_share_kernel(struct file *filp,
 			     unsigned long virt, unsigned long size,
-			     unsigned long flags, unsigned long *paddr,
+			     unsigned long flags, phys_addr_t *paddr,
 			     struct xrp_mapping *mapping)
 {
 	struct xvp_file *xvp_file = filp->private_data;
 	struct xvp *xvp = xvp_file->xvp;
-	unsigned long phys = __pa(virt);
+	phys_addr_t phys = __pa(virt);
 
 	mapping->type = XRP_MAPPING_KERNEL;
 	*paddr = phys;
-	pr_debug("%s: sharing kernel-only buffer: 0x%08lx\n", __func__, phys);
+	pr_debug("%s: sharing kernel-only buffer: %pap\n", __func__, paddr);
 	pr_debug("%s: mapping = %p, mapping->type = %d\n",
 		 __func__, mapping, mapping->type);
 
@@ -702,10 +702,10 @@ static long xrp_share_kernel(struct file *filp,
 
 static long __xrp_share_block(struct file *filp,
 			      unsigned long virt, unsigned long size,
-			      unsigned long flags, unsigned long *paddr,
+			      unsigned long flags, phys_addr_t *paddr,
 			      struct xrp_mapping *mapping)
 {
-	unsigned long phys = ~0ul;
+	phys_addr_t phys = ~0ul;
 	struct xvp_file *xvp_file = filp->private_data;
 	struct mm_struct *mm = current->mm;
 	struct vm_area_struct *vma = find_vma(mm, virt);
@@ -965,9 +965,9 @@ struct xrp_request {
 	size_t n_buffers;
 	struct xrp_mapping *buffer_mapping;
 	struct xrp_dsp_buffer *dsp_buffer;
-	unsigned long in_data_phys;
-	unsigned long out_data_phys;
-	unsigned long dsp_buffer_phys;
+	phys_addr_t in_data_phys;
+	phys_addr_t out_data_phys;
+	phys_addr_t dsp_buffer_phys;
 	union {
 		struct xrp_mapping in_data_mapping;
 		u8 in_data[XRP_DSP_CMD_INLINE_DATA_SIZE];
@@ -1142,7 +1142,7 @@ static long xrp_map_request(struct file *filp, struct xrp_request *rq,
 
 	for (i = 0; i < n_buffers; ++i) {
 		struct xrp_ioctl_buffer ioctl_buffer;
-		unsigned long buffer_phys = ~0ul;
+		phys_addr_t buffer_phys = ~0ul;
 
 		if (copy_from_user(&ioctl_buffer, buffer + i,
 				   sizeof(ioctl_buffer))) {
