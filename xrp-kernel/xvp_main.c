@@ -15,28 +15,21 @@
 #include <linux/interrupt.h>
 #include <linux/io.h>
 #include <linux/kernel.h>
-#include <linux/miscdevice.h>
 #include <linux/module.h>
-#include <linux/mutex.h>
 #include <linux/of.h>
 #include <linux/of_address.h>
 #include <linux/of_device.h>
 #include <linux/platform_device.h>
 #include <linux/slab.h>
-#include <asm/cacheflush.h>
 #include <asm/mman.h>
 #include <asm/uaccess.h>
-#include "xrp_address_map.h"
-#include "xrp_alloc.h"
 #include "xrp_hw.h"
+#include "xrp_internal.h"
 #include "xrp_kernel_defs.h"
 #include "xrp_kernel_dsp_interface.h"
 
 #define DRIVER_NAME "xrp"
 #define XVP_TIMEOUT_JIFFIES (HZ * 10)
-
-struct xvp;
-struct xvp_file;
 
 struct xvp_alien_mapping {
 	unsigned long vaddr;
@@ -61,27 +54,6 @@ struct xrp_mapping {
 		struct xrp_allocation *xrp_allocation;
 		struct xvp_alien_mapping *xvp_alien_mapping;
 	};
-};
-
-struct xvp {
-	struct device *dev;
-	const char *firmware_name;
-	const struct firmware *firmware;
-	struct miscdevice miscdev;
-	const struct xrp_hw_ops *hw_ops;
-	void *hw_arg;
-
-	void __iomem *comm;
-	phys_addr_t pmem;
-	phys_addr_t comm_phys;
-
-	struct xrp_address_map address_map;
-
-	bool host_irq_mode;
-	struct completion completion;
-
-	struct xrp_allocation_pool pool;
-	struct mutex comm_lock;
 };
 
 struct xvp_file {
