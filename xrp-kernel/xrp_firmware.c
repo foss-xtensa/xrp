@@ -13,6 +13,7 @@
 #include <linux/io.h>
 #include <linux/of.h>
 #include <linux/of_address.h>
+#include "xrp_address_map.h"
 #include "xrp_internal.h"
 #include "xrp_firmware.h"
 #include "xrp_kernel_dsp_interface.h"
@@ -284,7 +285,9 @@ static int xrp_load_firmware(struct xvp *xvp)
 		return -EINVAL;
 	}
 
-	xrp_firmware_fixup_symbol(xvp, "xrp_dsp_comm_base", xvp->comm_phys);
+	xrp_firmware_fixup_symbol(xvp, "xrp_dsp_comm_base",
+				  xrp_translate_to_dsp(&xvp->address_map,
+						       xvp->comm_phys));
 
 	for (i = 0; i < ehdr->e_phnum; ++i) {
 		Elf32_Phdr *phdr = (void *)xvp->firmware->data +
