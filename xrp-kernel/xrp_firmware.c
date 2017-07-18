@@ -19,9 +19,19 @@
 
 static phys_addr_t xrp_translate_addr(struct xvp *xvp, Elf32_Phdr *phdr)
 {
+	phys_addr_t res;
 	__be32 addr = cpu_to_be32((u32)phdr->p_paddr);
+	struct device_node *node =
+		of_get_next_child(xvp->dev->of_node, NULL);
 
-	return of_translate_address(xvp->dev->of_node, &addr);
+	if (!node)
+		node = xvp->dev->of_node;
+
+	res = of_translate_address(node, &addr);
+
+	if (node != xvp->dev->of_node)
+		of_node_put(node);
+	return res;
 }
 
 static int xrp_load_segment_to_sysmem(struct xvp *xvp, Elf32_Phdr *phdr)
