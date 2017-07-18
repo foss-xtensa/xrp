@@ -17,7 +17,7 @@
 #include "xrp_firmware.h"
 #include "xrp_kernel_dsp_interface.h"
 
-static phys_addr_t xrp_translate_addr(struct xvp *xvp, Elf32_Phdr *phdr)
+static phys_addr_t xrp_translate_to_cpu(struct xvp *xvp, Elf32_Phdr *phdr)
 {
 	phys_addr_t res;
 	__be32 addr = cpu_to_be32((u32)phdr->p_paddr);
@@ -36,7 +36,7 @@ static phys_addr_t xrp_translate_addr(struct xvp *xvp, Elf32_Phdr *phdr)
 
 static int xrp_load_segment_to_sysmem(struct xvp *xvp, Elf32_Phdr *phdr)
 {
-	phys_addr_t pa = xrp_translate_addr(xvp, phdr);
+	phys_addr_t pa = xrp_translate_to_cpu(xvp, phdr);
 	struct page *page = pfn_to_page(__phys_to_pfn(pa));
 	size_t page_offs = pa & ~PAGE_MASK;
 	size_t offs;
@@ -83,7 +83,7 @@ static int xrp_load_segment_to_sysmem(struct xvp *xvp, Elf32_Phdr *phdr)
 
 static int xrp_load_segment_to_iomem(struct xvp *xvp, Elf32_Phdr *phdr)
 {
-	phys_addr_t pa = xrp_translate_addr(xvp, phdr);
+	phys_addr_t pa = xrp_translate_to_cpu(xvp, phdr);
 	void __iomem *p = ioremap(pa, phdr->p_memsz);
 
 	if (!p) {
@@ -306,7 +306,7 @@ static int xrp_load_firmware(struct xvp *xvp)
 			return -EINVAL;
 		}
 
-		pa = xrp_translate_addr(xvp, phdr);
+		pa = xrp_translate_to_cpu(xvp, phdr);
 		if (pa == OF_BAD_ADDR) {
 			dev_err(xvp->dev,
 				"device address 0x%08x could not be mapped to host physical address",
