@@ -498,6 +498,7 @@ void xrp_retain_device(struct xrp_device *device, enum xrp_status *status)
 void xrp_release_device(struct xrp_device *device, enum xrp_status *status)
 {
 	if (last_refcount(device)) {
+		xrp_free_pool(&device->shared_pool);
 	}
 	set_status(status, release_refcounted(device));
 }
