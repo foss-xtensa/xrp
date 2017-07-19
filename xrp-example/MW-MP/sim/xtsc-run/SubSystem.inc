@@ -101,8 +101,8 @@
 --set_memory_parm=request_fifo_depth=2
 // Share with external host
 --set_memory_parm=page_byte_size=134217728
---set_memory_parm=shared_memory_user=true
---set_memory_parm=shared_memory_names=SharedRAM_L
+--set_memory_parm=host_shared_memory=true
+--set_memory_parm=shared_memory_name=SharedRAM_L
 --create_memory=SharedRAM_L
 
 // Create SystemROM_L
