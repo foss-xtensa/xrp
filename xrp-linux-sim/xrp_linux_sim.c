@@ -23,6 +23,7 @@
 
 #include <fcntl.h>
 #include <libfdt.h>
+#include <pthread.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -74,6 +75,7 @@ struct xrp_device_description {
 
 	uint32_t device_irq_mode;
 	uint32_t device_irq[3];
+	pthread_mutex_t hw_mutex;
 };
 
 static struct xrp_device_description xrp_device_description[4];
@@ -84,10 +86,36 @@ struct xrp_refcounted {
 	unsigned long count;
 };
 
+struct xrp_request {
+	struct xrp_request *next;
+	struct xrp_dsp_cmd dsp_cmd;
+
+	size_t in_data_size;
+	void *out_data;
+	void *out_data_ptr;
+	size_t out_data_size;
+	struct xrp_buffer_group *buffer_group;
+	struct xrp_event *event;
+
+	struct xrp_allocation *in_data_allocation;
+	struct xrp_allocation *out_data_allocation;
+	struct xrp_allocation *buffer_allocation;
+	struct xrp_allocation **user_buffer_allocation;
+	struct xrp_dsp_buffer *buffer_ptr;
+};
+
 struct xrp_device {
 	struct xrp_refcounted ref;
 	struct xrp_device_description *description;
 	struct xrp_allocation_pool shared_pool;
+
+	pthread_t thread;
+	pthread_mutex_t request_queue_mutex;
+	pthread_cond_t request_queue_cond;
+	struct {
+		struct xrp_request *head;
+		struct xrp_request *tail;
+	} request_queue;
 };
 
 struct xrp_buffer {
@@ -124,7 +152,8 @@ struct xrp_queue {
 struct xrp_event {
 	struct xrp_refcounted ref;
 	struct xrp_device *device;
-	unsigned long cookie;
+	pthread_mutex_t mutex;
+	pthread_cond_t cond;
 };
 
 /* Helpers */
@@ -413,6 +442,7 @@ static void initialize(void)
 			.comm_base = getprop_u32(reg, 8),
 			.shared_base = getprop_u32(reg, 16),
 			.shared_size = getprop_u32(reg, 20),
+			.hw_mutex = PTHREAD_MUTEX_INITIALIZER,
 		};
 
 		device_irq_mode = fdt_getprop(fdt, offset, "device-irq-mode", &len);
@@ -463,6 +493,18 @@ static void initialize(void)
 
 /* Device API. */
 
+static void xrp_queue_process(struct xrp_device *device);
+
+static void *xrp_device_thread(void *p)
+{
+	struct xrp_device *device = p;
+
+	for (;;)
+		xrp_queue_process(device);
+
+	return NULL;
+}
+
 struct xrp_device *xrp_open_device(int idx, enum xrp_status *status)
 {
 	struct xrp_device *device;
@@ -486,6 +528,9 @@ struct xrp_device *xrp_open_device(int idx, enum xrp_status *status)
 		      device->description->shared_base,
 		      device->description->shared_size);
 
+	pthread_mutex_init(&device->request_queue_mutex, NULL);
+	pthread_cond_init(&device->request_queue_cond, NULL);
+	pthread_create(&device->thread, NULL, xrp_device_thread, device);
 	set_status(status, XRP_STATUS_SUCCESS);
 	return device;
 }
@@ -498,6 +543,13 @@ void xrp_retain_device(struct xrp_device *device, enum xrp_status *status)
 void xrp_release_device(struct xrp_device *device, enum xrp_status *status)
 {
 	if (last_refcount(device)) {
+		pthread_cancel(device->thread);
+		pthread_join(device->thread, NULL);
+		pthread_mutex_lock(&device->request_queue_mutex);
+		if (device->request_queue.head != NULL)
+			printf("%s: releasing a device with non-empty queue\n",
+			       __func__);
+		pthread_mutex_unlock(&device->request_queue_mutex);
 		xrp_free_pool(&device->shared_pool);
 	}
 	set_status(status, release_refcounted(device));
@@ -745,9 +797,123 @@ void xrp_run_command_sync(struct xrp_queue *queue,
 			  struct xrp_buffer_group *buffer_group,
 			  enum xrp_status *status)
 {
+	struct xrp_event *evt;
 	xrp_enqueue_command(queue, in_data, in_data_size,
 			    out_data, out_data_size,
-			    buffer_group, NULL, status);
+			    buffer_group, &evt, status);
+	if (*status != XRP_STATUS_SUCCESS)
+		return;
+	xrp_wait(evt, NULL);
+	xrp_release_event(evt, NULL);
+}
+
+static void xrp_enqueue_request(struct xrp_device *device,
+				struct xrp_request *rq)
+{
+	pthread_mutex_lock(&device->request_queue_mutex);
+	rq->next = NULL;
+	if (device->request_queue.tail) {
+		device->request_queue.tail->next = rq;
+	} else {
+		device->request_queue.head = rq;
+		pthread_cond_broadcast(&device->request_queue_cond);
+	}
+	device->request_queue.tail = rq;
+	pthread_mutex_unlock(&device->request_queue_mutex);
+}
+
+static struct xrp_request *_xrp_dequeue_request(struct xrp_device *device)
+{
+	struct xrp_request *rq = device->request_queue.head;
+
+	if (!rq)
+		return NULL;
+
+	if (rq == device->request_queue.tail)
+		device->request_queue.tail = NULL;
+	device->request_queue.head = rq->next;
+	return rq;
+}
+
+static void xrp_queue_cleanup(void *p)
+{
+	struct xrp_device *device = p;
+	pthread_mutex_unlock(&device->request_queue_mutex);
+}
+
+static void xrp_queue_process(struct xrp_device *device)
+{
+	size_t n_buffers;
+	struct xrp_dsp_cmd *dsp_cmd = device->description->comm_ptr;
+	struct xrp_request *rq;
+	size_t i;
+	int old_state;
+
+	pthread_mutex_lock(&device->request_queue_mutex);
+	pthread_cleanup_push(xrp_queue_cleanup, device);
+	pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, &old_state);
+	for (;;) {
+		rq = _xrp_dequeue_request(device);
+		if (rq)
+			break;
+		pthread_cond_wait(&device->request_queue_cond,
+				  &device->request_queue_mutex);
+	}
+	pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, NULL);
+	pthread_cleanup_pop(1);
+
+	pthread_mutex_lock(&device->description->hw_mutex);
+	memcpy(dsp_cmd, &rq->dsp_cmd, sizeof(rq->dsp_cmd));
+	barrier();
+	xrp_comm_write32(&dsp_cmd->flags, XRP_DSP_CMD_FLAG_REQUEST_VALID);
+	barrier();
+	xrp_send_device_irq(device->description);
+	do {
+		barrier();
+	} while (xrp_comm_read32(&dsp_cmd->flags) !=
+		 (XRP_DSP_CMD_FLAG_REQUEST_VALID |
+		  XRP_DSP_CMD_FLAG_RESPONSE_VALID));
+
+	memcpy(&rq->dsp_cmd, dsp_cmd, sizeof(rq->dsp_cmd));
+	memcpy(rq->out_data, rq->out_data_ptr, rq->out_data_size);
+	pthread_mutex_unlock(&device->description->hw_mutex);
+
+	if (rq->in_data_size > XRP_DSP_CMD_INLINE_DATA_SIZE) {
+		xrp_free(rq->in_data_allocation);
+	}
+	if (rq->out_data_size > XRP_DSP_CMD_INLINE_DATA_SIZE) {
+		xrp_free(rq->out_data_allocation);
+	}
+
+	n_buffers = rq->buffer_group ? rq->buffer_group->n_buffers : 0;
+	for (i = 0; i < n_buffers; ++i) {
+		phys_addr_t addr;
+
+		if (rq->buffer_group->buffer[i].buffer->type != XRP_BUFFER_TYPE_DEVICE) {
+			if (rq->buffer_ptr[i].flags & XRP_DSP_BUFFER_FLAG_WRITE) {
+				addr = rq->user_buffer_allocation[i]->start;
+				memcpy(rq->buffer_group->buffer[i].buffer->ptr, p2v(addr),
+				       rq->buffer_group->buffer[i].buffer->size);
+			}
+			xrp_free(rq->user_buffer_allocation[i]);
+		}
+	}
+	if (n_buffers > XRP_DSP_CMD_INLINE_BUFFER_COUNT) {
+		xrp_free(rq->buffer_allocation);
+	}
+
+	if (rq->buffer_group)
+		xrp_release_buffer_group(rq->buffer_group, NULL);
+
+	if (rq->event) {
+		pthread_mutex_lock(&rq->event->mutex);
+		pthread_cond_broadcast(&rq->event->cond);
+		pthread_mutex_unlock(&rq->event->mutex);
+		xrp_release_event(rq->event, NULL);
+	}
+	free(rq->user_buffer_allocation);
+	free(rq);
+	pthread_setcancelstate(old_state, NULL);
 }
 
 void xrp_enqueue_command(struct xrp_queue *queue,
@@ -761,24 +927,26 @@ void xrp_enqueue_command(struct xrp_queue *queue,
 	struct xrp_event *event = NULL;
 	size_t n_buffers = buffer_group ? buffer_group->n_buffers : 0;
 	size_t i;
-	struct xrp_dsp_cmd *dsp_cmd = device->description->comm_ptr;
-	struct xrp_allocation *in_data_allocation;
-	struct xrp_allocation *out_data_allocation;
-	struct xrp_allocation *buffer_allocation;
-	struct xrp_allocation *user_buffer_allocation[n_buffers];
+	struct xrp_request *rq = malloc(sizeof(*rq));
+	struct xrp_dsp_cmd *dsp_cmd = &rq->dsp_cmd;
 	void *in_data_ptr;
-	void *out_data_ptr;
-	struct xrp_dsp_buffer *buffer_ptr;
+
+	rq->in_data_size = in_data_size;
+	rq->out_data = out_data;
+	rq->out_data_size = out_data_size;
+	rq->buffer_group = buffer_group;
+	if (buffer_group)
+		xrp_retain_buffer_group(buffer_group, NULL);
 
 	if (in_data_size > XRP_DSP_CMD_INLINE_DATA_SIZE) {
 		long rc = xrp_allocate(&device->shared_pool, in_data_size,
-				       0x10, &in_data_allocation);
+				       0x10, &rq->in_data_allocation);
 		if (rc < 0) {
 			set_status(status, XRP_STATUS_FAILURE);
 			return;
 		}
-		dsp_cmd->in_data_addr = in_data_allocation->start;
-		in_data_ptr = p2v(in_data_allocation->start);
+		dsp_cmd->in_data_addr = rq->in_data_allocation->start;
+		in_data_ptr = p2v(rq->in_data_allocation->start);
 	} else {
 		in_data_ptr = &dsp_cmd->in_data;
 	}
@@ -787,33 +955,34 @@ void xrp_enqueue_command(struct xrp_queue *queue,
 
 	if (out_data_size > XRP_DSP_CMD_INLINE_DATA_SIZE) {
 		long rc = xrp_allocate(&device->shared_pool, out_data_size,
-				       0x10, &out_data_allocation);
+				       0x10, &rq->out_data_allocation);
 		if (rc < 0) {
 			set_status(status, XRP_STATUS_FAILURE);
 			return;
 		}
-		dsp_cmd->out_data_addr = out_data_allocation->start;
-		out_data_ptr = p2v(out_data_allocation->start);
+		dsp_cmd->out_data_addr = rq->out_data_allocation->start;
+		rq->out_data_ptr = p2v(rq->out_data_allocation->start);
 	} else {
-		out_data_ptr = &dsp_cmd->out_data;
+		rq->out_data_ptr = &dsp_cmd->out_data;
 	}
 	dsp_cmd->out_data_size = out_data_size;
 
 	if (n_buffers > XRP_DSP_CMD_INLINE_BUFFER_COUNT) {
 		long rc = xrp_allocate(&device->shared_pool,
 				       n_buffers * sizeof(struct xrp_dsp_buffer),
-				       0x10, &buffer_allocation);
+				       0x10, &rq->buffer_allocation);
 		if (rc < 0) {
 			set_status(status, XRP_STATUS_FAILURE);
 			return;
 		}
-		dsp_cmd->buffer_addr = buffer_allocation->start;
-		buffer_ptr = p2v(buffer_allocation->start);
+		dsp_cmd->buffer_addr = rq->buffer_allocation->start;
+		rq->buffer_ptr = p2v(rq->buffer_allocation->start);
 	} else {
-		buffer_ptr = dsp_cmd->buffer_data;
+		rq->buffer_ptr = dsp_cmd->buffer_data;
 	}
 	dsp_cmd->buffer_size = n_buffers * sizeof(struct xrp_dsp_buffer);
 
+	rq->user_buffer_allocation = malloc(n_buffers * sizeof(void *));
 	for (i = 0; i < n_buffers; ++i) {
 		phys_addr_t addr;
 
@@ -827,17 +996,17 @@ void xrp_enqueue_command(struct xrp_queue *queue,
 		} else {
 			long rc = xrp_allocate(&device->shared_pool,
 					       buffer_group->buffer[i].buffer->size,
-					       0x10, user_buffer_allocation + i);
+					       0x10, rq->user_buffer_allocation + i);
 
 			if (rc < 0) {
 				set_status(status, XRP_STATUS_FAILURE);
 				return;
 			}
-			addr = user_buffer_allocation[i]->start;
+			addr = rq->user_buffer_allocation[i]->start;
 			memcpy(p2v(addr), buffer_group->buffer[i].buffer->ptr,
 			       buffer_group->buffer[i].buffer->size);
 		}
-		buffer_ptr[i] = (struct xrp_dsp_buffer){
+		rq->buffer_ptr[i] = (struct xrp_dsp_buffer){
 			.flags = buffer_group->buffer[i].access_flags,
 			.size = buffer_group->buffer[i].buffer->size,
 			.addr = addr,
@@ -859,66 +1028,23 @@ void xrp_enqueue_command(struct xrp_queue *queue,
 			return;
 		}
 		event->device = queue->device;
-	}
-
-	barrier();
-	xrp_comm_write32(&dsp_cmd->flags, XRP_DSP_CMD_FLAG_REQUEST_VALID);
-	barrier();
-	xrp_send_device_irq(device->description);
-	do {
-		barrier();
-	} while (xrp_comm_read32(&dsp_cmd->flags) !=
-		 (XRP_DSP_CMD_FLAG_REQUEST_VALID |
-		  XRP_DSP_CMD_FLAG_RESPONSE_VALID));
-
-	memcpy(out_data, out_data_ptr, out_data_size);
-
-	if (in_data_size > XRP_DSP_CMD_INLINE_DATA_SIZE) {
-		xrp_free(in_data_allocation);
-	}
-	if (out_data_size > XRP_DSP_CMD_INLINE_DATA_SIZE) {
-		xrp_free(out_data_allocation);
-	}
-	for (i = 0; i < n_buffers; ++i) {
-		phys_addr_t addr;
-
-		if (buffer_group->buffer[i].buffer->type != XRP_BUFFER_TYPE_DEVICE) {
-			if (buffer_ptr[i].flags & XRP_DSP_BUFFER_FLAG_WRITE) {
-				addr = user_buffer_allocation[i]->start;
-				memcpy(buffer_group->buffer[i].buffer->ptr, p2v(addr),
-				       buffer_group->buffer[i].buffer->size);
-			}
-			xrp_free(user_buffer_allocation[i]);
-		}
-	}
-	if (n_buffers > XRP_DSP_CMD_INLINE_BUFFER_COUNT) {
-		xrp_free(buffer_allocation);
-	}
-
-	if (evt) {
-//		event->cookie = ioctl_queue.flags;
+		pthread_mutex_init(&event->mutex, NULL);
+		pthread_cond_init(&event->cond, NULL);
 		*evt = event;
+		xrp_retain_event(event, NULL);
+		rq->event = event;
 	}
+	dsp_cmd->flags = 0;
+	xrp_enqueue_request(device, rq);
 	set_status(status, XRP_STATUS_SUCCESS);
 }
 
 void xrp_wait(struct xrp_event *event, enum xrp_status *status)
 {
-	(void)event;
-	(void)status;
-#if 0
-	struct xrp_ioctl_wait ioctl_wait = {
-		.cookie = event->cookie,
-	};
-	int ret = ioctl(event->device->fd,
-			XRP_IOCTL_WAIT, &ioctl_wait);
-
-	if (ret < 0) {
-		set_status(status, XRP_STATUS_FAILURE);
-		return;
-	}
+	pthread_mutex_lock(&event->mutex);
+	pthread_cond_wait(&event->cond, &event->mutex);
+	pthread_mutex_unlock(&event->mutex);
 	set_status(status, XRP_STATUS_SUCCESS);
-#endif
 }
 
 void xrp_exit(void)
