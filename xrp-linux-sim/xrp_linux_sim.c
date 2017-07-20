@@ -45,6 +45,11 @@ typedef uint64_t __u64;
 #include "../xrp-kernel/xrp_kernel_dsp_interface.h"
 #include "xrp_alloc.h"
 
+#if defined(__STDC_NO_ATOMICS__)
+#warning The compiler does not support atomics, reference counting may not be thread safe
+#define _Atomic
+#endif
+
 enum {
 	XRP_IRQ_NONE,
 	XRP_IRQ_LEVEL,
@@ -83,7 +88,7 @@ static int xrp_device_count;
 static phys_addr_t xrp_exit_loc;
 
 struct xrp_refcounted {
-	unsigned long count;
+	_Atomic unsigned long count;
 };
 
 struct xrp_request {
@@ -180,7 +185,7 @@ static enum xrp_status retain_refcounted(void *buf)
 	struct xrp_refcounted *ref = buf;
 
 	if (ref) {
-		++ref->count;
+		(void)++ref->count;
 		return XRP_STATUS_SUCCESS;
 	}
 	return XRP_STATUS_FAILURE;
