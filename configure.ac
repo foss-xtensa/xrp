@@ -48,6 +48,11 @@ AC_ARG_ENABLE(example,
 	      [build_example=no])
 AM_CONDITIONAL([BUILD_EXAMPLE], [test x$build_example = xtrue])
 
+AS_IF([test x$build_dsp = xfalse -a x$build_sim = xtrue],
+      [
+      AC_CHECK_HEADERS([valgrind/memcheck.h])
+      ])
+
 AS_IF([test x$build_dsp = xfalse -a x$build_example = xtrue -a x$build_sim = xtrue],
       [
       AC_CHECK_HEADER([libfdt.h],, [AC_MSG_FAILURE([No usable libfdt.h is found])])

@@ -33,6 +33,12 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#ifdef HAVE_VALGRIND_MEMCHECK_H
+#include <valgrind/memcheck.h>
+#else
+#define VALGRIND_MAKE_MEM_DEFINED(a, b) ((void)(a),(void)(b))
+#endif
+
 #define barrier() asm volatile ("" ::: "memory")
 #define mb() barrier()
 #define schedule() barrier()
@@ -880,6 +886,7 @@ static void xrp_queue_process(struct xrp_device *device)
 		  XRP_DSP_CMD_FLAG_RESPONSE_VALID));
 
 	memcpy(&rq->dsp_cmd, dsp_cmd, sizeof(rq->dsp_cmd));
+	VALGRIND_MAKE_MEM_DEFINED(rq->out_data_ptr, rq->out_data_size);
 	memcpy(rq->out_data, rq->out_data_ptr, rq->out_data_size);
 	pthread_mutex_unlock(&device->description->hw_mutex);
 
@@ -897,6 +904,9 @@ static void xrp_queue_process(struct xrp_device *device)
 		if (rq->buffer_group->buffer[i].buffer->type != XRP_BUFFER_TYPE_DEVICE) {
 			if (rq->buffer_ptr[i].flags & XRP_DSP_BUFFER_FLAG_WRITE) {
 				addr = rq->user_buffer_allocation[i]->start;
+				if (!(rq->buffer_ptr[i].flags & XRP_DSP_BUFFER_FLAG_READ))
+					VALGRIND_MAKE_MEM_DEFINED(p2v(addr),
+								  rq->buffer_group->buffer[i].buffer->size);
 				memcpy(rq->buffer_group->buffer[i].buffer->ptr, p2v(addr),
 				       rq->buffer_group->buffer[i].buffer->size);
 			}
