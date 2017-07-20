@@ -39,6 +39,7 @@ struct xrp_event;
 enum xrp_status {
 	XRP_STATUS_SUCCESS,
 	XRP_STATUS_FAILURE,
+	XRP_STATUS_PENDING,
 };
 enum xrp_access_flags {
 	XRP_READ		= 0x1,
@@ -215,6 +216,15 @@ void xrp_release_event(struct xrp_event *event,
 
 
 /*
+ * Get status of the event/associated command.
+ * The function may be called at any time, it sets *status to
+ * XRP_STATUS_PENDING if the command has not been executed yet, or to the
+ * command execution status. See status description of xrp_run_command_sync
+ * for the description of command execution status.
+ */
+void xrp_event_status(struct xrp_event *event, enum xrp_status *status);
+
+/*
  * Communication API.
  */
 
@@ -238,6 +248,13 @@ void xrp_release_event(struct xrp_event *event,
  * copying depending on the implementation.
  *
  * All buffers in the passed group must be unmapped at that point.
+ *
+ * status is the result of command execution. Command execution is
+ * successfull if the command was delivered to the DSP and the response was
+ * delivered back. Otherwise the command execution is failed. IOW execution
+ * success means that the out_data contains command-specific response received
+ * from the DSP, execution failure means that out_data does not contain useful
+ * information.
  */
 void xrp_run_command_sync(struct xrp_queue *queue,
 			  const void *in_data, size_t in_data_size,
@@ -265,6 +282,13 @@ void xrp_run_command_sync(struct xrp_queue *queue,
  * it is signaled when the command execution is complete.
  * The returned event object is reference counted and is created with
  * reference count of 1.
+ *
+ * status is the result of command enqueuing. Command enqueuing is
+ * successfull if the command was enqueued on the host side and an associated
+ * event has been returned (if requested). Otherwise the command execution is
+ * failed. IOW enqueuing success means that if event is non-NULL then *event
+ * contains valid event, enqueuing failure means that *event does not contain
+ * useful information.
  */
 void xrp_enqueue_command(struct xrp_queue *queue,
 			 const void *in_data, size_t in_data_size,
@@ -278,6 +302,8 @@ void xrp_enqueue_command(struct xrp_queue *queue,
  * Waiting for already signaled event completes immediately.
  * Successful completion of this function does not alter the event state,
  * i.e. the event remains signaled.
+ * status is the result of waiting, not the result of the command execution.
+ * Use xrp_event_status to get the command execution status.
  */
 void xrp_wait(struct xrp_event *event, enum xrp_status *status);
 

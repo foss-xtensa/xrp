@@ -79,6 +79,7 @@ struct xrp_event {
 	struct xrp_refcounted ref;
 	struct xrp_device *device;
 	unsigned long cookie;
+	enum xrp_status status;
 };
 
 /* Helpers */
@@ -428,6 +429,10 @@ void xrp_release_event(struct xrp_event *event, enum xrp_status *status)
 	set_status(status, release_refcounted(event));
 }
 
+void xrp_event_status(struct xrp_event *event, enum xrp_status *status)
+{
+	set_status(status, event->status);
+}
 
 /* Communication API */
 
@@ -505,6 +510,7 @@ void xrp_enqueue_command(struct xrp_queue *queue,
 	}
 	if (evt) {
 		event->cookie = ioctl_queue.flags;
+		event->status = XRP_STATUS_SUCCESS;
 		*evt = event;
 	}
 	set_status(status, XRP_STATUS_SUCCESS);

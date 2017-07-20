@@ -165,6 +165,7 @@ struct xrp_event {
 	struct xrp_device *device;
 	pthread_mutex_t mutex;
 	pthread_cond_t cond;
+	_Atomic enum xrp_status status;
 };
 
 /* Helpers */
@@ -799,6 +800,10 @@ void xrp_release_event(struct xrp_event *event, enum xrp_status *status)
 	set_status(status, release_refcounted(event));
 }
 
+void xrp_event_status(struct xrp_event *event, enum xrp_status *status)
+{
+	set_status(status, event->status);
+}
 
 /* Communication API */
 
@@ -815,6 +820,7 @@ void xrp_run_command_sync(struct xrp_queue *queue,
 	if (*status != XRP_STATUS_SUCCESS)
 		return;
 	xrp_wait(evt, NULL);
+	xrp_event_status(evt, status);
 	xrp_release_event(evt, NULL);
 }
 
@@ -921,10 +927,12 @@ static void xrp_queue_process(struct xrp_device *device)
 		xrp_release_buffer_group(rq->buffer_group, NULL);
 
 	if (rq->event) {
-		pthread_mutex_lock(&rq->event->mutex);
-		pthread_cond_broadcast(&rq->event->cond);
-		pthread_mutex_unlock(&rq->event->mutex);
-		xrp_release_event(rq->event, NULL);
+		struct xrp_event *event = rq->event;
+		pthread_mutex_lock(&event->mutex);
+		event->status = XRP_STATUS_SUCCESS;
+		pthread_cond_broadcast(&event->cond);
+		pthread_mutex_unlock(&event->mutex);
+		xrp_release_event(event, NULL);
 	}
 	free(rq->user_buffer_allocation);
 	free(rq);
@@ -1045,6 +1053,7 @@ void xrp_enqueue_command(struct xrp_queue *queue,
 		event->device = queue->device;
 		pthread_mutex_init(&event->mutex, NULL);
 		pthread_cond_init(&event->cond, NULL);
+		event->status = XRP_STATUS_PENDING;
 		*evt = event;
 		xrp_retain_event(event, NULL);
 		rq->event = event;
@@ -1057,7 +1066,8 @@ void xrp_enqueue_command(struct xrp_queue *queue,
 void xrp_wait(struct xrp_event *event, enum xrp_status *status)
 {
 	pthread_mutex_lock(&event->mutex);
-	pthread_cond_wait(&event->cond, &event->mutex);
+	while (event->status == XRP_STATUS_PENDING)
+		pthread_cond_wait(&event->cond, &event->mutex);
 	pthread_mutex_unlock(&event->mutex);
 	set_status(status, XRP_STATUS_SUCCESS);
 }
