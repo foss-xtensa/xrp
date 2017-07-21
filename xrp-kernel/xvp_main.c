@@ -1391,19 +1391,22 @@ static inline void xvp_disable_dsp(struct xvp *xvp)
 
 static inline void xrp_reset_dsp(struct xvp *xvp)
 {
-	if (loopback < LOOPBACK_NOMMIO)
+	if (loopback < LOOPBACK_NOMMIO &&
+	    xvp->hw_ops->reset)
 		xvp->hw_ops->reset(xvp->hw_arg);
 }
 
 static inline void xrp_halt_dsp(struct xvp *xvp)
 {
-	if (loopback < LOOPBACK_NOMMIO)
+	if (loopback < LOOPBACK_NOMMIO &&
+	    xvp->hw_ops->halt)
 		xvp->hw_ops->halt(xvp->hw_arg);
 }
 
 static inline void xrp_release_dsp(struct xvp *xvp)
 {
-	if (loopback < LOOPBACK_NOMMIO)
+	if (loopback < LOOPBACK_NOMMIO &&
+	    xvp->hw_ops->release)
 		xvp->hw_ops->release(xvp->hw_arg);
 }
 
