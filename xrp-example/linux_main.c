@@ -5,6 +5,7 @@
 #include <malloc.h>
 #include "xrp_api.h"
 
+/* Test data transfer from and to in/out buffers */
 static void f1(int devid)
 {
 	enum xrp_status status;
@@ -31,6 +32,7 @@ static void f1(int devid)
 	xrp_release_device(device, &status);
 }
 
+/* Test asynchronous API */
 static void f2(int devid)
 {
 	enum xrp_status status;
@@ -39,7 +41,7 @@ static void f2(int devid)
 	struct xrp_buffer_group *group = xrp_create_buffer_group(&status);
 	struct xrp_buffer *buf = xrp_create_buffer(device, 1024, NULL, &status);
 	void *data = xrp_map_buffer(buf, 0, 1024, XRP_READ_WRITE, &status);
-	struct xrp_event *event;
+	struct xrp_event *event[2];
 
 	memset(data, 'z', 1024);
 
@@ -47,15 +49,23 @@ static void f2(int devid)
 
 	xrp_add_buffer_to_group(group, buf, XRP_READ_WRITE, &status);
 
-	xrp_enqueue_command(queue, NULL, 0, NULL, 0, group, &event, &status);
+	xrp_enqueue_command(queue, NULL, 0, NULL, 0, group, event + 0, &status);
+	assert(status == XRP_STATUS_SUCCESS);
+	xrp_enqueue_command(queue, NULL, 0, NULL, 0, group, event + 1, &status);
+	assert(status == XRP_STATUS_SUCCESS);
 	xrp_release_buffer_group(group, &status);
 	xrp_release_buffer(buf, &status);
 	xrp_release_queue(queue, &status);
-	xrp_wait(event, &status);
-	xrp_release_event(event, &status);
+	xrp_wait(event[1], &status);
+	xrp_event_status(event[0], &status);
+	assert(status != XRP_STATUS_PENDING);
+	xrp_wait(event[0], &status);
+	xrp_release_event(event[0], &status);
+	xrp_release_event(event[1], &status);
 	xrp_release_device(device, &status);
 }
 
+/* Test data transfer from and to device and user buffers */
 static void f3(int devid)
 {
 	enum xrp_status status;
