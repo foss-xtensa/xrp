@@ -325,16 +325,20 @@ start:
 	pr_debug("%s: done\n", __func__);
 }
 
-static inline int xrp_request_valid(struct xrp_dsp_cmd *dsp_cmd)
+static inline int xrp_request_valid(struct xrp_dsp_cmd *dsp_cmd,
+				    uint32_t *pflags)
 {
 	uint32_t flags = XT_L32AI(&dsp_cmd->flags, 0);
+
+	*pflags = flags;
 	return (flags & (XRP_DSP_CMD_FLAG_REQUEST_VALID |
 			 XRP_DSP_CMD_FLAG_RESPONSE_VALID)) ==
 		XRP_DSP_CMD_FLAG_REQUEST_VALID;
 
 }
 
-static void wait_for_request(struct xrp_dsp_cmd *dsp_cmd)
+static void wait_for_request(struct xrp_dsp_cmd *dsp_cmd,
+			     uint32_t *pflags)
 {
 	if (device_irq_mode != XRP_IRQ_NONE) {
 		unsigned level = XTOS_SET_INTLEVEL(15);
@@ -345,7 +349,7 @@ static void wait_for_request(struct xrp_dsp_cmd *dsp_cmd)
 
 			dcache_region_invalidate(dsp_cmd,
 						 sizeof(*dsp_cmd));
-			if (xrp_request_valid(dsp_cmd))
+			if (xrp_request_valid(dsp_cmd, pflags))
 				break;
 
 			_xtos_ints_on(1u << device_irq);
@@ -358,7 +362,7 @@ static void wait_for_request(struct xrp_dsp_cmd *dsp_cmd)
 		for (;;) {
 			dcache_region_invalidate(dsp_cmd,
 						 sizeof(*dsp_cmd));
-			if (xrp_request_valid(dsp_cmd))
+			if (xrp_request_valid(dsp_cmd, pflags))
 				break;
 		}
 	}
@@ -488,12 +492,17 @@ static enum xrp_status run_command_loop(void)
 
 	for (;;) {
 		enum xrp_status status = XRP_STATUS_SUCCESS;
+		uint32_t flags;
 
-		wait_for_request(xrp_dsp_comm_base);
-		status = process_command(xrp_dsp_comm_base);
+		wait_for_request(xrp_dsp_comm_base, &flags);
+		if (flags == XRP_DSP_SYNC_START) {
+			do_handshake(xrp_dsp_comm_base);
+		} else {
+			status = process_command(xrp_dsp_comm_base);
 
-		if (status != XRP_STATUS_SUCCESS)
-			return status;
+			if (status != XRP_STATUS_SUCCESS)
+				return status;
+		}
 	}
 }
 
