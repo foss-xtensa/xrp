@@ -80,6 +80,9 @@
 --set_memory_parm=block_write_repeat=1
 --set_memory_parm=burst_write_repeat=1
 --set_memory_parm=request_fifo_depth=2
+// Share with external host
+--set_memory_parm=host_shared_memory=true
+--set_memory_parm=shared_memory_name=SystemRAM_L
 --create_memory=SystemRAM_L
 
 // Create SharedRAM_L
