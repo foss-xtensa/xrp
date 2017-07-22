@@ -1800,21 +1800,19 @@ static int xvp_boot_firmware(struct xvp *xvp)
 	int ret;
 	struct xrp_dsp_sync __iomem *shared_sync = xvp->comm;
 
-	if (!xvp->firmware_name)
-		return 0;
+	if (xvp->firmware_name) {
+		if (loopback < LOOPBACK_NOFIRMWARE) {
+			ret = xvp_request_firmware(xvp);
+			if (ret < 0)
+				return ret;
+		}
 
-	if (loopback < LOOPBACK_NOFIRMWARE) {
-		ret = xvp_request_firmware(xvp);
-		if (ret < 0)
-			return ret;
+		if (loopback < LOOPBACK_NOIO) {
+			xrp_comm_write32(&shared_sync->sync, XRP_DSP_SYNC_IDLE);
+			mb();
+		}
+		xvp_release_dsp(xvp);
 	}
-
-	if (loopback < LOOPBACK_NOIO) {
-		xrp_comm_write32(&shared_sync->sync, XRP_DSP_SYNC_IDLE);
-		mb();
-	}
-	xvp_release_dsp(xvp);
-
 	if (loopback < LOOPBACK_NOIO) {
 		ret = xvp_synchronize(xvp);
 		if (ret < 0) {
