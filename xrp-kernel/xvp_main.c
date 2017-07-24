@@ -49,7 +49,7 @@ struct xrp_mapping {
 		XRP_MAPPING_NONE,
 		XRP_MAPPING_NATIVE,
 		XRP_MAPPING_ALIEN,
-		XRP_MAPPING_KERNEL,
+		XRP_MAPPING_KERNEL = 0x4,
 	} type;
 	union {
 		struct xrp_allocation *xrp_allocation;
@@ -650,19 +650,34 @@ static long xrp_share_kernel(struct file *filp,
 	struct xvp_file *xvp_file = filp->private_data;
 	struct xvp *xvp = xvp_file->xvp;
 	phys_addr_t phys = __pa(virt);
+	long err = 0;
 
-	mapping->type = XRP_MAPPING_KERNEL;
-	*paddr = phys;
-	pr_debug("%s: sharing kernel-only buffer: %pap\n", __func__, paddr);
+	pr_debug("%s: sharing kernel-only buffer: %pap\n", __func__, &phys);
+	if (xrp_translate_to_dsp(&xvp->address_map, phys) ==
+	    XRP_NO_TRANSLATION) {
+		mm_segment_t oldfs = get_fs();
+
+		pr_debug("%s: untranslatable addr, making shadow copy\n",
+			 __func__);
+	        set_fs(KERNEL_DS);
+		err = xvp_copy_virt_to_phys(xvp_file, flags,
+					    virt, size, paddr,
+					    &mapping->xvp_alien_mapping);
+		set_fs(oldfs);
+		mapping->type = XRP_MAPPING_ALIEN | XRP_MAPPING_KERNEL;
+	} else {
+		mapping->type = XRP_MAPPING_KERNEL;
+		*paddr = phys;
+
+		if (flags & XRP_FLAG_WRITE) {
+			xvp->hw_ops->flush_cache((void *)virt, phys, size);
+		} else if (flags & XRP_FLAG_READ) {
+			xvp->hw_ops->clean_cache((void *)virt, phys, size);
+		}
+	}
 	pr_debug("%s: mapping = %p, mapping->type = %d\n",
 		 __func__, mapping, mapping->type);
-
-	if (flags & XRP_FLAG_WRITE) {
-		xvp->hw_ops->flush_cache((void *)virt, phys, size);
-	} else if (flags & XRP_FLAG_READ) {
-		xvp->hw_ops->clean_cache((void *)virt, phys, size);
-	}
-	return 0;
+	return err;
 }
 
 /* Share blocks of memory, from host to IVP or back.
@@ -833,8 +848,12 @@ static long __xrp_unshare_block(struct file *filp, struct xrp_mapping *mapping,
 				unsigned long flags)
 {
 	long ret = 0;
+	mm_segment_t oldfs = get_fs();
 
-	switch (mapping->type) {
+	if (mapping->type & XRP_MAPPING_KERNEL)
+	        set_fs(KERNEL_DS);
+
+	switch (mapping->type & ~XRP_MAPPING_KERNEL) {
 	case XRP_MAPPING_NATIVE:
 		xrp_allocation_put(mapping->xrp_allocation);
 		break;
@@ -853,6 +872,9 @@ static long __xrp_unshare_block(struct file *filp, struct xrp_mapping *mapping,
 	default:
 		break;
 	}
+
+	if (mapping->type & XRP_MAPPING_KERNEL)
+		set_fs(oldfs);
 
 	mapping->type = XRP_MAPPING_NONE;
 
