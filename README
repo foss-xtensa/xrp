@@ -80,48 +80,63 @@ of the XRP interface.
   userspace processes on linux CPU cores. It communicates with devices managed
   by the linux kernel driver through the file-based interface exposed by the
   driver;
-- linux kernel driver does the following:
-  - manages Xtensa DSP cores: loads firmware into them, configures shared
-    memory/used IRQs, performs initial synchronization and manages request
-    queue;
+- linux kernel driver consists of the generic XRP implementation and an
+  optional hardware-specific XRP driver. Generic XRP driver does the
+  following:
+  - loads firmware into the DSP cores, performs initial synchronization and
+    manages request queue;
   - manages dedicated physical memory of the Xtensa DSP cores;
   - maps and unmaps userspace buffers associated with requests making them
     physically contiguous.
+  Hardware-specific XRP driver does the following:
+  - manages Xtensa DSP cores: stalls/unstalls, resets, selects reset vector,
+    configures shared memory/used IRQs, clocks, power, other relevant details
+    to get cores going;
+  - receives IRQs from DSPs and forwards them to the generic XRP driver;
+  - communicates hardware information to the hardware-specific part of the DSP
+    XRP library.
 - Xtensa DSP side XRP implementation is a library code that runs as a part
   of firmware on Xtensa DSP implementing DSP subset of the XRP API. It
   receives requests, invokes handler and sends replies back to host.
 
-   ,--------.
-   | System |
-   |        `-----------------------------------------------------------.
-   |  ,-----------.                          ,-------.-------.          |
-   |  | Host CPUS |                          | DSP 0 | DSP 1 | ...      |
-   |  |           `----------------------.   |       `------------.     |
-   |  | ,--------------.                 |   | ,----------------. |     |
-   |  | | User process | ...             |   | |   DSP payload  | |     |
-   |  | |              `---------------. |   | `----------------' |     |
-   |  | | ,--------------------------. | |   |     ^        |     |     |
-   |  | | |  User application code   | | |   |     |        v     |     |
-   |  | | `--------------------------' | |   | ,----------------. |<~.  |
-   |  | |             |       ^        | |   | | DSP XRP library| |<~|  |
-   |  | |             v       |        | |   | `----------------' |<~|  |
-   |  | | ,--------------------------. | |   `---- | ------ ^ ----'  |  |
-   |  | | | Native Linux XRP library | | |         v        |        |  |
-   |  | | `--------------------------' | |   ,-----------.  |        |  |
-   |  | `------------ | ----- ^ -------' |<~~| Host MMIO |  |        |  |
-   |  | ,--------.    |       |          |   `-----------'  |        |  |
-   |  | | Kernel |    |       |          |                  |        |  |
-   |  | |        `--- v ----- | -------. |                  v        |  |
-   |  | | ,--------------------------. | |   ,--------------------.  |  |
-   |  | | |  XRP linux kernel driver |<----->|    Shared memory   |  |  |
-   |  | | `--------------------------' | |   `--------------------'  |  |
-   |  | `---------------- | -----------' |   ,--------------------.  |  |
-   |  |                   |              |   |     DSP 0 MMIO     |~~|  |
-   |  |                   `----------------->|     DSP 1 MMIO     |~~|  |
-   |  |                                  |   |         ...        |~~'  |
-   |  `----------------------------------'   `--------------------'     |
-   |                                                                    |
-   `--------------------------------------------------------------------'
+  ,--------.
+  | System |
+  |        `------------------------------------------------------------.
+  |  ,-----------.                          ,-------.-------.           |
+  |  | Host CPUS |                          | DSP 0 | DSP 1 | ...       |
+  |  |           `----------------------.   |       `-------------.     |
+  |  | ,--------------.                 |   | ,-----------------. |     |
+  |  | | User process | ...             |   | |   DSP payload   | |     |
+  |  | |              `---------------. |   | `-----------------' |     |
+  |  | | ,--------------------------. | |   |     ^         |     |     |
+  |  | | |  User application code   | | |   |     |         v     |     |
+  |  | | `--------------------------' | |   | ,-----------------. |     |
+  |  | |             |       ^        | |   | | DSP XRP library | |     |
+  |  | |             v       |        | |   | `-----------------' |     |
+  |  | | ,--------------------------. | |   |     ^    ^    |     |     |
+  |  | | | Native Linux XRP library | | |   |     |    |    v     |<~.  |
+  |  | | `--------------------------' | |   |     | ,-----------. |<~|  |
+  |  | `------------ | ----- ^ -------' |   |     | |HW-specific|<~~~|  |
+  |  |               |       |          |   |     | |XRP library|<~~~|  |
+  |  | ,--------.    |       |          |   |     | `-----------' |  |  |
+  |  | | Kernel |    |       |          |   `---- | ------ | -----'  |  |
+  |  | |        `--- v ----- | -------. |         v        |         |  |
+  |  | | ,--------------------------. | |   ,-----------.  |         |  |
+  |  | | |  XRP linux kernel driver |<----->|   Shared  |  |         |  |
+  |  | | `--------------------------' | |   |   memory  |  |         |  |
+  |  | |             |       ^        | |   `-----------'  |         |  |
+  |  | |             v       |        | |                  v         |  |
+  |  | | ,--------------------------. | |            ,-----------.   |  |
+  |  | | |  HW-specific XRP  driver |<~~~~~~~~~~~~~~~| Host MMIO |   |  |
+  |  | | `--------------------------' | |            `-----------'   |  |
+  |  | `---------------- | -----------' |   ,--------------------.   |  |
+  |  |                   |              |   |     DSP 0 MMIO     |~~~|  |
+  |  |                   `----------------->|     DSP 1 MMIO     |~~~|  |
+  |  |                                  |   |         ...        |~~~'  |
+  |  `----------------------------------'   `--------------------'      |
+  |                                                                     |
+  `---------------------------------------------------------------------'
+
 
 Fast simulation runs linux-side code on a linux-based system and communicates
 with unmodiified Xtensa DSP code running in a simulator on the same linux-based
@@ -133,47 +148,125 @@ of the XRP interface and the DSP implementation of the XRP interface.
 - Xtensa DSP side XRP implementation is the same both in native and in fast
   simulation cases.
 
-   ,--------------.                       ,-------------------------.
-   | User process |                       | XTSC simulation process |
-   |              `--------------------.  |                         `---.
-   |                                   |  |  ,-------.-------.          |
-   |                                   |  |  | DSP 0 | DSP 1 | ...      |
-   |                                   |  |  |       `------------.     |
-   |  ,-----------------------------.  |  |  | ,----------------. |     |
-   |  |    User application code    |  |  |  | |   DSP payload  | |     |
-   |  `-----------------------------'  |  |  | `----------------' |     |
-   |              |       ^            |  |  |     ^        |     |     |
-   |              v       |            |  |  |     |        v     |     |
-   |  ,-----------------------------.  |  |  | ,----------------. |<~.  |
-   |  | Fast simulation XRP library |  |  |  | | DSP XRP library| |<~|  |
-   |  `-----------------------------'  |  |  | `----------------' |<~|  |
-   |                  ^                |  |  `--------- ^ --------'  |  |
-   |                  |                |  |             |            |  |
-   |                  v                |  |             v            |  |
-   |  ,-----------------------------------------------------------.  |  |
-   |  |                       Shared memory                       |  |  |
-   |  `-----------------------------------------------------------'  |  |
-   |                                   |  |      |                   |  |
-   `-----------------------------------'  |      v                   |  |
-                                          |  ,--------------------.  |  |
-                                          |  |  Helper LUA script |  |  |
-                                          |  `--------------------'  |  |
-                                          |      |                   |  |
-                                          |      v                   |  |
-                                          |  ,--------------------.  |  |
-                                          |  |     DSP 0 MMIO     |~~|  |
-                                          |  |     DSP 1 MMIO     |~~|  |
-                                          |  |         ...        |~~'  |
-                                          |  `--------------------'     |
-                                          |                             |
-                                          `-----------------------------'
+  ,--------------.                       ,-------------------------.
+  | User process |                       | XTSC simulation process |
+  |              `--------------------.  |                         `----.
+  |                                   |  |  ,-------.-------.           |
+  |                                   |  |  | DSP 0 | DSP 1 | ...       |
+  |                                   |  |  |       `-------------.     |
+  |  ,-----------------------------.  |  |  | ,-----------------. |     |
+  |  |    User application code    |  |  |  | |   DSP payload   | |     |
+  |  `-----------------------------'  |  |  | `-----------------' |     |
+  |              |       ^            |  |  |     ^         |     |     |
+  |              v       |            |  |  |     |         v     |     |
+  |  ,-----------------------------.  |  |  | ,-----------------. |     |
+  |  | Fast simulation XRP library |  |  |  | | DSP XRP library | |     |
+  |  `-----------------------------'  |  |  | `-----------------' |     |
+  |                  ^                |  |  |     ^    ^    |     |     |
+  |                  |                |  |  |     |    |    v     |<~.  |
+  |                  |                |  |  |     | ,-----------. |<~|  |
+  |                  |                |  |  |     | |HW-specific|<~~~|  |
+  |                  |                |  |  |     | |XRP library|<~~~|  |
+  |                  |                |  |  |     | `-----------' |  |  |
+  |                  |                |  |  `---- | --------------'  |  |
+  |                  v                |  |        v                  |  |
+  |  ,------------------------------------------------------------.  |  |
+  |  |                       Shared memory                        |  |  |
+  |  `------------------------------------------------------------'  |  |
+  |                                   |  |             |             |  |
+  `-----------------------------------'  |             v             |  |
+                                         |  ,---------------------.  |  |
+                                         |  |  Helper LUA script  |  |  |
+                                         |  `---------------------'  |  |
+                                         |             |             |  |
+                                         |             v             |  |
+                                         |  ,---------------------.  |  |
+                                         |  |     DSP 0 MMIO      |~~|  |
+                                         |  |     DSP 1 MMIO      |~~|  |
+                                         |  |         ...         |~~'  |
+                                         |  `---------------------'     |
+                                         |                              |
+                                         `------------------------------'
+
+A mixed variant of native and fast simulation system running linux-side code
+in a separate simulator is possible. It uses native linux XRP library and
+generic XRP kernel driver, but fast simulation DSP payload.
+This way it is possible to simulate heterogeneous setups, like Aarch64-based
+host + Xtensa DSPs.
+
+  ,--------------------------------.        ,-------------------------.
+  | Host system simulation process |        | XTSC simulation process |
+  |                                `-----.  |                         `----.
+  | ,-----------.                        |  |  ,-------.-------.           |
+  | | Host CPUS |                        |  |  | DSP 0 | DSP 1 | ...       |
+  | |           `----------------------. |  |  |       `-------------.     |
+  | | ,--------------.                 | |  |  | ,-----------------. |     |
+  | | | User process | ...             | |  |  | |   DSP payload   | |     |
+  | | |              `---------------. | |  |  | `-----------------' |     |
+  | | | ,--------------------------. | | |  |  |     ^         |     |     |
+  | | | |  User application code   | | | |  |  |     |         v     |     |
+  | | | `--------------------------' | | |  |  | ,-----------------. |     |
+  | | |             |       ^        | | |  |  | | DSP XRP library | |     |
+  | | |             v       |        | | |  |  | `-----------------' |     |
+  | | | ,--------------------------. | | |  |  |     ^    ^    |     |     |
+  | | | | Native Linux XRP library | | | |  |  |     |    |    v     |<~.  |
+  | | | `--------------------------' | | |  |  |     | ,-----------. |<~|  |
+  | | `------------ | ----- ^ -------' | |  |  |     | |HW-specific|<~~~|  |
+  | |               |       |          | |  |  |     | |XRP library|<~~~|  |
+  | | ,--------.    |       |          | |  |  |     | `-----------' |  |  |
+  | | | Kernel |    |       |          | |  |  `---- | --------------'  |  |
+  | | |        `--- v ----- | -------. | |  |        |                  |  |
+  | | | ,--------------------------. | | |  |        |                  |  |
+  | | | |  XRP linux kernel driver | | | |  |        |                  |  |
+  | | | `--------------------------' | | |  |        |                  |  |
+  | | `---------------- ^ -----------' | |  |        |                  |  |
+  | `------------------ | -------------' |  |        |                  |  |
+  |                     v                |  |        v                  |  |
+  | ,----------------------------------------------------------------.  |  |
+  | |                        Shared memory                           |  |  |
+  | `----------------------------------------------------------------'  |  |
+  |                                      |  |             |             |  |
+  `--------------------------------------'  |             v             |  |
+                                            |  ,---------------------.  |  |
+                                            |  |  Helper LUA script  |  |  |
+                                            |  `---------------------'  |  |
+                                            |             |             |  |
+                                            |             v             |  |
+                                            |  ,---------------------.  |  |
+                                            |  |     DSP 0 MMIO      |~~|  |
+                                            |  |     DSP 1 MMIO      |~~|  |
+                                            |  |         ...         |~~'  |
+                                            |  `---------------------'     |
+                                            |                              |
+                                            `------------------------------'
+
 
 Kernel driver requirements.
 ==========================
 
-The linux kernel driver is well tested with linux kernel version 4.8 and is
-known to work with linux kernel version 4.3 on xtensa and 32-bit ARM linux.
+The linux kernel driver is tested with a number of linux kernel versions from
+3.18 to 4.11 and is known to work on xtensa, 32- and 64-bit ARM linux.
+
 The driver makes the following assumptions:
+- DSP memory where firmware must be loaded (possibly including DRAM and IRAM)
+  is writable from the linux host. Host may access that memory at physical
+  addresses different from their physical addresses used by the DSP (i.e.
+  multiple DSPs may have identical configurations, and thus IRAM and DRAM at
+  the same addresses, but the host need to see each IRAM and DRAM at physical
+  addresses that don't overlap in order to be able to load firmware to each
+  DSP).
+- the driver provides functions to manage contiguous memory allocation for the
+  DSP. These functions manage physical memory pool configured for the DSP.
+  The DSP must have access to all of this physical memory, but not necessarily
+  at the same physical address as the host;
+- the generic XRP driver is sufficient for shared-memory based operation with
+  host and DSPs working in polling mode. If there are hardware-specific steps
+  needed to enable DSPs, or DSPs or host need to work in IRQ mode then an
+  additional hardware-specific XRP driver is needed for that system.
+
+There's an example of such additional driver in the package, called
+  xrp_hw_simple, which may be used as a reference/template. It makes the
+  following assumptions:
 - there exists reset and runstall memory-mapped registers for each DSP core,
   DSP doesn't need any additional setup to run (i.e. no clock setup, no power
   management, default reset vector);
@@ -183,15 +276,6 @@ The driver makes the following assumptions:
 - there may exist memory-mapped register for sending IRQ from DSP to the host;
   if it exists then in addition to always available polling mode the linux
   driver may run in IRQ mode.
-- DSP DRAM and IRAM are writable from the linux host. Host may access DRAM
-  and IRAM at physical addresses different from their physical addresses used
-  by the DSP (i.e. multiple DSPs may have identical configurations, and thus
-  IRAM and DRAM at the same addresses, but the host need to see each IRAM
-  and DRAM at physical addresses that don't overlap).
-- the driver provides functions to manage contiguous memory allocation for the
-  DSP. These functions manage physical memory pool configured for the DSP.
-  The DSP must have access to this physical memory at the same physical
-  address as the host.
 
 Configuration.
 =============
@@ -346,7 +430,12 @@ targets. Example building for xtensa linux:
     KSRC=`pwd`/../kernel/xrp-sim-dc233c make -C xrp-kernel modules
 
 The result is kernel object xrp-kernel/xrp.ko loadable into the kernel it was
-built against.
+built against. To build both xrp.ko and xrp_hw_simple.ko pass XRP_HW_SIMPLE=m
+to the make:
+
+  $ ARCH=xtensa CROSS_COMPILE=xtensa-dc233c-elf- \
+    KSRC=`pwd`/../kernel/xrp-sim-dc233c \
+    make -C xrp-kernel XRP_HW_SIMPLE=m modules
 
 Building XRP libraries.
 ======================
