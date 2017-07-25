@@ -490,7 +490,7 @@ library or example.
   - DSP_LSP: path to the LSP to be used.
 
   $ ./configure --host=xtensa-elf --enable-dsp --enable-example \
-    DSP_CORE=visionp6cnn_ao \
+    DSP_CORE=visionp6cnn_ao_exls \
     DSP_LSP=MW-MP/P6_0/xtensa-elf/lib/sim-stacklocal \
     CC=xt-xcc
   $ make
@@ -506,7 +506,7 @@ library or example.
   - DSP_COMM_BASE: base address of the DSP communication area.
 
   $ ./configure --host=xtensa-elf --enable-dsp --enable-example --enable-sim \
-    DSP_CORE=visionp6cnn_ao \
+    DSP_CORE=visionp6cnn_ao_exls \
     DSP_LSP=MW-MP/P6_0/xtensa-elf/lib/sim-stacklocal \
     DSP_COMM_BASE=0xf0000000 \
     CC=xt-xcc
