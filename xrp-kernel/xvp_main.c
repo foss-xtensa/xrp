@@ -32,6 +32,10 @@
 #define DRIVER_NAME "xrp"
 #define XVP_TIMEOUT_JIFFIES (HZ * 10)
 
+#ifndef __io_virt
+#define __io_virt(a) ((void __force *)(a))
+#endif
+
 struct xvp_alien_mapping {
 	unsigned long vaddr;
 	unsigned long size;
