@@ -36,7 +36,7 @@
 #define __io_virt(a) ((void __force *)(a))
 #endif
 
-struct xvp_alien_mapping {
+struct xrp_alien_mapping {
 	unsigned long vaddr;
 	unsigned long size;
 	phys_addr_t paddr;
@@ -57,7 +57,7 @@ struct xrp_mapping {
 	} type;
 	union {
 		struct xrp_allocation *xrp_allocation;
-		struct xvp_alien_mapping *xvp_alien_mapping;
+		struct xrp_alien_mapping alien_mapping;
 	};
 };
 
@@ -310,21 +310,7 @@ static long xrp_ioctl_alloc(struct file *filp,
 	return 0;
 }
 
-
-static struct xvp_alien_mapping *
-xvp_alien_mapping_create(struct xvp_alien_mapping mapping)
-{
-	struct xvp_alien_mapping *alien_mapping =
-		kmalloc(sizeof(*alien_mapping), GFP_KERNEL);
-
-	if (!alien_mapping)
-		return NULL;
-
-	*alien_mapping = mapping;
-	return alien_mapping;
-}
-
-static void xvp_alien_mapping_destroy(struct xvp_alien_mapping *alien_mapping)
+static void xrp_alien_mapping_destroy(struct xrp_alien_mapping *alien_mapping)
 {
 	int i;
 	struct page *page;
@@ -346,14 +332,13 @@ static void xvp_alien_mapping_destroy(struct xvp_alien_mapping *alien_mapping)
 	default:
 		break;
 	}
-	kfree(alien_mapping);
 }
 
 static long xvp_pfn_virt_to_phys(struct xvp_file *xvp_file,
 				 struct vm_area_struct *vma,
 				 unsigned long vaddr, unsigned long size,
 				 phys_addr_t *paddr,
-				 struct xvp_alien_mapping **mapping)
+				 struct xrp_alien_mapping *mapping)
 {
 	int i;
 	int ret;
@@ -362,7 +347,6 @@ static long xvp_pfn_virt_to_phys(struct xvp_file *xvp_file,
 		(vaddr >> PAGE_SHIFT);
 	unsigned long pfn;
 	const struct xrp_address_map_entry *address_map;
-	struct xvp_alien_mapping *alien_mapping;
 
 	ret = follow_pfn(vma, vaddr, &pfn);
 	if (ret)
@@ -396,16 +380,12 @@ static long xvp_pfn_virt_to_phys(struct xvp_file *xvp_file,
 		}
 		pfn = next_pfn;
 	}
-	alien_mapping = xvp_alien_mapping_create((struct xvp_alien_mapping){
-						 .vaddr = vaddr,
-						 .size = size,
-						 .paddr = *paddr,
-						 .type = ALIEN_PFN_MAP,
-						 });
-	if (!alien_mapping)
-		return -ENOMEM;
-
-	*mapping = alien_mapping;
+	*mapping = (struct xrp_alien_mapping){
+		.vaddr = vaddr,
+		.size = size,
+		.paddr = *paddr,
+		.type = ALIEN_PFN_MAP,
+	};
 	pr_debug("%s: success, paddr: %pap\n", __func__, paddr);
 	return 0;
 }
@@ -413,7 +393,7 @@ static long xvp_pfn_virt_to_phys(struct xvp_file *xvp_file,
 static long xvp_gup_virt_to_phys(struct xvp_file *xvp_file,
 				 unsigned long vaddr, unsigned long size,
 				 phys_addr_t *paddr,
-				 struct xvp_alien_mapping **mapping)
+				 struct xrp_alien_mapping *mapping)
 {
 	int ret;
 	int i;
@@ -422,7 +402,6 @@ static long xvp_gup_virt_to_phys(struct xvp_file *xvp_file,
 		(vaddr >> PAGE_SHIFT);
 	struct page **page = kmalloc(nr_pages * sizeof(void *), GFP_KERNEL);
 	const struct xrp_address_map_entry *address_map;
-	struct xvp_alien_mapping *alien_mapping;
 
 	if (!page)
 		return -ENOMEM;
@@ -468,18 +447,12 @@ static long xvp_gup_virt_to_phys(struct xvp_file *xvp_file,
 	}
 
 	*paddr = __pfn_to_phys(page_to_pfn(page[0])) + (vaddr & ~PAGE_MASK);
-	alien_mapping = xvp_alien_mapping_create((struct xvp_alien_mapping){
-						 .vaddr = vaddr,
-						 .size = size,
-						 .paddr = *paddr,
-						 .type = ALIEN_GUP,
-						 });
-	if (!alien_mapping) {
-		ret = -ENOMEM;
-		goto out_put;
-	}
-
-	*mapping = alien_mapping;
+	*mapping = (struct xrp_alien_mapping){
+		.vaddr = vaddr,
+		.size = size,
+		.paddr = *paddr,
+		.type = ALIEN_GUP,
+	};
 	ret = 0;
 	pr_debug("%s: success, paddr: %pap\n", __func__, paddr);
 
@@ -575,13 +548,12 @@ static long xvp_copy_virt_to_phys(struct xvp_file *xvp_file,
 				  unsigned long flags,
 				  unsigned long vaddr, unsigned long size,
 				  phys_addr_t *paddr,
-				  struct xvp_alien_mapping **mapping)
+				  struct xrp_alien_mapping *mapping)
 {
 	phys_addr_t phys;
 	unsigned long align = clamp(vaddr & -vaddr, PAGE_SIZE, 16ul);
 	unsigned long offset = vaddr & (align - 1);
 	struct xrp_allocation *allocation;
-	struct xvp_alien_mapping *alien_mapping;
 	long rc;
 
 	rc = xrp_allocate(&xvp_file->xvp->pool,
@@ -602,19 +574,13 @@ static long xvp_copy_virt_to_phys(struct xvp_file *xvp_file,
 	}
 
 	*paddr = phys;
-	alien_mapping = xvp_alien_mapping_create((struct xvp_alien_mapping){
-						 .vaddr = vaddr,
-						 .size = size,
-						 .paddr = *paddr,
-						 .allocation = allocation,
-						 .type = ALIEN_COPY,
-						 });
-	if (!alien_mapping) {
-		xrp_allocation_put(allocation);
-		return -ENOMEM;
-	}
-
-	*mapping = alien_mapping;
+	*mapping = (struct xrp_alien_mapping){
+		.vaddr = vaddr,
+		.size = size,
+		.paddr = *paddr,
+		.allocation = allocation,
+		.type = ALIEN_COPY,
+	};
 	pr_debug("%s: copying to pa: %pap\n", __func__, paddr);
 
 	return 0;
@@ -666,7 +632,7 @@ static long xrp_share_kernel(struct file *filp,
 	        set_fs(KERNEL_DS);
 		err = xvp_copy_virt_to_phys(xvp_file, flags,
 					    virt, size, paddr,
-					    &mapping->xvp_alien_mapping);
+					    &mapping->alien_mapping);
 		set_fs(oldfs);
 		mapping->type = XRP_MAPPING_ALIEN | XRP_MAPPING_KERNEL;
 	} else {
@@ -745,7 +711,8 @@ static long __xrp_share_block(struct file *filp,
 		phys = xvp_file->xvp->pmem + (vma->vm_pgoff << PAGE_SHIFT) +
 			virt - vma->vm_start;
 	} else {
-		struct xvp_alien_mapping *alien_mapping = NULL;
+		struct xrp_alien_mapping *alien_mapping =
+			&mapping->alien_mapping;
 		long rc;
 
 		/* Otherwise this is alien allocation. */
@@ -756,12 +723,12 @@ static long __xrp_share_block(struct file *filp,
 			rc = xvp_pfn_virt_to_phys(xvp_file, vma,
 						  virt, size,
 						  &phys,
-						  &alien_mapping);
+						  alien_mapping);
 		} else {
 			up_read(&mm->mmap_sem);
 			rc = xvp_gup_virt_to_phys(xvp_file, virt,
 						  size, &phys,
-						  &alien_mapping);
+						  alien_mapping);
 			down_read(&mm->mmap_sem);
 		}
 
@@ -771,7 +738,7 @@ static long __xrp_share_block(struct file *filp,
 		if (rc < 0) {
 			rc = xvp_copy_virt_to_phys(xvp_file, flags,
 						   virt, size, &phys,
-						   &alien_mapping);
+						   alien_mapping);
 			do_cache = false;
 		}
 
@@ -786,7 +753,6 @@ static long __xrp_share_block(struct file *filp,
 			virt - alien_mapping->vaddr;
 
 		mapping->type = XRP_MAPPING_ALIEN;
-		mapping->xvp_alien_mapping = alien_mapping;
 	}
 
 	*paddr = phys;
@@ -807,7 +773,7 @@ static long __xrp_share_block(struct file *filp,
 }
 
 static long xrp_writeback_alien_mapping(struct xvp_file *xvp_file,
-					struct xvp_alien_mapping *alien_mapping)
+					struct xrp_alien_mapping *alien_mapping)
 {
 	struct page *page;
 	size_t nr_pages;
@@ -865,9 +831,9 @@ static long __xrp_unshare_block(struct file *filp, struct xrp_mapping *mapping,
 	case XRP_MAPPING_ALIEN:
 		if (flags & XRP_FLAG_WRITE)
 			ret = xrp_writeback_alien_mapping(filp->private_data,
-							  mapping->xvp_alien_mapping);
+							  &mapping->alien_mapping);
 
-		xvp_alien_mapping_destroy(mapping->xvp_alien_mapping);
+		xrp_alien_mapping_destroy(&mapping->alien_mapping);
 		break;
 
 	case XRP_MAPPING_KERNEL:
@@ -890,7 +856,7 @@ static bool xrp_unshare_block_need_mm(struct xrp_mapping *mapping,
 {
 	return mapping->type == XRP_MAPPING_ALIEN &&
 		(flags & XRP_FLAG_WRITE) &&
-		mapping->xvp_alien_mapping->type == ALIEN_COPY;
+		mapping->alien_mapping.type == ALIEN_COPY;
 }
 
 static long xrp_ioctl_free(struct file *filp,
