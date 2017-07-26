@@ -4678,7 +4678,7 @@ DSP_CORE="${DSP_CORE:-visionp6cnn_ao_exls}"
 
 
 
-DSP_LSP="${DSP_LSP:-\$(srcdir)/MW-MP/P6_0/xtensa-elf/lib/sim-stack-local}"
+DSP_LSP="${DSP_LSP:-\$(srcdir)/MW-MP/P6_0/xtensa-elf/lib/sim-stacklocal}"
 
 
 
@@ -4686,7 +4686,6 @@ DSP_COMM_BASE="${DSP_COMM_BASE:-0xf0000000}"
 
 
 
-#AC_SUBST(DTC, ["${DTC:-dtc}"])
 
 
 cat >confcache <<\_ACEOF
