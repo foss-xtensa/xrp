@@ -23,16 +23,15 @@
 
 #include <stdint.h>
 #include <stdio.h>
-#include <xtensa/tie/xt_interrupt.h>
 #include <xtensa/tie/xt_sync.h>
 #include <xtensa/xtruntime.h>
 
 #include "xrp_api.h"
+#include "xrp_dsp_hw.h"
 
 typedef uint8_t __u8;
 typedef uint32_t __u32;
 #include "xrp_kernel_dsp_interface.h"
-#include "xrp_hw_simple_dsp_interface.h"
 
 #ifdef DEBUG
 #define pr_debug printf
@@ -47,27 +46,7 @@ static inline int pr_debug(const char *p, ...)
 extern char xrp_dsp_comm_base_magic[] __attribute__((weak));
 void *xrp_dsp_comm_base = &xrp_dsp_comm_base_magic;
 
-static uint32_t mmio_base;
-
-enum xrp_irq_mode {
-	XRP_IRQ_NONE,
-	XRP_IRQ_LEVEL,
-	XRP_IRQ_EDGE,
-};
-static enum xrp_irq_mode host_irq_mode;
-static enum xrp_irq_mode device_irq_mode;
-
-static uint32_t device_irq_offset;
-static uint32_t device_irq_bit;
-static uint32_t device_irq;
-
-static uint32_t host_irq_offset;
-static uint32_t host_irq_bit;
-
 static int manage_cache;
-
-#define device_mmio(off) ((volatile void *)mmio_base + off)
-#define host_mmio(off) ((volatile void *)mmio_base + off)
 
 /* DSP side XRP API implementation */
 
@@ -221,38 +200,9 @@ struct xrp_buffer *xrp_get_buffer_from_group(struct xrp_buffer_group *group,
 
 /* DSP side request handling */
 
-static void xrp_irq_handler(void)
-{
-	pr_debug("%s\n", __func__);
-	if (device_irq_mode == XRP_IRQ_LEVEL)
-		XT_S32RI(0, device_mmio(device_irq_offset), 0);
-}
-
-static void xrp_send_host_irq(void)
-{
-	switch (host_irq_mode) {
-	case XRP_IRQ_EDGE:
-		XT_S32RI(0, host_mmio(host_irq_offset), 0);
-		/* fall through */
-	case XRP_IRQ_LEVEL:
-		XT_S32RI(1u << host_irq_bit, host_mmio(host_irq_offset), 0);
-		break;
-	default:
-		break;
-	}
-}
-
 static void do_handshake(struct xrp_dsp_sync *shared_sync)
 {
 	uint32_t v;
-	static const enum xrp_irq_mode irq_mode[] = {
-		[XRP_DSP_SYNC_IRQ_MODE_NONE] = XRP_IRQ_NONE,
-		[XRP_DSP_SYNC_IRQ_MODE_LEVEL] = XRP_IRQ_LEVEL,
-		[XRP_DSP_SYNC_IRQ_MODE_EDGE] = XRP_IRQ_EDGE,
-	};
-	struct xrp_hw_simple_sync_data *hw_sync =
-		(struct xrp_hw_simple_sync_data *)&shared_sync->hw_sync_data;
-
 
 	pr_debug("%s, shared_sync = %p\n", __func__, shared_sync);
 start:
@@ -275,52 +225,15 @@ start:
 			goto start;
 	}
 
-	mmio_base = hw_sync->device_mmio_base;
-	pr_debug("%s: mmio_base: 0x%08x\n", __func__, mmio_base);
+	xrp_hw_set_sync_data(shared_sync->hw_sync_data);
 
-	if (hw_sync->device_irq_mode < sizeof(irq_mode) / sizeof(*irq_mode)) {
-		device_irq_mode = irq_mode[hw_sync->device_irq_mode];
-		device_irq_offset = hw_sync->device_irq_offset;
-		device_irq_bit = hw_sync->device_irq_bit;
-		device_irq = hw_sync->device_irq;
-		pr_debug("%s: device_irq_mode = %d, device_irq_offset = %d, device_irq_bit = %d, device_irq = %d\n",
-			__func__, device_irq_mode,
-			device_irq_offset, device_irq_bit, device_irq);
-	} else {
-		device_irq_mode = XRP_IRQ_NONE;
-	}
+	XT_S32RI(XRP_DSP_SYNC_DSP_TO_HOST, &shared_sync->sync, 0);
+	dcache_region_writeback(&shared_sync->sync,
+				sizeof(shared_sync->sync));
 
-	if (hw_sync->host_irq_mode < sizeof(irq_mode) / sizeof(*irq_mode)) {
-		host_irq_mode = irq_mode[hw_sync->host_irq_mode];
-		host_irq_offset = hw_sync->host_irq_offset;
-		host_irq_bit = hw_sync->host_irq_bit;
-		pr_debug("%s: host_irq_mode = %d, host_irq_offset = %d, host_irq_bit = %d\n",
-			__func__, host_irq_mode, host_irq_offset, host_irq_bit);
-	} else {
-		host_irq_mode = XRP_IRQ_NONE;
-	}
+	xrp_hw_wait_device_irq();
 
-	if (device_irq_mode != XRP_IRQ_NONE) {
-		_xtos_ints_off(1u << device_irq);
-		_xtos_set_interrupt_handler(device_irq, xrp_irq_handler);
-		_xtos_dispatch_level1_interrupts();
-		XTOS_SET_INTLEVEL(15);
-
-		XT_S32RI(XRP_DSP_SYNC_DSP_TO_HOST, &shared_sync->sync, 0);
-		dcache_region_writeback(&shared_sync->sync,
-					sizeof(shared_sync->sync));
-
-		pr_debug("%s: waiting for device IRQ...\n", __func__);
-		_xtos_ints_on(1u << device_irq);
-		XT_WAITI(0);
-		XTOS_SET_INTLEVEL(15);
-		_xtos_ints_off(1u << device_irq);
-	} else {
-		XT_S32RI(XRP_DSP_SYNC_DSP_TO_HOST, &shared_sync->sync, 0);
-		dcache_region_writeback(&shared_sync->sync,
-					sizeof(shared_sync->sync));
-	}
-	xrp_send_host_irq();
+	xrp_hw_send_host_irq();
 
 	pr_debug("%s: done\n", __func__);
 }
@@ -340,31 +253,12 @@ static inline int xrp_request_valid(struct xrp_dsp_cmd *dsp_cmd,
 static void wait_for_request(struct xrp_dsp_cmd *dsp_cmd,
 			     uint32_t *pflags)
 {
-	if (device_irq_mode != XRP_IRQ_NONE) {
-		unsigned level = XTOS_SET_INTLEVEL(15);
-
-		for (;;) {
-			if (device_irq_mode == XRP_IRQ_LEVEL)
-				XT_S32RI(0, device_mmio(device_irq_offset), 0);
-
-			dcache_region_invalidate(dsp_cmd,
-						 sizeof(*dsp_cmd));
-			if (xrp_request_valid(dsp_cmd, pflags))
-				break;
-
-			_xtos_ints_on(1u << device_irq);
-			XT_WAITI(0);
-			XTOS_SET_INTLEVEL(15);
-			_xtos_ints_off(1u << device_irq);
-		}
-		XTOS_RESTORE_INTLEVEL(level);
-	} else {
-		for (;;) {
-			dcache_region_invalidate(dsp_cmd,
-						 sizeof(*dsp_cmd));
-			if (xrp_request_valid(dsp_cmd, pflags))
-				break;
-		}
+	for (;;) {
+		dcache_region_invalidate(dsp_cmd,
+					 sizeof(*dsp_cmd));
+		if (xrp_request_valid(dsp_cmd, pflags))
+			break;
+		xrp_hw_wait_device_irq();
 	}
 }
 
@@ -377,7 +271,7 @@ static void complete_request(struct xrp_dsp_cmd *dsp_cmd)
 	XT_S32RI(flags, &dsp_cmd->flags, 0);
 	dcache_region_writeback(&dsp_cmd->flags,
 				sizeof(dsp_cmd->flags));
-	xrp_send_host_irq();
+	xrp_hw_send_host_irq();
 }
 
 static enum xrp_access_flags dsp_buffer_allowed_access(__u32 flags)

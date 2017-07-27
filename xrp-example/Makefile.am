@@ -34,8 +34,8 @@ endif
 xrp_dsp_nat_SOURCES = dsp_main.c
 xrp_dsp_sim_SOURCES = dsp_main.c
 
-xrp_dsp_nat_LDADD = ../xrp-dsp/libxrp-dsp.a
-xrp_dsp_sim_LDADD = ../xrp-dsp/libxrp-dsp.a
+xrp_dsp_nat_LDADD = ../xrp-dsp/libxrp-dsp.a ../xrp-dsp/libxrp-dsp-hw-simple.a
+xrp_dsp_sim_LDADD = ../xrp-dsp/libxrp-dsp.a ../xrp-dsp/libxrp-dsp-hw-simple.a
 
 xrp_linux_nat_SOURCES = linux_main.c
 xrp_linux_sim_SOURCES = linux_main.c xrp.s

@@ -103,12 +103,14 @@ am__installdirs = "$(DESTDIR)$(bindir)"
 PROGRAMS = $(bin_PROGRAMS)
 am_xrp_dsp_nat_OBJECTS = dsp_main.$(OBJEXT)
 xrp_dsp_nat_OBJECTS = $(am_xrp_dsp_nat_OBJECTS)
-xrp_dsp_nat_DEPENDENCIES = ../xrp-dsp/libxrp-dsp.a
+xrp_dsp_nat_DEPENDENCIES = ../xrp-dsp/libxrp-dsp.a \
+	../xrp-dsp/libxrp-dsp-hw-simple.a
 xrp_dsp_nat_LINK = $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
 	$(xrp_dsp_nat_LDFLAGS) $(LDFLAGS) -o $@
 am_xrp_dsp_sim_OBJECTS = dsp_main.$(OBJEXT)
 xrp_dsp_sim_OBJECTS = $(am_xrp_dsp_sim_OBJECTS)
-xrp_dsp_sim_DEPENDENCIES = ../xrp-dsp/libxrp-dsp.a
+xrp_dsp_sim_DEPENDENCIES = ../xrp-dsp/libxrp-dsp.a \
+	../xrp-dsp/libxrp-dsp-hw-simple.a
 xrp_dsp_sim_LINK = $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
 	$(xrp_dsp_sim_LDFLAGS) $(LDFLAGS) -o $@
 am_xrp_linux_nat_OBJECTS = linux_main.$(OBJEXT)
@@ -297,8 +299,8 @@ AM_CFLAGS = -W -Wall $(am__append_1)
 @BUILD_DSP_FALSE@@BUILD_SIM_TRUE@CLEANFILES = xrp.s
 xrp_dsp_nat_SOURCES = dsp_main.c
 xrp_dsp_sim_SOURCES = dsp_main.c
-xrp_dsp_nat_LDADD = ../xrp-dsp/libxrp-dsp.a
-xrp_dsp_sim_LDADD = ../xrp-dsp/libxrp-dsp.a
+xrp_dsp_nat_LDADD = ../xrp-dsp/libxrp-dsp.a ../xrp-dsp/libxrp-dsp-hw-simple.a
+xrp_dsp_sim_LDADD = ../xrp-dsp/libxrp-dsp.a ../xrp-dsp/libxrp-dsp-hw-simple.a
 xrp_linux_nat_SOURCES = linux_main.c
 xrp_linux_sim_SOURCES = linux_main.c xrp.s
 xrp_linux_sim_CFLAGS = -pthread
