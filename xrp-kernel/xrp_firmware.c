@@ -310,7 +310,7 @@ static int xrp_load_firmware(struct xvp *xvp)
 		}
 
 		pa = xrp_translate_to_cpu(xvp, phdr);
-		if (pa == OF_BAD_ADDR) {
+		if (pa == (phys_addr_t)OF_BAD_ADDR) {
 			dev_err(xvp->dev,
 				"device address 0x%08x could not be mapped to host physical address",
 				(u32)phdr->p_paddr);
