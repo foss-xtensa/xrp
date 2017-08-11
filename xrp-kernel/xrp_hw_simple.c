@@ -137,59 +137,50 @@ static irqreturn_t irq_handler(int irq, void *dev_id)
 }
 
 #if defined(__XTENSA__)
-static inline void clean_cache(void *vaddr, phys_addr_t paddr,
-			       unsigned long sz)
+static void clean_cache(void *vaddr, phys_addr_t paddr, unsigned long sz)
 {
 	__flush_dcache_range((unsigned long)vaddr, sz);
 }
 
-static inline void flush_cache(void *vaddr, phys_addr_t paddr,
-			       unsigned long sz)
+static void flush_cache(void *vaddr, phys_addr_t paddr, unsigned long sz)
 {
 	__flush_dcache_range((unsigned long)vaddr, sz);
 	__invalidate_dcache_range((unsigned long)vaddr, sz);
 }
 
-static inline void invalidate_cache(void *vaddr, phys_addr_t paddr,
-				    unsigned long sz)
+static void invalidate_cache(void *vaddr, phys_addr_t paddr, unsigned long sz)
 {
 	__invalidate_dcache_range((unsigned long)vaddr, sz);
 }
 #elif defined(__arm__)
-static inline void clean_cache(void *vaddr, phys_addr_t paddr,
-			       unsigned long sz)
+static void clean_cache(void *vaddr, phys_addr_t paddr, unsigned long sz)
 {
 	__cpuc_flush_dcache_area(vaddr, sz);
 	outer_clean_range(paddr, paddr + sz);
 }
 
-static inline void flush_cache(void *vaddr, phys_addr_t paddr,
-			       unsigned long sz)
+static void flush_cache(void *vaddr, phys_addr_t paddr, unsigned long sz)
 {
 	__cpuc_flush_dcache_area(vaddr, sz);
 	outer_flush_range(paddr, paddr + sz);
 }
 
-static inline void invalidate_cache(void *vaddr, phys_addr_t paddr,
-				    unsigned long sz)
+static void invalidate_cache(void *vaddr, phys_addr_t paddr, unsigned long sz)
 {
 	__cpuc_flush_dcache_area(vaddr, sz);
 	outer_inv_range(paddr, paddr + sz);
 }
 #else
 #warning "cache operations are not implemented for this architecture"
-static inline void clean_cache(void *vaddr, phys_addr_t paddr,
-			       unsigned long sz)
+static void clean_cache(void *vaddr, phys_addr_t paddr, unsigned long sz)
 {
 }
 
-static inline void flush_cache(void *vaddr, phys_addr_t paddr,
-			       unsigned long sz)
+static void flush_cache(void *vaddr, phys_addr_t paddr, unsigned long sz)
 {
 }
 
-static inline void invalidate_cache(void *vaddr, phys_addr_t paddr,
-				    unsigned long sz)
+static void invalidate_cache(void *vaddr, phys_addr_t paddr, unsigned long sz)
 {
 }
 #endif

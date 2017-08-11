@@ -1553,15 +1553,15 @@ static void *get_hw_sync_data(void *hw_arg, size_t *sz)
 	return p;
 }
 
-void clean_cache(void *vaddr, phys_addr_t paddr, unsigned long sz)
+static void clean_cache(void *vaddr, phys_addr_t paddr, unsigned long sz)
 {
 }
 
-void flush_cache(void *vaddr, phys_addr_t paddr, unsigned long sz)
+static void flush_cache(void *vaddr, phys_addr_t paddr, unsigned long sz)
 {
 }
 
-void invalidate_cache(void *vaddr, phys_addr_t paddr, unsigned long sz)
+static void invalidate_cache(void *vaddr, phys_addr_t paddr, unsigned long sz)
 {
 }
 
