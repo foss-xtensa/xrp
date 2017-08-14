@@ -817,11 +817,15 @@ void xrp_run_command_sync(struct xrp_queue *queue,
 			  enum xrp_status *status)
 {
 	struct xrp_event *evt;
+	enum xrp_status s;
+
 	xrp_enqueue_command(queue, in_data, in_data_size,
 			    out_data, out_data_size,
-			    buffer_group, &evt, status);
-	if (*status != XRP_STATUS_SUCCESS)
+			    buffer_group, &evt, &s);
+	if (s != XRP_STATUS_SUCCESS) {
+		set_status(status, s);
 		return;
+	}
 	xrp_wait(evt, NULL);
 	xrp_event_status(evt, status);
 	xrp_release_event(evt, NULL);
