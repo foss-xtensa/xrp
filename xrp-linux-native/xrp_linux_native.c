@@ -215,7 +215,7 @@ struct xrp_buffer *xrp_create_buffer(struct xrp_device *device,
 			return NULL;
 		}
 		buf->type = XRP_BUFFER_TYPE_DEVICE;
-		buf->ptr = (void *)ioctl_alloc.addr;
+		buf->ptr = (void *)(uintptr_t)ioctl_alloc.addr;
 		buf->size = size;
 	} else {
 		buf->type = XRP_BUFFER_TYPE_HOST;
@@ -236,7 +236,7 @@ void xrp_release_buffer(struct xrp_buffer *buffer, enum xrp_status *status)
 		if (buffer->type == XRP_BUFFER_TYPE_DEVICE) {
 			enum xrp_status s;
 			struct xrp_ioctl_alloc ioctl_alloc = {
-				.addr = (__u64)buffer->ptr,
+				.addr = (uintptr_t)buffer->ptr,
 			};
 			int ret = ioctl(buffer->device->fd,
 					XRP_IOCTL_FREE, &ioctl_alloc);
@@ -462,9 +462,9 @@ void xrp_enqueue_command(struct xrp_queue *queue,
 		.out_data_size = out_data_size,
 		.buffer_size = n_buffers *
 			sizeof(struct xrp_ioctl_buffer),
-		.in_data_addr = (__u64)in_data,
-		.out_data_addr = (__u64)out_data,
-		.buffer_addr = (__u64)ioctl_buffer,
+		.in_data_addr = (uintptr_t)in_data,
+		.out_data_addr = (uintptr_t)out_data,
+		.buffer_addr = (uintptr_t)ioctl_buffer,
 	};
 	int ret;
 	size_t i;
@@ -478,7 +478,7 @@ void xrp_enqueue_command(struct xrp_queue *queue,
 		ioctl_buffer[i] = (struct xrp_ioctl_buffer){
 			.flags = buffer_group->buffer[i].access_flags,
 			.size = buffer_group->buffer[i].buffer->size,
-			.addr = (__u64)buffer_group->buffer[i].buffer->ptr,
+			.addr = (uintptr_t)buffer_group->buffer[i].buffer->ptr,
 		};
 	}
 
