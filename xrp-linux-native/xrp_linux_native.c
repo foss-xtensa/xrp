@@ -22,9 +22,11 @@
  */
 
 #include <fcntl.h>
+#include <pthread.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/ioctl.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -36,8 +38,13 @@ typedef uint64_t __u64;
 #include "xrp_api.h"
 #include "xrp_kernel_defs.h"
 
+#if defined(__STDC_NO_ATOMICS__)
+#warning The compiler does not support atomics, reference counting may not be thread safe
+#define _Atomic
+#endif
+
 struct xrp_refcounted {
-	unsigned long count;
+	_Atomic unsigned long count;
 };
 
 struct xrp_device {
@@ -70,16 +77,36 @@ struct xrp_buffer_group {
 	struct xrp_buffer_group_record *buffer;
 };
 
+struct xrp_request {
+	struct xrp_request *next;
+
+	void *in_data;
+	void *out_data;
+	size_t in_data_size;
+	size_t out_data_size;
+	struct xrp_buffer_group *buffer_group;
+	struct xrp_event *event;
+};
+
 struct xrp_queue {
 	struct xrp_refcounted ref;
 	struct xrp_device *device;
+
+	pthread_t thread;
+	pthread_mutex_t request_queue_mutex;
+	pthread_cond_t request_queue_cond;
+	struct {
+		struct xrp_request *head;
+		struct xrp_request *tail;
+	} request_queue;
 };
 
 struct xrp_event {
 	struct xrp_refcounted ref;
-	struct xrp_device *device;
-	unsigned long cookie;
-	enum xrp_status status;
+	struct xrp_queue *queue;
+	pthread_mutex_t mutex;
+	pthread_cond_t cond;
+	_Atomic enum xrp_status status;
 };
 
 /* Helpers */
@@ -106,7 +133,7 @@ static enum xrp_status retain_refcounted(void *buf)
 	struct xrp_refcounted *ref = buf;
 
 	if (ref) {
-		++ref->count;
+		(void)++ref->count;
 		return XRP_STATUS_SUCCESS;
 	}
 	return XRP_STATUS_FAILURE;
@@ -359,6 +386,18 @@ struct xrp_buffer *xrp_get_buffer_from_group(struct xrp_buffer_group *group,
 
 /* Queue API. */
 
+static void xrp_queue_process(struct xrp_queue *queue);
+
+static void *xrp_queue_thread(void *p)
+{
+	struct xrp_queue *queue = p;
+
+	for (;;)
+		xrp_queue_process(queue);
+
+	return NULL;
+}
+
 struct xrp_queue *xrp_create_queue(struct xrp_device *device,
 				   enum xrp_status *status)
 {
@@ -385,6 +424,10 @@ struct xrp_queue *xrp_create_queue(struct xrp_device *device,
 	}
 	queue->device = device;
 
+	pthread_mutex_init(&queue->request_queue_mutex, NULL);
+	pthread_cond_init(&queue->request_queue_cond, NULL);
+	pthread_create(&queue->thread, NULL, xrp_queue_thread, queue);
+
 	return queue;
 }
 
@@ -398,6 +441,14 @@ void xrp_release_queue(struct xrp_queue *queue, enum xrp_status *status)
 	if (last_refcount(queue)) {
 		enum xrp_status s;
 
+		pthread_cancel(queue->thread);
+		pthread_join(queue->thread, NULL);
+		pthread_mutex_lock(&queue->request_queue_mutex);
+		if (queue->request_queue.head != NULL)
+			printf("%s: releasing non-empty queue\n", __func__);
+		pthread_mutex_unlock(&queue->request_queue_mutex);
+		pthread_mutex_destroy(&queue->request_queue_mutex);
+		pthread_cond_destroy(&queue->request_queue_cond);
 		xrp_release_device(queue->device, &s);
 		if (s != XRP_STATUS_SUCCESS) {
 			set_status(status, s);
@@ -407,54 +458,40 @@ void xrp_release_queue(struct xrp_queue *queue, enum xrp_status *status)
 	set_status(status, release_refcounted(queue));
 }
 
-
-/* Event API. */
-
-void xrp_retain_event(struct xrp_event *event, enum xrp_status *status)
+static void xrp_enqueue_request(struct xrp_queue *queue,
+				struct xrp_request *rq)
 {
-	set_status(status, retain_refcounted(event));
-}
-
-void xrp_release_event(struct xrp_event *event, enum xrp_status *status)
-{
-	if (last_refcount(event)) {
-		enum xrp_status s;
-
-		xrp_release_device(event->device, &s);
-		if (s != XRP_STATUS_SUCCESS) {
-			set_status(status, s);
-			return;
-		}
+	pthread_mutex_lock(&queue->request_queue_mutex);
+	rq->next = NULL;
+	if (queue->request_queue.tail) {
+		queue->request_queue.tail->next = rq;
+	} else {
+		queue->request_queue.head = rq;
+		pthread_cond_broadcast(&queue->request_queue_cond);
 	}
-	set_status(status, release_refcounted(event));
+	queue->request_queue.tail = rq;
+	pthread_mutex_unlock(&queue->request_queue_mutex);
 }
 
-void xrp_event_status(struct xrp_event *event, enum xrp_status *status)
+static struct xrp_request *_xrp_dequeue_request(struct xrp_queue *queue)
 {
-	set_status(status, event->status);
+	struct xrp_request *rq = queue->request_queue.head;
+
+	if (!rq)
+		return NULL;
+
+	if (rq == queue->request_queue.tail)
+		queue->request_queue.tail = NULL;
+	queue->request_queue.head = rq->next;
+	return rq;
 }
 
-/* Communication API */
-
-void xrp_run_command_sync(struct xrp_queue *queue,
-			  const void *in_data, size_t in_data_size,
-			  void *out_data, size_t out_data_size,
-			  struct xrp_buffer_group *buffer_group,
-			  enum xrp_status *status)
+static void _xrp_run_command(struct xrp_queue *queue,
+			     const void *in_data, size_t in_data_size,
+			     void *out_data, size_t out_data_size,
+			     struct xrp_buffer_group *buffer_group,
+			     enum xrp_status *status)
 {
-	xrp_enqueue_command(queue, in_data, in_data_size,
-			    out_data, out_data_size,
-			    buffer_group, NULL, status);
-}
-
-void xrp_enqueue_command(struct xrp_queue *queue,
-			 const void *in_data, size_t in_data_size,
-			 void *out_data, size_t out_data_size,
-			 struct xrp_buffer_group *buffer_group,
-			 struct xrp_event **evt,
-			 enum xrp_status *status)
-{
-	struct xrp_event *event = NULL;
 	size_t n_buffers = buffer_group ? buffer_group->n_buffers : 0;
 	struct xrp_ioctl_buffer ioctl_buffer[n_buffers];/* TODO */
 	struct xrp_ioctl_queue ioctl_queue = {
@@ -482,51 +519,184 @@ void xrp_enqueue_command(struct xrp_queue *queue,
 		};
 	}
 
+	ret = ioctl(queue->device->fd,
+		    XRP_IOCTL_QUEUE, &ioctl_queue);
+
+	if (ret < 0)
+		set_status(status, XRP_STATUS_FAILURE);
+	else
+		set_status(status, XRP_STATUS_SUCCESS);
+}
+
+static void xrp_queue_cleanup(void *p)
+{
+	struct xrp_queue *queue = p;
+	pthread_mutex_unlock(&queue->request_queue_mutex);
+}
+
+static void xrp_queue_process(struct xrp_queue *queue)
+{
+	struct xrp_request *rq;
+	enum xrp_status status;
+	int old_state;
+
+	pthread_mutex_lock(&queue->request_queue_mutex);
+	pthread_cleanup_push(xrp_queue_cleanup, queue);
+	pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, &old_state);
+	for (;;) {
+		rq = _xrp_dequeue_request(queue);
+		if (rq)
+			break;
+		pthread_cond_wait(&queue->request_queue_cond,
+				  &queue->request_queue_mutex);
+	}
+	pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, NULL);
+	pthread_cleanup_pop(1);
+
+	_xrp_run_command(queue,
+			 rq->in_data, rq->in_data_size,
+			 rq->out_data, rq->out_data_size,
+			 rq->buffer_group,
+			 &status);
+
+	if (rq->buffer_group)
+		xrp_release_buffer_group(rq->buffer_group, NULL);
+
+	if (rq->event) {
+		struct xrp_event *event = rq->event;
+		pthread_mutex_lock(&event->mutex);
+		event->status = status;
+		pthread_cond_broadcast(&event->cond);
+		pthread_mutex_unlock(&event->mutex);
+		xrp_release_event(event, NULL);
+	}
+	free(rq->in_data);
+	free(rq);
+	pthread_setcancelstate(old_state, NULL);
+}
+
+
+/* Event API. */
+
+void xrp_retain_event(struct xrp_event *event, enum xrp_status *status)
+{
+	set_status(status, retain_refcounted(event));
+}
+
+void xrp_release_event(struct xrp_event *event, enum xrp_status *status)
+{
+	if (last_refcount(event)) {
+		enum xrp_status s;
+
+		xrp_release_queue(event->queue, &s);
+		if (s != XRP_STATUS_SUCCESS) {
+			set_status(status, s);
+			return;
+		}
+		pthread_mutex_destroy(&event->mutex);
+		pthread_cond_destroy(&event->cond);
+	}
+	set_status(status, release_refcounted(event));
+}
+
+void xrp_event_status(struct xrp_event *event, enum xrp_status *status)
+{
+	set_status(status, event->status);
+}
+
+/* Communication API */
+
+void xrp_run_command_sync(struct xrp_queue *queue,
+			  const void *in_data, size_t in_data_size,
+			  void *out_data, size_t out_data_size,
+			  struct xrp_buffer_group *buffer_group,
+			  enum xrp_status *status)
+{
+	struct xrp_event *evt;
+	enum xrp_status s;
+
+	xrp_enqueue_command(queue, in_data, in_data_size,
+			    out_data, out_data_size,
+			    buffer_group, &evt, &s);
+	if (s != XRP_STATUS_SUCCESS) {
+		set_status(status, s);
+		return;
+	}
+	xrp_wait(evt, NULL);
+	xrp_event_status(evt, status);
+	xrp_release_event(evt, NULL);
+}
+
+void xrp_enqueue_command(struct xrp_queue *queue,
+			 const void *in_data, size_t in_data_size,
+			 void *out_data, size_t out_data_size,
+			 struct xrp_buffer_group *buffer_group,
+			 struct xrp_event **evt,
+			 enum xrp_status *status)
+{
+	struct xrp_request *rq;
+	void *in_data_copy;
+	struct xrp_event *event = NULL;
+
+	rq = malloc(sizeof(*rq));
+	in_data_copy = malloc(in_data_size);
+
+	if (!rq || (in_data_size && !in_data_copy)) {
+		free(in_data_copy);
+		free(rq);
+		set_status(status, XRP_STATUS_FAILURE);
+		return;
+	}
+
+	memcpy(in_data_copy, in_data, in_data_size);
+	rq->in_data = in_data_copy;
+	rq->in_data_size = in_data_size;
+	rq->out_data = out_data;
+	rq->out_data_size = out_data_size;
+
 	if (evt) {
 		enum xrp_status s;
 
 		event = alloc_refcounted(sizeof(*event));
 		if (!event) {
+			free(rq->in_data);
+			free(rq);
 			set_status(status, XRP_STATUS_FAILURE);
 			return;
 		}
-		xrp_retain_device(queue->device, &s);
+		xrp_retain_queue(queue, &s);
 		if (s != XRP_STATUS_SUCCESS) {
+			free(rq->in_data);
+			free(rq);
 			set_status(status, s);
 			release_refcounted(event);
 			return;
 		}
-		event->device = queue->device;
-	}
-
-	ret = ioctl(queue->device->fd,
-		    XRP_IOCTL_QUEUE, &ioctl_queue);
-
-	if (ret < 0) {
-		if (event)
-			xrp_release_event(event, NULL);
-		set_status(status, XRP_STATUS_FAILURE);
-		return;
-	}
-	if (evt) {
-		event->cookie = ioctl_queue.flags;
-		event->status = XRP_STATUS_SUCCESS;
+		event->queue = queue;
+		pthread_mutex_init(&event->mutex, NULL);
+		pthread_cond_init(&event->cond, NULL);
+		event->status = XRP_STATUS_PENDING;
 		*evt = event;
+		xrp_retain_event(event, NULL);
+		rq->event = event;
+	} else {
+		rq->event = NULL;
 	}
+
+	if (buffer_group)
+		xrp_retain_buffer_group(buffer_group, NULL);
+	rq->buffer_group = buffer_group;
+
+	xrp_enqueue_request(queue, rq);
+
 	set_status(status, XRP_STATUS_SUCCESS);
 }
 
 void xrp_wait(struct xrp_event *event, enum xrp_status *status)
 {
-	struct xrp_ioctl_wait ioctl_wait = {
-		.cookie = event->cookie,
-	};
-	int ret = ioctl(event->device->fd,
-			XRP_IOCTL_WAIT, &ioctl_wait);
-
-	if (ret < 0) {
-		set_status(status, XRP_STATUS_FAILURE);
-		return;
-	}
+	pthread_mutex_lock(&event->mutex);
+	while (event->status == XRP_STATUS_PENDING)
+		pthread_cond_wait(&event->cond, &event->mutex);
+	pthread_mutex_unlock(&event->mutex);
 	set_status(status, XRP_STATUS_SUCCESS);
 }

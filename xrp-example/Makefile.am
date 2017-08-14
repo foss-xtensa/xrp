@@ -40,6 +40,9 @@ xrp_dsp_sim_LDADD = ../xrp-dsp/libxrp-dsp.a ../xrp-dsp/libxrp-dsp-hw-simple.a
 xrp_linux_nat_SOURCES = linux_main.c
 xrp_linux_sim_SOURCES = linux_main.c xrp.s
 
+xrp_linux_nat_CFLAGS = -pthread
+xrp_linux_nat_LDFLAGS = -pthread
+
 xrp_linux_sim_CFLAGS = -pthread
 xrp_linux_sim_LDFLAGS = -pthread
 

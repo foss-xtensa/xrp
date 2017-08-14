@@ -113,10 +113,12 @@ xrp_dsp_sim_DEPENDENCIES = ../xrp-dsp/libxrp-dsp.a \
 	../xrp-dsp/libxrp-dsp-hw-simple.a
 xrp_dsp_sim_LINK = $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
 	$(xrp_dsp_sim_LDFLAGS) $(LDFLAGS) -o $@
-am_xrp_linux_nat_OBJECTS = linux_main.$(OBJEXT)
+am_xrp_linux_nat_OBJECTS = xrp_linux_nat-linux_main.$(OBJEXT)
 xrp_linux_nat_OBJECTS = $(am_xrp_linux_nat_OBJECTS)
 xrp_linux_nat_DEPENDENCIES =  \
 	../xrp-linux-native/libxrp-linux-native.a
+xrp_linux_nat_LINK = $(CCLD) $(xrp_linux_nat_CFLAGS) $(CFLAGS) \
+	$(xrp_linux_nat_LDFLAGS) $(LDFLAGS) -o $@
 am_xrp_linux_sim_OBJECTS = xrp_linux_sim-linux_main.$(OBJEXT) \
 	xrp.$(OBJEXT)
 xrp_linux_sim_OBJECTS = $(am_xrp_linux_sim_OBJECTS)
@@ -303,6 +305,8 @@ xrp_dsp_nat_LDADD = ../xrp-dsp/libxrp-dsp.a ../xrp-dsp/libxrp-dsp-hw-simple.a
 xrp_dsp_sim_LDADD = ../xrp-dsp/libxrp-dsp.a ../xrp-dsp/libxrp-dsp-hw-simple.a
 xrp_linux_nat_SOURCES = linux_main.c
 xrp_linux_sim_SOURCES = linux_main.c xrp.s
+xrp_linux_nat_CFLAGS = -pthread
+xrp_linux_nat_LDFLAGS = -pthread
 xrp_linux_sim_CFLAGS = -pthread
 xrp_linux_sim_LDFLAGS = -pthread
 xrp_linux_nat_LDADD = ../xrp-linux-native/libxrp-linux-native.a
@@ -395,7 +399,7 @@ xrp-dsp-sim$(EXEEXT): $(xrp_dsp_sim_OBJECTS) $(xrp_dsp_sim_DEPENDENCIES) $(EXTRA
 
 xrp-linux-nat$(EXEEXT): $(xrp_linux_nat_OBJECTS) $(xrp_linux_nat_DEPENDENCIES) $(EXTRA_xrp_linux_nat_DEPENDENCIES) 
 	@rm -f xrp-linux-nat$(EXEEXT)
-	$(AM_V_CCLD)$(LINK) $(xrp_linux_nat_OBJECTS) $(xrp_linux_nat_LDADD) $(LIBS)
+	$(AM_V_CCLD)$(xrp_linux_nat_LINK) $(xrp_linux_nat_OBJECTS) $(xrp_linux_nat_LDADD) $(LIBS)
 
 xrp-linux-sim$(EXEEXT): $(xrp_linux_sim_OBJECTS) $(xrp_linux_sim_DEPENDENCIES) $(EXTRA_xrp_linux_sim_DEPENDENCIES) 
 	@rm -f xrp-linux-sim$(EXEEXT)
@@ -408,7 +412,7 @@ distclean-compile:
 	-rm -f *.tab.c
 
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/dsp_main.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/linux_main.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/xrp_linux_nat-linux_main.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/xrp_linux_sim-linux_main.Po@am__quote@
 
 .c.o:
@@ -426,6 +430,20 @@ distclean-compile:
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='$<' object='$@' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(COMPILE) -c -o $@ `$(CYGPATH_W) '$<'`
+
+xrp_linux_nat-linux_main.o: linux_main.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(xrp_linux_nat_CFLAGS) $(CFLAGS) -MT xrp_linux_nat-linux_main.o -MD -MP -MF $(DEPDIR)/xrp_linux_nat-linux_main.Tpo -c -o xrp_linux_nat-linux_main.o `test -f 'linux_main.c' || echo '$(srcdir)/'`linux_main.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/xrp_linux_nat-linux_main.Tpo $(DEPDIR)/xrp_linux_nat-linux_main.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='linux_main.c' object='xrp_linux_nat-linux_main.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(xrp_linux_nat_CFLAGS) $(CFLAGS) -c -o xrp_linux_nat-linux_main.o `test -f 'linux_main.c' || echo '$(srcdir)/'`linux_main.c
+
+xrp_linux_nat-linux_main.obj: linux_main.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(xrp_linux_nat_CFLAGS) $(CFLAGS) -MT xrp_linux_nat-linux_main.obj -MD -MP -MF $(DEPDIR)/xrp_linux_nat-linux_main.Tpo -c -o xrp_linux_nat-linux_main.obj `if test -f 'linux_main.c'; then $(CYGPATH_W) 'linux_main.c'; else $(CYGPATH_W) '$(srcdir)/linux_main.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/xrp_linux_nat-linux_main.Tpo $(DEPDIR)/xrp_linux_nat-linux_main.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='linux_main.c' object='xrp_linux_nat-linux_main.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(xrp_linux_nat_CFLAGS) $(CFLAGS) -c -o xrp_linux_nat-linux_main.obj `if test -f 'linux_main.c'; then $(CYGPATH_W) 'linux_main.c'; else $(CYGPATH_W) '$(srcdir)/linux_main.c'; fi`
 
 xrp_linux_sim-linux_main.o: linux_main.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(xrp_linux_sim_CFLAGS) $(CFLAGS) -MT xrp_linux_sim-linux_main.o -MD -MP -MF $(DEPDIR)/xrp_linux_sim-linux_main.Tpo -c -o xrp_linux_sim-linux_main.o `test -f 'linux_main.c' || echo '$(srcdir)/'`linux_main.c
