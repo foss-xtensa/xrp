@@ -649,8 +649,7 @@ void xrp_unmap_buffer(struct xrp_buffer *buffer, void *p,
 {
 	if (p >= buffer->ptr && (size_t)(p - buffer->ptr) <= buffer->size) {
 		(void)--buffer->map_count;
-		release_refcounted(buffer);
-		set_status(status, XRP_STATUS_SUCCESS);
+		xrp_release_buffer(buffer, status);
 	} else {
 		set_status(status, XRP_STATUS_FAILURE);
 	}
