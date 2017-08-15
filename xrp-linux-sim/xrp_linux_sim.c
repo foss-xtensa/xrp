@@ -565,6 +565,8 @@ void xrp_release_device(struct xrp_device *device, enum xrp_status *status)
 			printf("%s: releasing a device with non-empty queue\n",
 			       __func__);
 		pthread_mutex_unlock(&device->request_queue_mutex);
+		pthread_mutex_destroy(&device->request_queue_mutex);
+		pthread_cond_destroy(&device->request_queue_cond);
 		xrp_free_pool(&device->shared_pool);
 	}
 	set_status(status, release_refcounted(device));
@@ -799,6 +801,8 @@ void xrp_release_event(struct xrp_event *event, enum xrp_status *status)
 			set_status(status, s);
 			return;
 		}
+		pthread_mutex_destroy(&event->mutex);
+		pthread_cond_destroy(&event->cond);
 	}
 	set_status(status, release_refcounted(event));
 }
