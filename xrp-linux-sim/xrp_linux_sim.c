@@ -102,6 +102,7 @@ struct xrp_request {
 	struct xrp_request *next;
 	struct xrp_dsp_cmd dsp_cmd;
 
+	size_t n_buffers;
 	size_t in_data_size;
 	void *out_data;
 	void *out_data_ptr;
@@ -151,6 +152,7 @@ struct xrp_buffer_group_record {
 
 struct xrp_buffer_group {
 	struct xrp_refcounted ref;
+	pthread_mutex_t mutex;
 	size_t n_buffers;
 	size_t capacity;
 	struct xrp_buffer_group_record *buffer;
@@ -661,10 +663,12 @@ struct xrp_buffer_group *xrp_create_buffer_group(enum xrp_status *status)
 {
 	struct xrp_buffer_group *group = alloc_refcounted(sizeof(*group));
 
-	if (group)
+	if (group) {
+		pthread_mutex_init(&group->mutex, NULL);
 		set_status(status, XRP_STATUS_SUCCESS);
-	else
+	} else {
 		set_status(status, XRP_STATUS_FAILURE);
+	}
 
 	return group;
 }
@@ -681,8 +685,11 @@ void xrp_release_buffer_group(struct xrp_buffer_group *group,
 	if (last_refcount(group)) {
 		size_t i;
 
+		pthread_mutex_lock(&group->mutex);
 		for (i = 0; i < group->n_buffers; ++i)
 			xrp_release_buffer(group->buffer[i].buffer, NULL);
+		pthread_mutex_unlock(&group->mutex);
+		pthread_mutex_destroy(&group->mutex);
 		free(group->buffer);
 	}
 	set_status(status, release_refcounted(group));
@@ -694,7 +701,9 @@ size_t xrp_add_buffer_to_group(struct xrp_buffer_group *group,
 			       enum xrp_status *status)
 {
 	enum xrp_status s;
+	size_t n_buffers;
 
+	pthread_mutex_lock(&group->mutex);
 	if (group->n_buffers == group->capacity) {
 		struct xrp_buffer_group_record *r =
 			realloc(group->buffer,
@@ -702,6 +711,7 @@ size_t xrp_add_buffer_to_group(struct xrp_buffer_group *group,
 				((group->capacity + 2) * 2));
 
 		if (r == NULL) {
+			pthread_mutex_unlock(&group->mutex);
 			set_status(status, XRP_STATUS_FAILURE);
 			return -1;
 		}
@@ -711,25 +721,32 @@ size_t xrp_add_buffer_to_group(struct xrp_buffer_group *group,
 
 	xrp_retain_buffer(buffer, &s);
 	if (s != XRP_STATUS_SUCCESS) {
+		pthread_mutex_unlock(&group->mutex);
 		set_status(status, s);
 		return -1;
 	}
 	group->buffer[group->n_buffers].buffer = buffer;
 	group->buffer[group->n_buffers].access_flags = access_flags;
-	return group->n_buffers++;
+	n_buffers = group->n_buffers++;
+	pthread_mutex_unlock(&group->mutex);
+	return n_buffers;
 }
 
 struct xrp_buffer *xrp_get_buffer_from_group(struct xrp_buffer_group *group,
 					     size_t idx,
 					     enum xrp_status *status)
 {
-	if (idx < group->n_buffers) {
-		set_status(status, XRP_STATUS_SUCCESS);
+	struct xrp_buffer *buffer = NULL;
 
-		return group->buffer[idx].buffer;
+	pthread_mutex_lock(&group->mutex);
+	if (idx < group->n_buffers) {
+		buffer = group->buffer[idx].buffer;
+		xrp_retain_buffer(buffer, status);
+	} else {
+		set_status(status, XRP_STATUS_FAILURE);
 	}
-	set_status(status, XRP_STATUS_FAILURE);
-	return NULL;
+	pthread_mutex_unlock(&group->mutex);
+	return buffer;
 }
 
 
@@ -871,7 +888,6 @@ static void xrp_queue_cleanup(void *p)
 
 static void xrp_queue_process(struct xrp_device *device)
 {
-	size_t n_buffers;
 	struct xrp_dsp_cmd *dsp_cmd = device->description->comm_ptr;
 	struct xrp_request *rq;
 	size_t i;
@@ -914,8 +930,10 @@ static void xrp_queue_process(struct xrp_device *device)
 		xrp_free(rq->out_data_allocation);
 	}
 
-	n_buffers = rq->buffer_group ? rq->buffer_group->n_buffers : 0;
-	for (i = 0; i < n_buffers; ++i) {
+	if (rq->buffer_group)
+		pthread_mutex_lock(&rq->buffer_group->mutex);
+
+	for (i = 0; i < rq->n_buffers; ++i) {
 		phys_addr_t addr;
 
 		if (rq->buffer_group->buffer[i].buffer->type != XRP_BUFFER_TYPE_DEVICE) {
@@ -930,12 +948,14 @@ static void xrp_queue_process(struct xrp_device *device)
 			xrp_free(rq->user_buffer_allocation[i]);
 		}
 	}
-	if (n_buffers > XRP_DSP_CMD_INLINE_BUFFER_COUNT) {
+	if (rq->n_buffers > XRP_DSP_CMD_INLINE_BUFFER_COUNT) {
 		xrp_free(rq->buffer_allocation);
 	}
 
-	if (rq->buffer_group)
+	if (rq->buffer_group) {
+		pthread_mutex_unlock(&rq->buffer_group->mutex);
 		xrp_release_buffer_group(rq->buffer_group, NULL);
+	}
 
 	if (rq->event) {
 		struct xrp_event *event = rq->event;
@@ -959,7 +979,7 @@ void xrp_enqueue_command(struct xrp_queue *queue,
 {
 	struct xrp_device *device = queue->device;
 	struct xrp_event *event = NULL;
-	size_t n_buffers = buffer_group ? buffer_group->n_buffers : 0;
+	size_t n_buffers;
 	size_t i;
 	struct xrp_request *rq = malloc(sizeof(*rq));
 	struct xrp_dsp_cmd *dsp_cmd = &rq->dsp_cmd;
@@ -1001,11 +1021,16 @@ void xrp_enqueue_command(struct xrp_queue *queue,
 	}
 	dsp_cmd->out_data_size = out_data_size;
 
+	if (buffer_group)
+		pthread_mutex_lock(&buffer_group->mutex);
+
+	n_buffers = buffer_group ? buffer_group->n_buffers : 0;
 	if (n_buffers > XRP_DSP_CMD_INLINE_BUFFER_COUNT) {
 		long rc = xrp_allocate(&device->shared_pool,
 				       n_buffers * sizeof(struct xrp_dsp_buffer),
 				       0x10, &rq->buffer_allocation);
 		if (rc < 0) {
+			pthread_mutex_unlock(&buffer_group->mutex);
 			set_status(status, XRP_STATUS_FAILURE);
 			return;
 		}
@@ -1016,11 +1041,13 @@ void xrp_enqueue_command(struct xrp_queue *queue,
 	}
 	dsp_cmd->buffer_size = n_buffers * sizeof(struct xrp_dsp_buffer);
 
+	rq->n_buffers = n_buffers;
 	rq->user_buffer_allocation = malloc(n_buffers * sizeof(void *));
 	for (i = 0; i < n_buffers; ++i) {
 		phys_addr_t addr;
 
 		if (buffer_group->buffer[i].buffer->map_count > 0) {
+			pthread_mutex_unlock(&buffer_group->mutex);
 			set_status(status, XRP_STATUS_FAILURE);
 			return;
 
@@ -1046,6 +1073,9 @@ void xrp_enqueue_command(struct xrp_queue *queue,
 			.addr = addr,
 		};
 	}
+
+	if (buffer_group)
+		pthread_mutex_unlock(&buffer_group->mutex);
 
 	if (evt) {
 		enum xrp_status s;

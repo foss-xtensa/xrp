@@ -72,6 +72,7 @@ struct xrp_buffer_group_record {
 
 struct xrp_buffer_group {
 	struct xrp_refcounted ref;
+	pthread_mutex_t mutex;
 	size_t n_buffers;
 	size_t capacity;
 	struct xrp_buffer_group_record *buffer;
@@ -312,10 +313,12 @@ struct xrp_buffer_group *xrp_create_buffer_group(enum xrp_status *status)
 {
 	struct xrp_buffer_group *group = alloc_refcounted(sizeof(*group));
 
-	if (group)
+	if (group) {
+		pthread_mutex_init(&group->mutex, NULL);
 		set_status(status, XRP_STATUS_SUCCESS);
-	else
+	} else {
 		set_status(status, XRP_STATUS_FAILURE);
+	}
 
 	return group;
 }
@@ -332,8 +335,11 @@ void xrp_release_buffer_group(struct xrp_buffer_group *group,
 	if (last_refcount(group)) {
 		size_t i;
 
+		pthread_mutex_lock(&group->mutex);
 		for (i = 0; i < group->n_buffers; ++i)
 			xrp_release_buffer(group->buffer[i].buffer, NULL);
+		pthread_mutex_unlock(&group->mutex);
+		pthread_mutex_destroy(&group->mutex);
 		free(group->buffer);
 	}
 	set_status(status, release_refcounted(group));
@@ -345,7 +351,9 @@ size_t xrp_add_buffer_to_group(struct xrp_buffer_group *group,
 			       enum xrp_status *status)
 {
 	enum xrp_status s;
+	size_t n_buffers;
 
+	pthread_mutex_lock(&group->mutex);
 	if (group->n_buffers == group->capacity) {
 		struct xrp_buffer_group_record *r =
 			realloc(group->buffer,
@@ -353,6 +361,7 @@ size_t xrp_add_buffer_to_group(struct xrp_buffer_group *group,
 				((group->capacity + 2) * 2));
 
 		if (r == NULL) {
+			pthread_mutex_unlock(&group->mutex);
 			set_status(status, XRP_STATUS_FAILURE);
 			return -1;
 		}
@@ -362,25 +371,32 @@ size_t xrp_add_buffer_to_group(struct xrp_buffer_group *group,
 
 	xrp_retain_buffer(buffer, &s);
 	if (s != XRP_STATUS_SUCCESS) {
+		pthread_mutex_unlock(&group->mutex);
 		set_status(status, s);
 		return -1;
 	}
 	group->buffer[group->n_buffers].buffer = buffer;
 	group->buffer[group->n_buffers].access_flags = access_flags;
-	return group->n_buffers++;
+	n_buffers = group->n_buffers++;
+	pthread_mutex_unlock(&group->mutex);
+	return n_buffers;
 }
 
 struct xrp_buffer *xrp_get_buffer_from_group(struct xrp_buffer_group *group,
 					     size_t idx,
 					     enum xrp_status *status)
 {
-	if (idx < group->n_buffers) {
-		set_status(status, XRP_STATUS_SUCCESS);
+	struct xrp_buffer *buffer = NULL;
 
-		return group->buffer[idx].buffer;
+	pthread_mutex_lock(&group->mutex);
+	if (idx < group->n_buffers) {
+		buffer = group->buffer[idx].buffer;
+		xrp_retain_buffer(buffer, status);
+	} else {
+		set_status(status, XRP_STATUS_FAILURE);
 	}
-	set_status(status, XRP_STATUS_FAILURE);
-	return NULL;
+	pthread_mutex_unlock(&group->mutex);
+	return buffer;
 }
 
 
@@ -492,35 +508,43 @@ static void _xrp_run_command(struct xrp_queue *queue,
 			     struct xrp_buffer_group *buffer_group,
 			     enum xrp_status *status)
 {
-	size_t n_buffers = buffer_group ? buffer_group->n_buffers : 0;
-	struct xrp_ioctl_buffer ioctl_buffer[n_buffers];/* TODO */
-	struct xrp_ioctl_queue ioctl_queue = {
-		.in_data_size = in_data_size,
-		.out_data_size = out_data_size,
-		.buffer_size = n_buffers *
-			sizeof(struct xrp_ioctl_buffer),
-		.in_data_addr = (uintptr_t)in_data,
-		.out_data_addr = (uintptr_t)out_data,
-		.buffer_addr = (uintptr_t)ioctl_buffer,
-	};
 	int ret;
-	size_t i;
 
-	for (i = 0; i < n_buffers; ++i) {
-		if (buffer_group->buffer[i].buffer->map_count > 0) {
-			set_status(status, XRP_STATUS_FAILURE);
-			return;
-
-		}
-		ioctl_buffer[i] = (struct xrp_ioctl_buffer){
-			.flags = buffer_group->buffer[i].access_flags,
-			.size = buffer_group->buffer[i].buffer->size,
-			.addr = (uintptr_t)buffer_group->buffer[i].buffer->ptr,
+	if (buffer_group)
+		pthread_mutex_lock(&buffer_group->mutex);
+	{
+		size_t n_buffers = buffer_group ? buffer_group->n_buffers : 0;
+		struct xrp_ioctl_buffer ioctl_buffer[n_buffers];/* TODO */
+		struct xrp_ioctl_queue ioctl_queue = {
+			.in_data_size = in_data_size,
+			.out_data_size = out_data_size,
+			.buffer_size = n_buffers *
+				sizeof(struct xrp_ioctl_buffer),
+			.in_data_addr = (uintptr_t)in_data,
+			.out_data_addr = (uintptr_t)out_data,
+			.buffer_addr = (uintptr_t)ioctl_buffer,
 		};
-	}
+		size_t i;
 
-	ret = ioctl(queue->device->fd,
-		    XRP_IOCTL_QUEUE, &ioctl_queue);
+		for (i = 0; i < n_buffers; ++i) {
+			if (buffer_group->buffer[i].buffer->map_count > 0) {
+				pthread_mutex_unlock(&buffer_group->mutex);
+				set_status(status, XRP_STATUS_FAILURE);
+				return;
+
+			}
+			ioctl_buffer[i] = (struct xrp_ioctl_buffer){
+				.flags = buffer_group->buffer[i].access_flags,
+				.size = buffer_group->buffer[i].buffer->size,
+				.addr = (uintptr_t)buffer_group->buffer[i].buffer->ptr,
+			};
+		}
+		if (buffer_group)
+			pthread_mutex_unlock(&buffer_group->mutex);
+
+		ret = ioctl(queue->device->fd,
+			    XRP_IOCTL_QUEUE, &ioctl_queue);
+	}
 
 	if (ret < 0)
 		set_status(status, XRP_STATUS_FAILURE);
