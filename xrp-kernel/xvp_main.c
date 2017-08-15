@@ -851,14 +851,6 @@ static long __xrp_unshare_block(struct file *filp, struct xrp_mapping *mapping,
 	return ret;
 }
 
-static bool xrp_unshare_block_need_mm(struct xrp_mapping *mapping,
-				      unsigned long flags)
-{
-	return mapping->type == XRP_MAPPING_ALIEN &&
-		(flags & XRP_FLAG_WRITE) &&
-		mapping->alien_mapping.type == ALIEN_COPY;
-}
-
 static long xrp_ioctl_free(struct file *filp,
 			   struct xrp_ioctl_alloc __user *p)
 {
@@ -969,11 +961,8 @@ static void xrp_unmap_request_nowb(struct file *filp, struct xrp_request *rq)
 	}
 }
 
-static long xrp_unmap_request(struct file *filp, struct xrp_request *rq,
-			      bool has_mm, bool *_need_mm)
+static long xrp_unmap_request(struct file *filp, struct xrp_request *rq)
 {
-	bool need_mm = false;
-	bool need_mm_buffers = false;
 	size_t n_buffers = rq->n_buffers;
 	size_t i;
 	long ret = 0;
@@ -982,20 +971,15 @@ static long xrp_unmap_request(struct file *filp, struct xrp_request *rq,
 	if (rq->ioctl_queue.in_data_size > XRP_DSP_CMD_INLINE_DATA_SIZE)
 		__xrp_unshare_block(filp, &rq->in_data_mapping, XRP_FLAG_READ);
 	if (rq->ioctl_queue.out_data_size > XRP_DSP_CMD_INLINE_DATA_SIZE) {
-		if (!has_mm && xrp_unshare_block_need_mm(&rq->out_data_mapping,
-							 XRP_FLAG_WRITE)) {
-			need_mm = true;
-		} else {
-			rc = __xrp_unshare_block(filp, &rq->out_data_mapping,
-						 XRP_FLAG_WRITE);
+		rc = __xrp_unshare_block(filp, &rq->out_data_mapping,
+					 XRP_FLAG_WRITE);
 
-			if (rc < 0) {
-				pr_debug("%s: out_data could not be unshared\n",
-					 __func__);
-				ret = rc;
-			}
+		if (rc < 0) {
+			pr_debug("%s: out_data could not be unshared\n",
+				 __func__);
+			ret = rc;
 		}
-	} else if (has_mm) {
+	} else {
 		if (copy_to_user((void __user *)(unsigned long)rq->ioctl_queue.out_data_addr,
 				 rq->out_data,
 				 rq->ioctl_queue.out_data_size)) {
@@ -1003,8 +987,6 @@ static long xrp_unmap_request(struct file *filp, struct xrp_request *rq,
 				 __func__);
 			ret = -EFAULT;
 		}
-	} else {
-		need_mm = true;
 	}
 
 	if (n_buffers > XRP_DSP_CMD_INLINE_BUFFER_COUNT)
@@ -1012,22 +994,16 @@ static long xrp_unmap_request(struct file *filp, struct xrp_request *rq,
 				    XRP_FLAG_READ_WRITE);
 
 	for (i = 0; i < n_buffers; ++i) {
-		if (!has_mm &&
-		    xrp_unshare_block_need_mm(rq->buffer_mapping + i,
-					      rq->dsp_buffer[i].flags)) {
-			need_mm_buffers = true;
-		} else {
-			rc = __xrp_unshare_block(filp, rq->buffer_mapping + i,
-						 rq->dsp_buffer[i].flags);
-			if (rc < 0) {
-				pr_debug("%s: buffer %zd could not be unshared\n",
-					 __func__, i);
-				ret = rc;
-			}
+		rc = __xrp_unshare_block(filp, rq->buffer_mapping + i,
+					 rq->dsp_buffer[i].flags);
+		if (rc < 0) {
+			pr_debug("%s: buffer %zd could not be unshared\n",
+				 __func__, i);
+			ret = rc;
 		}
 	}
 
-	if (!need_mm_buffers && n_buffers) {
+	if (n_buffers) {
 		kfree(rq->buffer_mapping);
 		if (n_buffers > XRP_DSP_CMD_INLINE_BUFFER_COUNT) {
 			kfree(rq->dsp_buffer);
@@ -1035,8 +1011,6 @@ static long xrp_unmap_request(struct file *filp, struct xrp_request *rq,
 		rq->n_buffers = 0;
 	}
 
-	if (_need_mm)
-		*_need_mm = need_mm || need_mm_buffers;
 	return ret;
 }
 
@@ -1258,7 +1232,7 @@ static long xrp_ioctl_submit_sync(struct file *filp,
 	}
 
 	if (ret == 0)
-		ret = xrp_unmap_request(filp, rq, true, NULL);
+		ret = xrp_unmap_request(filp, rq);
 	else
 		xrp_unmap_request_nowb(filp, rq);
 	kfree(rq);
