@@ -141,7 +141,7 @@ struct xrp_buffer {
 	struct xrp_allocation *xrp_allocation;
 	void *ptr;
 	size_t size;
-	unsigned long map_count;
+	_Atomic unsigned long map_count;
 	enum xrp_access_flags map_flags;
 };
 
@@ -635,7 +635,7 @@ void *xrp_map_buffer(struct xrp_buffer *buffer, size_t offset, size_t size,
 	if (offset <= buffer->size &&
 	    size <= buffer->size - offset) {
 		retain_refcounted(buffer);
-		++buffer->map_count;
+		(void)++buffer->map_count;
 		buffer->map_flags |= map_flags;
 		set_status(status, XRP_STATUS_SUCCESS);
 		return buffer->ptr + offset;
@@ -648,7 +648,7 @@ void xrp_unmap_buffer(struct xrp_buffer *buffer, void *p,
 		      enum xrp_status *status)
 {
 	if (p >= buffer->ptr && (size_t)(p - buffer->ptr) <= buffer->size) {
-		--buffer->map_count;
+		(void)--buffer->map_count;
 		release_refcounted(buffer);
 		set_status(status, XRP_STATUS_SUCCESS);
 	} else {
