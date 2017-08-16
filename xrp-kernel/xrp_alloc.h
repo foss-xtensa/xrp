@@ -19,6 +19,9 @@
  * CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
  * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ *
+ * Alternatively you can use and distribute this file under the terms of
+ * the GNU General Public License version 2 or later.
  */
 
 #ifndef XRP_ALLOC_H
