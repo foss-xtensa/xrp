@@ -61,6 +61,8 @@ int xrp_init(struct platform_device *pdev, struct xvp *xvp,
 	     const struct xrp_hw_ops *hw, void *hw_arg);
 int xrp_init_v1(struct platform_device *pdev, struct xvp *xvp,
 		const struct xrp_hw_ops *hw, void *hw_arg);
+int xrp_init_cma(struct platform_device *pdev, struct xvp *xvp,
+		 const struct xrp_hw_ops *hw, void *hw_arg);
 
 int xrp_deinit(struct platform_device *pdev);
 irqreturn_t xrp_irq_handler(int irq, struct xvp *xvp);

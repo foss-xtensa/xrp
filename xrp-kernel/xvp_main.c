@@ -40,6 +40,7 @@
 #include <linux/of.h>
 #include <linux/of_address.h>
 #include <linux/of_device.h>
+#include <linux/of_reserved_mem.h>
 #include <linux/platform_device.h>
 #include <linux/pm_runtime.h>
 #include <linux/property.h>
@@ -47,6 +48,7 @@
 #include <linux/slab.h>
 #include <asm/mman.h>
 #include <asm/uaccess.h>
+#include "xrp_cma_alloc.h"
 #include "xrp_firmware.h"
 #include "xrp_hw.h"
 #include "xrp_internal.h"
@@ -1513,7 +1515,8 @@ static int xrp_init_regs_v0(struct platform_device *pdev, struct xvp *xvp)
 
 	xvp->pmem = mem->start;
 	xvp->shared_size = resource_size(mem);
-	return 0;
+	return xrp_init_private_pool(&xvp->pool, xvp->pmem,
+				     xvp->shared_size);
 }
 
 static int xrp_init_regs_v1(struct platform_device *pdev, struct xvp *xvp)
@@ -1539,7 +1542,24 @@ static int xrp_init_regs_v1(struct platform_device *pdev, struct xvp *xvp)
 	r = *mem;
 	r.end = r.start + PAGE_SIZE;
 	xvp->comm = devm_ioremap_resource(&pdev->dev, &r);
-	return 0;
+	return xrp_init_private_pool(&xvp->pool, xvp->pmem,
+				     xvp->shared_size);
+}
+
+static int xrp_init_regs_cma(struct platform_device *pdev, struct xvp *xvp)
+{
+	dma_addr_t comm_phys;
+
+	if (of_reserved_mem_device_init(xvp->dev) < 0)
+		return -ENODEV;
+
+	xvp->comm = dma_alloc_attrs(xvp->dev, PAGE_SIZE, &comm_phys,
+				    GFP_KERNEL, 0);
+	if (!xvp->comm)
+		return -ENOMEM;
+
+	xvp->comm_phys = dma_to_phys(xvp->dev, comm_phys);
+	return xrp_init_cma_pool(&xvp->pool, xvp->dev);
 }
 
 static int xrp_init_common(struct platform_device *pdev, struct xvp *xvp,
@@ -1563,12 +1583,6 @@ static int xrp_init_common(struct platform_device *pdev, struct xvp *xvp,
 
 	pr_debug("%s: comm = %pap/%p\n", __func__, &xvp->comm_phys, xvp->comm);
 	pr_debug("%s: xvp->pmem = %pap\n", __func__, &xvp->pmem);
-
-	ret = xrp_init_private_pool(&xvp->pool, xvp->pmem,
-				    xvp->shared_size);
-	if (ret < 0)
-		goto err;
-	}
 
 	ret = xrp_init_address_map(xvp->dev, &xvp->address_map);
 	if (ret < 0)
@@ -1629,6 +1643,13 @@ int xrp_init_v1(struct platform_device *pdev, struct xvp *xvp,
 }
 EXPORT_SYMBOL(xrp_init_v1);
 
+int xrp_init_cma(struct platform_device *pdev, struct xvp *xvp,
+		 const struct xrp_hw_ops *hw_ops, void *hw_arg)
+{
+	return xrp_init_common(pdev, xvp, hw_ops, hw_arg, xrp_init_regs_cma);
+}
+EXPORT_SYMBOL(xrp_init_cma);
+
 int xrp_deinit(struct platform_device *pdev)
 {
 	struct xvp *xvp = platform_get_drvdata(pdev);
@@ -1681,6 +1702,9 @@ static const struct of_device_id xrp_of_match[] = {
 	}, {
 		.compatible = "cdns,xrp,v1",
 		.data = xrp_init_v1,
+	}, {
+		.compatible = "cdns,xrp,cma",
+		.data = xrp_init_cma,
 	}, {},
 };
 MODULE_DEVICE_TABLE(of, xrp_of_match);
