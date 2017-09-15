@@ -308,6 +308,28 @@ void xrp_enqueue_command(struct xrp_queue *queue,
 void xrp_wait(struct xrp_event *event, enum xrp_status *status);
 
 
+/* New DSP-specific interface (library-style) */
+
+/*
+ * Check if there's a command from the host in the hardware queue.
+ * Returns XRP_STATUS_PENDING if the queue is empty or XRP_STATUS_SUCCESS
+ * if there is a command ready for processing.
+ *
+ * The check is quick and may be issued in any context.
+ */
+enum xrp_status xrp_device_poll(struct xrp_device *device);
+
+/*
+ * Check if there's a command from the host in the hardware queue and invoke
+ * command handler if there's one.
+ * Returns XRP_STATUS_PENDING if the queue is empty, or the status returned by
+ * the command handler.
+ */
+enum xrp_status xrp_device_dispatch(struct xrp_device *device);
+
+
+/* Legacy DSP-specific interface (framework-style) */
+
 /*
  * DSP side callbacks.
  */

@@ -151,7 +151,8 @@ am_libxrp_dsp_hw_simple_a_OBJECTS = xrp_dsp_hw_simple.$(OBJEXT)
 libxrp_dsp_hw_simple_a_OBJECTS = $(am_libxrp_dsp_hw_simple_a_OBJECTS)
 libxrp_dsp_a_AR = $(AR) $(ARFLAGS)
 libxrp_dsp_a_LIBADD =
-am_libxrp_dsp_a_OBJECTS = xrp_dsp.$(OBJEXT)
+am_libxrp_dsp_a_OBJECTS = xrp_dsp.$(OBJEXT) \
+	xrp_dsp_framework.$(OBJEXT)
 libxrp_dsp_a_OBJECTS = $(am_libxrp_dsp_a_OBJECTS)
 AM_V_P = $(am__v_P_@AM_V@)
 am__v_P_ = $(am__v_P_@AM_DEFAULT_V@)
@@ -309,7 +310,7 @@ AM_CPPFLAGS = -I$(srcdir)/.. -I$(srcdir)/../xrp-kernel
 AM_CFLAGS = -W -Wall --xtensa-core=$(DSP_CORE)
 include_HEADERS = ../xrp_api.h xrp_dsp_hw.h
 lib_LIBRARIES = libxrp-dsp.a libxrp-dsp-hw-simple.a
-libxrp_dsp_a_SOURCES = xrp_dsp.c
+libxrp_dsp_a_SOURCES = xrp_dsp.c xrp_dsp_framework.c
 libxrp_dsp_hw_simple_a_SOURCES = xrp_dsp_hw_simple.c
 all: all-am
 
@@ -394,6 +395,7 @@ distclean-compile:
 	-rm -f *.tab.c
 
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/xrp_dsp.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/xrp_dsp_framework.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/xrp_dsp_hw_simple.Po@am__quote@
 
 .c.o:

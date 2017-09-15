@@ -28,7 +28,6 @@
 #include <xtensa/corebits.h>
 #include <xtensa/xtruntime.h>
 #include "xrp_api.h"
-#include "xrp_dsp_hw.h"
 
 static void hang(void) __attribute__((noreturn));
 static void hang(void)
@@ -88,6 +87,15 @@ static void register_exception_handlers(void)
 	}
 }
 
+void xrp_user_initialize(enum xrp_status *status)
+{
+	printf("%s\n", __func__);
+	register_exception_handlers();
+	atexit(hang);
+	if (status != NULL)
+		*status = XRP_STATUS_SUCCESS;
+}
+
 void xrp_run_command(const void *in_data, size_t in_data_size,
 		     void *out_data, size_t out_data_size,
 		     struct xrp_buffer_group *buffer_group,
@@ -135,25 +143,4 @@ void xrp_run_command(const void *in_data, size_t in_data_size,
 	}
 	if (status != NULL)
 		*status = XRP_STATUS_SUCCESS;
-}
-
-int main(void)
-{
-	enum xrp_status status;
-	struct xrp_device *device;
-
-	register_exception_handlers();
-	device = xrp_open_device(0, &status);
-	if (status != XRP_STATUS_SUCCESS) {
-		printf("xrp_open_device failed\n");
-		return 1;
-	}
-	for (;;) {
-		status = xrp_device_dispatch(device);
-		if (status == XRP_STATUS_PENDING)
-			xrp_hw_wait_device_irq();
-		else if (status != XRP_STATUS_SUCCESS)
-			return status;
-	}
-	return 0;
 }

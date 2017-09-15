@@ -54,6 +54,11 @@ struct xrp_refcounted {
 	unsigned long count;
 };
 
+struct xrp_device {
+	struct xrp_refcounted ref;
+	void *dsp_cmd;
+};
+
 struct xrp_buffer {
 	struct xrp_refcounted ref;
 	void *ptr;
@@ -104,6 +109,30 @@ static enum xrp_status release_refcounted(struct xrp_refcounted *ref)
 			return XRP_STATUS_SUCCESS;
 	}
 	return XRP_STATUS_FAILURE;
+}
+
+struct xrp_device *xrp_open_device(int idx, enum xrp_status *status)
+{
+	static struct xrp_device device;
+
+	if (idx == 0) {
+		device.dsp_cmd = xrp_dsp_comm_base;
+		set_status(status, XRP_STATUS_SUCCESS);
+		return &device;
+	} else {
+		set_status(status, XRP_STATUS_FAILURE);
+		return NULL;
+	}
+}
+
+void xrp_retain_device(struct xrp_device *device, enum xrp_status *status)
+{
+	set_status(status, retain_refcounted(&device->ref));
+}
+
+void xrp_release_device(struct xrp_device *device, enum xrp_status *status)
+{
+	set_status(status, release_refcounted(&device->ref));
 }
 
 struct xrp_buffer *xrp_create_buffer(struct xrp_device *device,
@@ -250,18 +279,6 @@ static inline int xrp_request_valid(struct xrp_dsp_cmd *dsp_cmd,
 
 }
 
-static void wait_for_request(struct xrp_dsp_cmd *dsp_cmd,
-			     uint32_t *pflags)
-{
-	for (;;) {
-		dcache_region_invalidate(dsp_cmd,
-					 sizeof(*dsp_cmd));
-		if (xrp_request_valid(dsp_cmd, pflags))
-			break;
-		xrp_hw_wait_device_irq();
-	}
-}
-
 static void complete_request(struct xrp_dsp_cmd *dsp_cmd)
 {
 	uint32_t flags = dsp_cmd->flags | XRP_DSP_CMD_FLAG_RESPONSE_VALID;
@@ -280,9 +297,10 @@ static enum xrp_access_flags dsp_buffer_allowed_access(__u32 flags)
 		XRP_READ : XRP_READ_WRITE;
 }
 
-static enum xrp_status process_command(struct xrp_dsp_cmd *dsp_cmd)
+static enum xrp_status process_command(struct xrp_device *device)
 {
 	enum xrp_status status;
+	struct xrp_dsp_cmd *dsp_cmd = device->dsp_cmd;
 	size_t n_buffers = dsp_cmd->buffer_size / sizeof(struct xrp_dsp_buffer);
 	struct xrp_dsp_buffer *dsp_buffer;
 	struct xrp_buffer_group buffer_group;
@@ -379,40 +397,33 @@ static enum xrp_status process_command(struct xrp_dsp_cmd *dsp_cmd)
 	return status;
 }
 
-
-static enum xrp_status run_command_loop(void)
+enum xrp_status xrp_device_poll(struct xrp_device *device)
 {
-	do_handshake(xrp_dsp_comm_base);
+	uint32_t flags;
 
-	for (;;) {
-		enum xrp_status status = XRP_STATUS_SUCCESS;
-		uint32_t flags;
+	dcache_region_invalidate(device->dsp_cmd,
+				 sizeof(*device->dsp_cmd));
+	if (xrp_request_valid(device->dsp_cmd, &flags))
+		return XRP_STATUS_SUCCESS;
+	else
+		return XRP_STATUS_PENDING;
+}
 
-		wait_for_request(xrp_dsp_comm_base, &flags);
-		if (flags == XRP_DSP_SYNC_START) {
-			do_handshake(xrp_dsp_comm_base);
-		} else {
-			status = process_command(xrp_dsp_comm_base);
+enum xrp_status xrp_device_dispatch(struct xrp_device *device)
+{
+	uint32_t flags;
+	enum xrp_status status;
 
-			if (status != XRP_STATUS_SUCCESS)
-				return status;
-		}
+	dcache_region_invalidate(device->dsp_cmd,
+				 sizeof(*device->dsp_cmd));
+	if (!xrp_request_valid(device->dsp_cmd, &flags))
+		return XRP_STATUS_PENDING;
+
+	if (flags == XRP_DSP_SYNC_START) {
+		do_handshake(device->dsp_cmd);
+		status = XRP_STATUS_SUCCESS;
+	} else {
+		status = process_command(device);
 	}
-}
-
-void xrp_user_initialize(enum xrp_status *status) __attribute__((weak));
-void xrp_user_initialize(enum xrp_status *status)
-{
-	set_status(status, XRP_STATUS_SUCCESS);
-}
-
-int main()
-{
-	enum xrp_status status = XRP_STATUS_SUCCESS;
-
-	xrp_user_initialize(&status);
-
-	if (status != XRP_STATUS_SUCCESS)
-		return status;
-	return run_command_loop();
+	return status;
 }
