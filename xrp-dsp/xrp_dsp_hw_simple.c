@@ -86,13 +86,17 @@ void xrp_hw_send_host_irq(void)
 
 void xrp_hw_wait_device_irq(void)
 {
+	unsigned old_intlevel;
+
 	if (device_irq_mode == XRP_IRQ_NONE)
 		return;
 
 	pr_debug("%s: waiting for device IRQ...\n", __func__);
+	old_intlevel = XTOS_SET_INTLEVEL(15);
 	_xtos_ints_on(1u << device_irq);
 	XT_WAITI(0);
 	_xtos_ints_off(1u << device_irq);
+	XTOS_RESTORE_INTLEVEL(old_intlevel);
 }
 
 void xrp_hw_set_sync_data(void *p)
