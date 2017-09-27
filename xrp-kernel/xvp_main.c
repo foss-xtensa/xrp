@@ -40,6 +40,7 @@
 #include <linux/of_address.h>
 #include <linux/of_device.h>
 #include <linux/platform_device.h>
+#include <linux/pm_runtime.h>
 #include <linux/slab.h>
 #include <asm/mman.h>
 #include <asm/uaccess.h>
@@ -1336,12 +1337,19 @@ static int xvp_open(struct inode *inode, struct file *filp)
 {
 	struct xvp *xvp = container_of(filp->private_data,
 				       struct xvp, miscdev);
-	struct xvp_file *xvp_file =
-		devm_kzalloc(xvp->dev, sizeof(*xvp_file), GFP_KERNEL);
+	struct xvp_file *xvp_file;
+	int rc;
 
 	pr_debug("%s\n", __func__);
-	if (!xvp_file)
+	rc = pm_runtime_get_sync(xvp->dev);
+	if (rc < 0)
+		return rc;
+
+	xvp_file = devm_kzalloc(xvp->dev, sizeof(*xvp_file), GFP_KERNEL);
+	if (!xvp_file) {
+		pm_runtime_put_sync(xvp->dev);
 		return -ENOMEM;
+	}
 
 	xvp_file->xvp = xvp;
 	spin_lock_init(&xvp_file->busy_list_lock);
@@ -1356,6 +1364,7 @@ static int xvp_close(struct inode *inode, struct file *filp)
 	pr_debug("%s\n", __func__);
 
 	devm_kfree(xvp_file->xvp->dev, xvp_file);
+	pm_runtime_put_sync(xvp_file->xvp->dev);
 	return 0;
 }
 
@@ -1438,6 +1447,37 @@ static const struct file_operations xvp_fops = {
 	.release = xvp_close,
 };
 
+int xrp_runtime_suspend(struct device *dev)
+{
+	struct xvp *xvp = dev_get_drvdata(dev);
+
+	xrp_halt_dsp(xvp);
+	xvp_disable_dsp(xvp);
+	return 0;
+}
+EXPORT_SYMBOL(xrp_runtime_suspend);
+
+int xrp_runtime_resume(struct device *dev)
+{
+	struct xvp *xvp = dev_get_drvdata(dev);
+	int ret;
+
+	ret = xvp_enable_dsp(xvp);
+	if (ret < 0) {
+		dev_err(xvp->dev, "couldn't enable DSP\n");
+		return ret;
+	}
+
+	xrp_reset_dsp(xvp);
+
+	ret = xrp_boot_firmware(xvp);
+	if (ret < 0)
+		xvp_disable_dsp(xvp);
+
+	return ret;
+}
+EXPORT_SYMBOL(xrp_runtime_resume);
+
 int xrp_init(struct platform_device *pdev, struct xvp *xvp,
 	     const struct xrp_hw_ops *hw_ops, void *hw_arg)
 {
@@ -1487,17 +1527,12 @@ int xrp_init(struct platform_device *pdev, struct xvp *xvp,
 		goto err_free_map;
 	}
 
-	ret = xvp_enable_dsp(xvp);
-	if (ret < 0) {
-		dev_err(xvp->dev, "couldn't enable DSP\n");
-		goto err_free_map;
+	pm_runtime_enable(xvp->dev);
+	if (!pm_runtime_enabled(xvp->dev)) {
+		ret = xrp_runtime_resume(xvp->dev);
+		if (ret)
+			goto err_pm_disable;
 	}
-
-	xrp_reset_dsp(xvp);
-
-	ret = xrp_boot_firmware(xvp);
-	if (ret < 0)
-		goto err_disable;
 
 	sprintf(nodename, "xvp%u", xvp_nodeid++);
 
@@ -1510,10 +1545,10 @@ int xrp_init(struct platform_device *pdev, struct xvp *xvp,
 
 	ret = misc_register(&xvp->miscdev);
 	if (ret < 0)
-		goto err_disable;
+		goto err_pm_disable;
 	return 0;
-err_disable:
-	xvp_disable_dsp(xvp);
+err_pm_disable:
+	pm_runtime_disable(xvp->dev);
 err_free_map:
 	xrp_free_address_map(&xvp->address_map);
 err_free_pool:
@@ -1528,8 +1563,10 @@ int xrp_deinit(struct platform_device *pdev)
 {
 	struct xvp *xvp = platform_get_drvdata(pdev);
 
-	xrp_halt_dsp(xvp);
-	xvp_disable_dsp(xvp);
+	pm_runtime_disable(xvp->dev);
+	if (!pm_runtime_status_suspended(xvp->dev))
+		xrp_runtime_suspend(xvp->dev);
+
 	misc_deregister(&xvp->miscdev);
 	release_firmware(xvp->firmware);
 	xrp_free_pool(&xvp->pool);
@@ -1590,12 +1627,18 @@ static const struct of_device_id xrp_match[] = {
 MODULE_DEVICE_TABLE(of, xrp_match);
 #endif
 
+static const struct dev_pm_ops xrp_pm_ops = {
+	SET_RUNTIME_PM_OPS(xrp_runtime_suspend,
+			   xrp_runtime_resume, NULL)
+};
+
 static struct platform_driver xrp_driver = {
 	.probe   = xrp_probe,
 	.remove  = xrp_remove,
 	.driver  = {
 		.name = DRIVER_NAME,
 		.of_match_table = of_match_ptr(xrp_match),
+		.pm = &xrp_pm_ops,
 	},
 };
 

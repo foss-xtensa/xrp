@@ -62,5 +62,7 @@ int xrp_init(struct platform_device *pdev, struct xvp *xvp,
 
 int xrp_deinit(struct platform_device *pdev);
 irqreturn_t xrp_irq_handler(int irq, struct xvp *xvp);
+int xrp_runtime_resume(struct device *dev);
+int xrp_runtime_suspend(struct device *dev);
 
 #endif

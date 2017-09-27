@@ -323,12 +323,18 @@ static const struct of_device_id xrp_hw_simple_match[] = {
 MODULE_DEVICE_TABLE(of, xrp_hw_simple_match);
 #endif
 
+static const struct dev_pm_ops xrp_hw_simple_pm_ops = {
+	SET_RUNTIME_PM_OPS(xrp_runtime_suspend,
+			   xrp_runtime_resume, NULL)
+};
+
 static struct platform_driver xrp_hw_simple_driver = {
 	.probe   = xrp_hw_simple_probe,
 	.remove  = xrp_hw_simple_remove,
 	.driver  = {
 		.name = DRIVER_NAME,
 		.of_match_table = of_match_ptr(xrp_hw_simple_match),
+		.pm = &xrp_hw_simple_pm_ops,
 	},
 };
 
