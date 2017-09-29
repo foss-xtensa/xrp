@@ -89,6 +89,21 @@ static void register_exception_handlers(void)
 	}
 }
 
+void xrp_run_command(const void *in_data, size_t in_data_size,
+		     void *out_data, size_t out_data_size,
+		     struct xrp_buffer_group *buffer_group,
+		     enum xrp_status *status)
+{
+	(void)in_data;
+	(void)in_data_size;
+	(void)out_data;
+	(void)out_data_size;
+	(void)buffer_group;
+	printf("%s\n", __func__);
+	if (status)
+		*status = XRP_STATUS_SUCCESS;
+}
+
 static enum xrp_status example_v1_handler(void *handler_context,
 					  const void *in_data, size_t in_data_size,
 					  void *out_data, size_t out_data_size,
@@ -189,7 +204,7 @@ int main(void)
 	xrp_device_register_namespace(device, XRP_EXAMPLE_V1_NSID,
 				      example_v1_handler, NULL, &status);
 	if (status != XRP_STATUS_SUCCESS) {
-		printf("xrp_register_namespace failed\n");
+		printf("xrp_register_namespace for XRP_EXAMPLE_V1_NSID failed\n");
 		return 1;
 	}
 	for (;;) {

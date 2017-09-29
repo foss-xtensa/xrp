@@ -367,6 +367,34 @@ static void f5(int devid)
 	assert(status == XRP_STATUS_SUCCESS);
 }
 
+/* Test default namespace */
+static void f6(int devid)
+{
+	enum xrp_status status = -1;
+	struct xrp_device *device;
+	struct xrp_queue *queue;
+
+	device = xrp_open_device(devid, &status);
+	assert(status == XRP_STATUS_SUCCESS);
+	status = -1;
+	queue = queue = xrp_create_queue(device, &status);
+	assert(status == XRP_STATUS_SUCCESS);
+	status = -1;
+
+	xrp_run_command_sync(queue,
+			     NULL, 0,
+			     NULL, 0,
+			     NULL, &status);
+	assert(status == XRP_STATUS_SUCCESS);
+	status = -1;
+
+	xrp_release_queue(queue, &status);
+	assert(status == XRP_STATUS_SUCCESS);
+	status = -1;
+	xrp_release_device(device, &status);
+	assert(status == XRP_STATUS_SUCCESS);
+}
+
 int main(int argc, char **argv)
 {
 	int devid = 0;
@@ -382,5 +410,7 @@ int main(int argc, char **argv)
 	f4(devid);
 	printf("=======================================================\n");
 	f5(devid);
+	printf("=======================================================\n");
+	f6(devid);
 	return 0;
 }
