@@ -100,6 +100,7 @@ struct xrp_queue {
 		struct xrp_request *head;
 		struct xrp_request *tail;
 	} request_queue;
+	int exit;
 };
 
 struct xrp_event {
@@ -431,14 +432,14 @@ struct xrp_buffer *xrp_get_buffer_from_group(struct xrp_buffer_group *group,
 
 /* Queue API. */
 
-static void xrp_queue_process(struct xrp_queue *queue);
+static int xrp_queue_process(struct xrp_queue *queue);
 
 static void *xrp_queue_thread(void *p)
 {
 	struct xrp_queue *queue = p;
 
-	for (;;)
-		xrp_queue_process(queue);
+	while (xrp_queue_process(queue)) {
+	}
 
 	return NULL;
 }
@@ -486,7 +487,11 @@ void xrp_release_queue(struct xrp_queue *queue, enum xrp_status *status)
 	if (last_refcount(queue)) {
 		enum xrp_status s;
 
-		pthread_cancel(queue->thread);
+
+		pthread_mutex_lock(&queue->request_queue_mutex);
+		queue->exit = 1;
+		pthread_cond_broadcast(&queue->request_queue_cond);
+		pthread_mutex_unlock(&queue->request_queue_mutex);
 		pthread_join(queue->thread, NULL);
 		pthread_mutex_lock(&queue->request_queue_mutex);
 		if (queue->request_queue.head != NULL)
@@ -581,30 +586,25 @@ static void _xrp_run_command(struct xrp_queue *queue,
 		set_status(status, XRP_STATUS_SUCCESS);
 }
 
-static void xrp_queue_cleanup(void *p)
-{
-	struct xrp_queue *queue = p;
-	pthread_mutex_unlock(&queue->request_queue_mutex);
-}
-
-static void xrp_queue_process(struct xrp_queue *queue)
+static int xrp_queue_process(struct xrp_queue *queue)
 {
 	struct xrp_request *rq;
 	enum xrp_status status;
-	int old_state;
+	int exit;
 
 	pthread_mutex_lock(&queue->request_queue_mutex);
-	pthread_cleanup_push(xrp_queue_cleanup, queue);
-	pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, &old_state);
 	for (;;) {
 		rq = _xrp_dequeue_request(queue);
-		if (rq)
+		exit = queue->exit;
+		if (rq || exit)
 			break;
 		pthread_cond_wait(&queue->request_queue_cond,
 				  &queue->request_queue_mutex);
 	}
-	pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, NULL);
-	pthread_cleanup_pop(1);
+	pthread_mutex_unlock(&queue->request_queue_mutex);
+
+	if (!rq)
+		return 0;
 
 	_xrp_run_command(queue,
 			 rq->in_data, rq->in_data_size,
@@ -625,7 +625,7 @@ static void xrp_queue_process(struct xrp_queue *queue)
 	}
 	free(rq->in_data);
 	free(rq);
-	pthread_setcancelstate(old_state, NULL);
+	return 1;
 }
 
 
