@@ -135,6 +135,32 @@ static void f3(int devid)
 	xrp_release_device(device, &status);
 }
 
+static void f4(int devid)
+{
+	enum xrp_status status;
+	struct xrp_device *device = xrp_open_device(devid, &status);
+	struct xrp_queue *queue = xrp_create_queue(device, &status);
+	struct xrp_buffer_group *group = xrp_create_buffer_group(&status);
+	struct xrp_buffer *buf1 = xrp_create_buffer(device, 1, NULL, &status);
+	struct xrp_buffer *buf2 = xrp_create_buffer(device, 1, NULL, &status);
+	struct xrp_buffer *buf3;
+	size_t i = xrp_add_buffer_to_group(group, buf1, XRP_READ, &status);
+
+	xrp_set_buffer_in_group(group, i, buf2, XRP_READ, &status);
+	assert(status == XRP_STATUS_SUCCESS);
+	xrp_set_buffer_in_group(group, i + 1, buf2, XRP_READ, &status);
+	assert(status == XRP_STATUS_FAILURE);
+	buf3 = xrp_get_buffer_from_group(group, i, &status);
+	assert(status == XRP_STATUS_SUCCESS);
+	assert(buf3 == buf2);
+	xrp_release_buffer(buf1, &status);
+	xrp_release_buffer(buf2, &status);
+	xrp_release_buffer(buf3, &status);
+	xrp_release_buffer_group(group, &status);
+	xrp_release_queue(queue, &status);
+	xrp_release_device(device, &status);
+}
+
 int main(int argc, char **argv)
 {
 	int devid = 0;
@@ -146,5 +172,7 @@ int main(int argc, char **argv)
 	f2(devid);
 	printf("=======================================================\n");
 	f3(devid);
+	printf("=======================================================\n");
+	f4(devid);
 	return 0;
 }

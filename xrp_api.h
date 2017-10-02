@@ -168,6 +168,20 @@ size_t xrp_add_buffer_to_group(struct xrp_buffer_group *group,
 			       enum xrp_status *status);
 
 /*
+ * Put new buffer to the existing index in the group.
+ * When operation succeeds it releases the buffer previously contained at
+ * that index and adds a reference to the new buffer.
+ *
+ * \param access_flags: granted access. User of the buffer on the DSP side
+ * will be able to map it only for this type of access.
+ */
+void xrp_set_buffer_in_group(struct xrp_buffer_group *group,
+			     size_t index,
+			     struct xrp_buffer *buffer,
+			     enum xrp_access_flags access_flags,
+			     enum xrp_status *status);
+
+/*
  * Get buffer from the group by its index.
  * Buffer must be freed with release_buffer.
  */

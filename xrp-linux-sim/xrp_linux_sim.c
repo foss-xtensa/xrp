@@ -731,6 +731,35 @@ size_t xrp_add_buffer_to_group(struct xrp_buffer_group *group,
 	return n_buffers;
 }
 
+void xrp_set_buffer_in_group(struct xrp_buffer_group *group,
+			     size_t index,
+			     struct xrp_buffer *buffer,
+			     enum xrp_access_flags access_flags,
+			     enum xrp_status *status)
+{
+	enum xrp_status s;
+
+	xrp_retain_buffer(buffer, &s);
+
+	if (s == XRP_STATUS_SUCCESS) {
+		struct xrp_buffer *old_buffer;
+
+		pthread_mutex_lock(&group->mutex);
+		if (index < group->n_buffers) {
+			old_buffer = group->buffer[index].buffer;
+			group->buffer[index].buffer = buffer;
+			group->buffer[index].access_flags = access_flags;
+			s = XRP_STATUS_SUCCESS;
+		} else {
+			old_buffer = buffer;
+			s = XRP_STATUS_FAILURE;
+		}
+		pthread_mutex_unlock(&group->mutex);
+		xrp_release_buffer(old_buffer, NULL);
+	}
+	set_status(status, s);
+}
+
 struct xrp_buffer *xrp_get_buffer_from_group(struct xrp_buffer_group *group,
 					     size_t idx,
 					     enum xrp_status *status)
