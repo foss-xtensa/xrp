@@ -26,6 +26,10 @@
 
 #include <stddef.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /*
  * User API.
  */
@@ -365,5 +369,9 @@ void xrp_run_command(const void *in_data, size_t in_data_size,
  * Helper function that terminates fast simulation
  */
 void xrp_exit(void);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
