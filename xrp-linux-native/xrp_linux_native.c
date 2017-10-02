@@ -32,8 +32,10 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#ifndef _UAPI_ASM_GENERIC_INT_LL64_H
 typedef uint32_t __u32;
 typedef uint64_t __u64;
+#endif
 
 #include "xrp_api.h"
 #include "xrp_kernel_defs.h"
