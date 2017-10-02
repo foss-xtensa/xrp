@@ -288,7 +288,7 @@ void *xrp_map_buffer(struct xrp_buffer *buffer, size_t offset, size_t size,
 		(void)++buffer->map_count;
 		buffer->map_flags |= map_flags;
 		set_status(status, XRP_STATUS_SUCCESS);
-		return buffer->ptr + offset;
+		return (char *)buffer->ptr + offset;
 	}
 	set_status(status, XRP_STATUS_FAILURE);
 	return NULL;
@@ -297,7 +297,8 @@ void *xrp_map_buffer(struct xrp_buffer *buffer, size_t offset, size_t size,
 void xrp_unmap_buffer(struct xrp_buffer *buffer, void *p,
 		      enum xrp_status *status)
 {
-	if (p >= buffer->ptr && (size_t)(p - buffer->ptr) <= buffer->size) {
+	if (p >= buffer->ptr &&
+	    (size_t)((char *)p - (char *)buffer->ptr) <= buffer->size) {
 		(void)--buffer->map_count;
 		xrp_release_buffer(buffer, status);
 	} else {
