@@ -24,7 +24,8 @@
 # the GNU General Public License version 2 or later.
 #
 
-xrp-y += xvp_main.o xrp_address_map.o xrp_alloc.o xrp_firmware.o
+xrp-y += xvp_main.o xrp_address_map.o xrp_alloc.o
+xrp-$(CONFIG_OF) += xrp_firmware.o
 
 obj-m += xrp.o
 obj-$(XRP_HW_SIMPLE) += xrp_hw_simple.o

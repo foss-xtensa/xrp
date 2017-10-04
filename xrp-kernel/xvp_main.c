@@ -26,6 +26,7 @@
  * the GNU General Public License version 2 or later.
  */
 
+#include <linux/acpi.h>
 #include <linux/completion.h>
 #include <linux/delay.h>
 #include <linux/dma-mapping.h>
@@ -41,6 +42,7 @@
 #include <linux/of_device.h>
 #include <linux/platform_device.h>
 #include <linux/pm_runtime.h>
+#include <linux/property.h>
 #include <linux/sched.h>
 #include <linux/slab.h>
 #include <asm/mman.h>
@@ -1518,8 +1520,8 @@ int xrp_init(struct platform_device *pdev, struct xvp *xvp,
 	if (ret < 0)
 		goto err_free_pool;
 
-	ret = of_property_read_string(pdev->dev.of_node, "firmware-name",
-				      &xvp->firmware_name);
+	ret = device_property_read_string(xvp->dev, "firmware-name",
+					  &xvp->firmware_name);
 	if (ret == -EINVAL || ret == -ENODATA) {
 		dev_dbg(xvp->dev,
 			"no firmware-name property, not loading firmware");
@@ -1604,6 +1606,23 @@ static const struct xrp_hw_ops hw_ops = {
 	.invalidate_cache = invalidate_cache,
 };
 
+#ifdef CONFIG_OF
+static const struct of_device_id xrp_of_match[] = {
+	{
+		.compatible = "cdns,xrp",
+	}, {},
+};
+MODULE_DEVICE_TABLE(of, xrp_of_match);
+#endif
+
+#ifdef CONFIG_ACPI
+static const struct acpi_device_id xrp_acpi_match[] = {
+	{ "CXRP0001", 0 },
+	{ },
+};
+MODULE_DEVICE_TABLE(acpi, xrp_acpi_match);
+#endif
+
 static int xrp_probe(struct platform_device *pdev)
 {
 	struct xvp *xvp = devm_kzalloc(&pdev->dev, sizeof(*xvp), GFP_KERNEL);
@@ -1619,15 +1638,6 @@ static int xrp_remove(struct platform_device *pdev)
 	return xrp_deinit(pdev);
 }
 
-#ifdef CONFIG_OF
-static const struct of_device_id xrp_match[] = {
-	{
-		.compatible = "cdns,xrp",
-	}, {},
-};
-MODULE_DEVICE_TABLE(of, xrp_match);
-#endif
-
 static const struct dev_pm_ops xrp_pm_ops = {
 	SET_RUNTIME_PM_OPS(xrp_runtime_suspend,
 			   xrp_runtime_resume, NULL)
@@ -1638,7 +1648,8 @@ static struct platform_driver xrp_driver = {
 	.remove  = xrp_remove,
 	.driver  = {
 		.name = DRIVER_NAME,
-		.of_match_table = of_match_ptr(xrp_match),
+		.of_match_table = of_match_ptr(xrp_of_match),
+		.acpi_match_table = ACPI_PTR(xrp_acpi_match),
 		.pm = &xrp_pm_ops,
 	},
 };

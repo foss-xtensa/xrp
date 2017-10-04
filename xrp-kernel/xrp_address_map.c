@@ -34,6 +34,7 @@
 #include <linux/sort.h>
 #include "xrp_address_map.h"
 
+#if IS_ENABLED(CONFIG_OF)
 static int xrp_compare_address_sort(const void *a, const void *b)
 {
 	const struct xrp_address_map_entry *pa = a;
@@ -47,16 +48,18 @@ static int xrp_compare_address_sort(const void *a, const void *b)
 		return 1;
 	return 0;
 }
+#endif
 
 int xrp_init_address_map(struct device *dev,
 			 struct xrp_address_map *map)
 {
+	int ret = 0;
+#if IS_ENABLED(CONFIG_OF)
 	struct device_node *pnode = dev->of_node;
 	struct device_node *node;
 	int rlen, off;
 	const __be32 *ranges = of_get_property(pnode, "ranges", &rlen);
 	int na, pna, ns;
-	int ret = 0;
 	int i;
 
 	if (!ranges) {
@@ -106,6 +109,7 @@ err:
 	return ret;
 
 empty:
+#endif
 	map->n = 1;
 	map->entry = kmalloc(sizeof(*map->entry), GFP_KERNEL);
 	map->entry->src_addr = 0;

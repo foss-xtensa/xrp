@@ -31,6 +31,14 @@
 
 struct xvp;
 
+#if IS_ENABLED(CONFIG_OF)
 int xrp_request_firmware(struct xvp *xvp);
+#else
+int xrp_request_firmware(struct xvp *xvp)
+{
+	(void)xvp;
+	return -EINVAL;
+}
+#endif
 
 #endif
