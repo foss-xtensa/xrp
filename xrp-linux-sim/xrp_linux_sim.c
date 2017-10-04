@@ -611,6 +611,7 @@ struct xrp_buffer *xrp_create_buffer(struct xrp_device *device,
 		buf->ptr = host_ptr;
 		buf->size = size;
 	}
+	set_status(status, XRP_STATUS_SUCCESS);
 	return buf;
 }
 
@@ -728,6 +729,7 @@ size_t xrp_add_buffer_to_group(struct xrp_buffer_group *group,
 	group->buffer[group->n_buffers].access_flags = access_flags;
 	n_buffers = group->n_buffers++;
 	pthread_mutex_unlock(&group->mutex);
+	set_status(status, XRP_STATUS_SUCCESS);
 	return n_buffers;
 }
 
@@ -805,6 +807,7 @@ struct xrp_queue *xrp_create_queue(struct xrp_device *device,
 		return NULL;
 	}
 	queue->device = device;
+	set_status(status, XRP_STATUS_SUCCESS);
 
 	return queue;
 }
