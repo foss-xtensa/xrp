@@ -1520,7 +1520,7 @@ int xrp_init(struct platform_device *pdev, struct xvp *xvp,
 
 	ret = of_property_read_string(pdev->dev.of_node, "firmware-name",
 				      &xvp->firmware_name);
-	if (ret == -EINVAL) {
+	if (ret == -EINVAL || ret == -ENODATA) {
 		dev_dbg(xvp->dev,
 			"no firmware-name property, not loading firmware");
 	} else if (ret < 0) {
