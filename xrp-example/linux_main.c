@@ -31,12 +31,19 @@
 /* Test data transfer from and to in/out buffers */
 static void f1(int devid)
 {
-	enum xrp_status status;
-	struct xrp_device *device = xrp_open_device(devid, &status);
-	struct xrp_queue *queue = xrp_create_queue(device, &status);
+	enum xrp_status status = -1;
+	struct xrp_device *device;
+	struct xrp_queue *queue;
 	char in_buf[32];
 	char out_buf[32];
 	int i, j;
+
+	device = xrp_open_device(devid, &status);
+	assert(status == XRP_STATUS_SUCCESS);
+	status = -1;
+	queue = xrp_create_queue(device, &status);
+	assert(status == XRP_STATUS_SUCCESS);
+	status = -1;
 
 	for (i = 0; i <= 32; ++i) {
 		memset(in_buf, i, sizeof(in_buf));
@@ -45,6 +52,8 @@ static void f1(int devid)
 				     in_buf, i,
 				     out_buf, i,
 				     NULL, &status);
+		assert(status == XRP_STATUS_SUCCESS);
+		status = -1;
 
 		for (j = 0; j < 32; ++j) {
 			assert(out_buf[j] == (j < i ? i + j : 0));
@@ -52,113 +61,237 @@ static void f1(int devid)
 	}
 
 	xrp_release_queue(queue, &status);
+	assert(status == XRP_STATUS_SUCCESS);
+	status = -1;
 	xrp_release_device(device, &status);
+	assert(status == XRP_STATUS_SUCCESS);
 }
 
 /* Test asynchronous API */
 static void f2(int devid)
 {
-	enum xrp_status status;
-	struct xrp_device *device = xrp_open_device(devid, &status);
-	struct xrp_queue *queue = xrp_create_queue(device, &status);
-	struct xrp_buffer_group *group = xrp_create_buffer_group(&status);
-	struct xrp_buffer *buf = xrp_create_buffer(device, 1024, NULL, &status);
-	void *data = xrp_map_buffer(buf, 0, 1024, XRP_READ_WRITE, &status);
+	enum xrp_status status = -1;
+	struct xrp_device *device;
+	struct xrp_queue *queue;
+	struct xrp_buffer_group *group;
+	struct xrp_buffer *buf;
+	void *data;
 	struct xrp_event *event[2];
+
+	device = xrp_open_device(devid, &status);
+	assert(status == XRP_STATUS_SUCCESS);
+	status = -1;
+
+	queue = xrp_create_queue(device, &status);
+	assert(status == XRP_STATUS_SUCCESS);
+	status = -1;
+
+	group = xrp_create_buffer_group(&status);
+	assert(status == XRP_STATUS_SUCCESS);
+	status = -1;
+
+	buf = xrp_create_buffer(device, 1024, NULL, &status);
+	assert(status == XRP_STATUS_SUCCESS);
+	status = -1;
+
+	data = xrp_map_buffer(buf, 0, 1024, XRP_READ_WRITE, &status);
+	assert(status == XRP_STATUS_SUCCESS);
+	status = -1;
 
 	memset(data, 'z', 1024);
 
 	xrp_unmap_buffer(buf, data, &status);
+	assert(status == XRP_STATUS_SUCCESS);
+	status = -1;
 
 	xrp_add_buffer_to_group(group, buf, XRP_READ_WRITE, &status);
+	assert(status == XRP_STATUS_SUCCESS);
+	status = -1;
 
 	xrp_enqueue_command(queue, NULL, 0, NULL, 0, group, event + 0, &status);
 	assert(status == XRP_STATUS_SUCCESS);
+	status = -1;
 	xrp_enqueue_command(queue, NULL, 0, NULL, 0, group, event + 1, &status);
 	assert(status == XRP_STATUS_SUCCESS);
+	status = -1;
 	xrp_release_buffer_group(group, &status);
+	assert(status == XRP_STATUS_SUCCESS);
+	status = -1;
 	xrp_release_buffer(buf, &status);
+	assert(status == XRP_STATUS_SUCCESS);
+	status = -1;
 	xrp_release_queue(queue, &status);
+	assert(status == XRP_STATUS_SUCCESS);
+	status = -1;
 	xrp_wait(event[1], &status);
+	assert(status == XRP_STATUS_SUCCESS);
+	status = -1;
 	xrp_event_status(event[0], &status);
 	assert(status != XRP_STATUS_PENDING);
+	status = -1;
 	xrp_wait(event[0], &status);
+	assert(status == XRP_STATUS_SUCCESS);
+	status = -1;
 	xrp_release_event(event[0], &status);
+	assert(status == XRP_STATUS_SUCCESS);
+	status = -1;
 	xrp_release_event(event[1], &status);
+	assert(status == XRP_STATUS_SUCCESS);
+	status = -1;
 	xrp_release_device(device, &status);
+	assert(status == XRP_STATUS_SUCCESS);
 }
 
 /* Test data transfer from and to device and user buffers */
 static void f3(int devid)
 {
-	enum xrp_status status;
-	struct xrp_device *device = xrp_open_device(devid, &status);
-	struct xrp_queue *queue = xrp_create_queue(device, &status);
+	enum xrp_status status = -1;
+	struct xrp_device *device;
+	struct xrp_queue *queue;
 	uint32_t sz;
 	int i;
+
+
+	device = xrp_open_device(devid, &status);
+	assert(status == XRP_STATUS_SUCCESS);
+	status = -1;
+	queue = xrp_create_queue(device, &status);
+	assert(status == XRP_STATUS_SUCCESS);
+	status = -1;
 
 	for (sz = 2048; sz < 16384; sz <<= 1) {
 		fprintf(stderr, "%s: sz = %zd\n", __func__, (size_t)sz);
 		for (i = 0; i < 4; ++i) {
 			void *p1 = (i & 1) ? malloc(sz) : NULL;
 			void *p2 = (i & 2) ? malloc(sz) : NULL;
-			struct xrp_buffer_group *group = xrp_create_buffer_group(&status);
-			struct xrp_buffer *buf1 = xrp_create_buffer(device, sz, p1, &status);
-			struct xrp_buffer *buf2 = xrp_create_buffer(device, sz, p2, &status);
-			void *data1 = xrp_map_buffer(buf1, 0, sz, XRP_READ_WRITE, &status);
+			struct xrp_buffer_group *group;
+			struct xrp_buffer *buf1;
+			struct xrp_buffer *buf2;
+			void *data1;
 			void *data2;
+
+			group = xrp_create_buffer_group(&status);
+			assert(status == XRP_STATUS_SUCCESS);
+			status = -1;
+			buf1 = xrp_create_buffer(device, sz, p1, &status);
+			assert(status == XRP_STATUS_SUCCESS);
+			status = -1;
+			buf2 = xrp_create_buffer(device, sz, p2, &status);
+			assert(status == XRP_STATUS_SUCCESS);
+			status = -1;
+
+			data1 = xrp_map_buffer(buf1, 0, sz, XRP_READ_WRITE, &status);
+			assert(status == XRP_STATUS_SUCCESS);
+			status = -1;
 
 			memset(data1, i + 3 + sz / 512, sz);
 			xrp_unmap_buffer(buf1, data1, &status);
+			assert(status == XRP_STATUS_SUCCESS);
+			status = -1;
 
 			xrp_add_buffer_to_group(group, buf1, XRP_READ, &status);
+			assert(status == XRP_STATUS_SUCCESS);
+			status = -1;
 			xrp_add_buffer_to_group(group, buf2, XRP_WRITE, &status);
+			assert(status == XRP_STATUS_SUCCESS);
+			status = -1;
 
 			xrp_run_command_sync(queue, &sz, sizeof(sz), NULL, 0, group, &status);
+			assert(status == XRP_STATUS_SUCCESS);
+			status = -1;
 			xrp_release_buffer_group(group, &status);
+			assert(status == XRP_STATUS_SUCCESS);
+			status = -1;
 
 			data1 = xrp_map_buffer(buf1, 0, sz, XRP_READ_WRITE, &status);
+			assert(status == XRP_STATUS_SUCCESS);
+			status = -1;
 			data2 = xrp_map_buffer(buf2, 0, sz, XRP_READ_WRITE, &status);
+			assert(status == XRP_STATUS_SUCCESS);
+			status = -1;
 			assert(data1);
 			assert(data2);
 			fprintf(stderr, "comparing %p vs %p\n", data1, data2);
 			assert(memcmp(data1, data2, sz) == 0);
 			xrp_unmap_buffer(buf1, data1, &status);
+			assert(status == XRP_STATUS_SUCCESS);
+			status = -1;
 			xrp_unmap_buffer(buf2, data2, &status);
+			assert(status == XRP_STATUS_SUCCESS);
+			status = -1;
 			xrp_release_buffer(buf1, &status);
+			assert(status == XRP_STATUS_SUCCESS);
+			status = -1;
 			xrp_release_buffer(buf2, &status);
+			assert(status == XRP_STATUS_SUCCESS);
+			status = -1;
 			free(p1);
 			free(p2);
 		}
 	}
 	xrp_release_queue(queue, &status);
+	assert(status == XRP_STATUS_SUCCESS);
+	status = -1;
 	xrp_release_device(device, &status);
+	assert(status == XRP_STATUS_SUCCESS);
 }
 
 static void f4(int devid)
 {
-	enum xrp_status status;
-	struct xrp_device *device = xrp_open_device(devid, &status);
-	struct xrp_queue *queue = xrp_create_queue(device, &status);
-	struct xrp_buffer_group *group = xrp_create_buffer_group(&status);
-	struct xrp_buffer *buf1 = xrp_create_buffer(device, 1, NULL, &status);
-	struct xrp_buffer *buf2 = xrp_create_buffer(device, 1, NULL, &status);
+	enum xrp_status status = -1;
+	struct xrp_device *device;
+	struct xrp_queue *queue;
+	struct xrp_buffer_group *group;
+	struct xrp_buffer *buf1;
+	struct xrp_buffer *buf2;
 	struct xrp_buffer *buf3;
-	size_t i = xrp_add_buffer_to_group(group, buf1, XRP_READ, &status);
+	size_t i;
 
+	device = xrp_open_device(devid, &status);
+	assert(status == XRP_STATUS_SUCCESS);
+	status = -1;
+	queue = xrp_create_queue(device, &status);
+	assert(status == XRP_STATUS_SUCCESS);
+	status = -1;
+	group = xrp_create_buffer_group(&status);
+	assert(status == XRP_STATUS_SUCCESS);
+	status = -1;
+	buf1 = xrp_create_buffer(device, 1, NULL, &status);
+	assert(status == XRP_STATUS_SUCCESS);
+	status = -1;
+	buf2 = xrp_create_buffer(device, 1, NULL, &status);
+	assert(status == XRP_STATUS_SUCCESS);
+	status = -1;
+	i = xrp_add_buffer_to_group(group, buf1, XRP_READ, &status);
+	assert(status == XRP_STATUS_SUCCESS);
+	status = -1;
 	xrp_set_buffer_in_group(group, i, buf2, XRP_READ, &status);
 	assert(status == XRP_STATUS_SUCCESS);
+	status = -1;
 	xrp_set_buffer_in_group(group, i + 1, buf2, XRP_READ, &status);
 	assert(status == XRP_STATUS_FAILURE);
+	status = -1;
 	buf3 = xrp_get_buffer_from_group(group, i, &status);
 	assert(status == XRP_STATUS_SUCCESS);
+	status = -1;
 	assert(buf3 == buf2);
 	xrp_release_buffer(buf1, &status);
+	assert(status == XRP_STATUS_SUCCESS);
+	status = -1;
 	xrp_release_buffer(buf2, &status);
+	assert(status == XRP_STATUS_SUCCESS);
+	status = -1;
 	xrp_release_buffer(buf3, &status);
+	assert(status == XRP_STATUS_SUCCESS);
+	status = -1;
 	xrp_release_buffer_group(group, &status);
+	assert(status == XRP_STATUS_SUCCESS);
+	status = -1;
 	xrp_release_queue(queue, &status);
+	assert(status == XRP_STATUS_SUCCESS);
+	status = -1;
 	xrp_release_device(device, &status);
+	assert(status == XRP_STATUS_SUCCESS);
 }
 
 int main(int argc, char **argv)
