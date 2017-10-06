@@ -1679,6 +1679,7 @@ MODULE_DEVICE_TABLE(acpi, xrp_acpi_match);
 
 static int xrp_probe(struct platform_device *pdev)
 {
+	int ret = -EINVAL;
 	struct xvp *xvp = devm_kzalloc(&pdev->dev, sizeof(*xvp), GFP_KERNEL);
 	if (!xvp)
 		return -ENOMEM;
@@ -1695,9 +1696,29 @@ static int xrp_probe(struct platform_device *pdev)
 	}
 #endif
 #ifdef CONFIG_ACPI
-	return xrp_init_v1(pdev, xvp, &hw_ops, NULL);
+	ret = xrp_init_v1(pdev, xvp, &hw_ops, NULL);
+	if (ret == 0) {
+		struct xrp_address_map_entry *entry;
+
+		/*
+		 * On ACPI system DSP can currently only access
+		 * its own shared memory.
+		 */
+		entry = xrp_get_address_mapping(&xvp->address_map,
+						xvp->comm_phys);
+		if (entry) {
+			entry->src_addr = xvp->comm_phys;
+			entry->dst_addr = (u32)xvp->comm_phys;
+			entry->size = (u32)xvp->shared_size + PAGE_SIZE;
+		} else {
+			dev_err(xvp->dev,
+				"%s: couldn't find mapping for shared memory\n",
+				__func__);
+			ret = -EINVAL;
+		}
+	}
 #endif
-	return -EINVAL;
+	return ret;
 }
 
 static int xrp_remove(struct platform_device *pdev)
