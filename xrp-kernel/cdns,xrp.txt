@@ -6,21 +6,6 @@ Required properties:
   DSP shared memory area.
 
 Optional properties:
-- device-irq: 3 32-bit cells:
-  - first: offset of the 32-bit device IRQ MMIO register from the DSP MMIO
-    block start;
-  - second: register bit index that controls IRQ;
-  - third: DSP IRQ number (normal core IRQ number, not external IRQ number)
-    controlled by this register/bit.
-- device-irq-mode: 0 for none (polling), 1 for level, 2 for edge.
-
-- host-irq: 2 32-bit cells:
-  - first: offset of the 32-bit device IRQ MMIO register from the DSP MMIO
-    block start;
-  - second: register bit index that controls IRQ.
-- host-irq-mode: 0 for none (polling), 1 for level, 2 for edge.
-- interrupts: host IRQ number controlled by this register/bit.
-
 - firmware-name: string identifying firmware name. If missing the driver
   doesn't load the firmware.
 
@@ -44,14 +29,9 @@ Example:
 		#address-cells = <1>;
 		#size-cells = <1>;
 		compatible = "cdns,xrp";
-		reg = <0xfd001000 0x00000200
-		       0xf0000000 0x00001000
-		       0xf0001000 0x00fff000>;
-		device-irq = <0 1 5>; /* offset, bit#, IRQ# */
-		device-irq-mode = <1>;
-		host-irq = <0xfffff000 0>; /* offset, bit# */
-		host-irq-mode = <2>;
-		interrupts = <15 0>;
+		reg = <0xfd001000 0x00000200   /* DSP MMIO */
+		       0xf0000000 0x00001000   /* DSP communication area */
+		       0xf0001000 0x00fff000>; /* DSP shared memory */
 		firmware-name = "xrp0.elf";
 		ranges = <0x00000000 0x00000000 0x10000000
 			  0x3ffc0000 0xc0000000 0x00020000
