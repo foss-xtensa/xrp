@@ -1481,11 +1481,58 @@ int xrp_runtime_resume(struct device *dev)
 }
 EXPORT_SYMBOL(xrp_runtime_resume);
 
-int xrp_init(struct platform_device *pdev, struct xvp *xvp,
-	     const struct xrp_hw_ops *hw_ops, void *hw_arg)
+static int xrp_init_regs_v0(struct platform_device *pdev, struct xvp *xvp)
+{
+	struct resource *mem;
+
+	mem = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+	if (!mem)
+		return -ENODEV;
+
+	xvp->comm_phys = mem->start;
+	xvp->comm = devm_ioremap_resource(&pdev->dev, mem);
+
+	mem = platform_get_resource(pdev, IORESOURCE_MEM, 2);
+	if (!mem)
+		return -ENODEV;
+
+	xvp->pmem = mem->start;
+	xvp->shared_size = resource_size(mem);
+	return 0;
+}
+
+static int xrp_init_regs_v1(struct platform_device *pdev, struct xvp *xvp)
+{
+	struct resource *mem;
+	struct resource r;
+
+	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+	if (!mem)
+		return -ENODEV;
+
+	if (resource_size(mem) < 2 * PAGE_SIZE) {
+		dev_err(xvp->dev,
+			"%s: shared memory size is too small\n",
+			__func__);
+		return -ENOMEM;
+	}
+
+	xvp->comm_phys = mem->start;
+	xvp->pmem = mem->start + PAGE_SIZE;
+	xvp->shared_size = resource_size(mem) - PAGE_SIZE;
+
+	r = *mem;
+	r.end = r.start + PAGE_SIZE;
+	xvp->comm = devm_ioremap_resource(&pdev->dev, &r);
+	return 0;
+}
+
+static int xrp_init_common(struct platform_device *pdev, struct xvp *xvp,
+			   const struct xrp_hw_ops *hw_ops, void *hw_arg,
+			   int (*xrp_init_regs)(struct platform_device *pdev,
+						struct xvp *xvp))
 {
 	int ret;
-	struct resource *mem;
 	char nodename[sizeof("xvp") + 3 * sizeof(int)];
 
 	xvp->dev = &pdev->dev;
@@ -1495,24 +1542,14 @@ int xrp_init(struct platform_device *pdev, struct xvp *xvp,
 	mutex_init(&xvp->comm_lock);
 	init_completion(&xvp->completion);
 
-	mem = platform_get_resource(pdev, IORESOURCE_MEM, 1);
-	if (!mem) {
-		ret = -ENODEV;
+	ret = xrp_init_regs(pdev, xvp);
+	if (ret < 0)
 		goto err;
-	}
-	xvp->comm_phys = mem->start;
-	xvp->comm = devm_ioremap_resource(&pdev->dev, mem);
-	pr_debug("%s: comm = %pap/%p\n", __func__, &mem->start, xvp->comm);
 
-	mem = platform_get_resource(pdev, IORESOURCE_MEM, 2);
-	if (!mem) {
-		ret = -ENODEV;
-		goto err;
-	}
-
-	xvp->pmem = mem->start;
+	pr_debug("%s: comm = %pap/%p\n", __func__, &xvp->comm_phys, xvp->comm);
 	pr_debug("%s: xvp->pmem = %pap\n", __func__, &xvp->pmem);
-	ret = xrp_init_pool(&xvp->pool, mem->start, resource_size(mem));
+
+	ret = xrp_init_pool(&xvp->pool, xvp->pmem, xvp->shared_size);
 	if (ret < 0)
 		goto err;
 
@@ -1560,7 +1597,20 @@ err:
 	dev_err(&pdev->dev, "%s: ret = %d\n", __func__, ret);
 	return ret;
 }
+
+int xrp_init(struct platform_device *pdev, struct xvp *xvp,
+	     const struct xrp_hw_ops *hw_ops, void *hw_arg)
+{
+	return xrp_init_common(pdev, xvp, hw_ops, hw_arg, xrp_init_regs_v0);
+}
 EXPORT_SYMBOL(xrp_init);
+
+int xrp_init_v1(struct platform_device *pdev, struct xvp *xvp,
+		const struct xrp_hw_ops *hw_ops, void *hw_arg)
+{
+	return xrp_init_common(pdev, xvp, hw_ops, hw_arg, xrp_init_regs_v1);
+}
+EXPORT_SYMBOL(xrp_init_v1);
 
 int xrp_deinit(struct platform_device *pdev)
 {
@@ -1610,6 +1660,10 @@ static const struct xrp_hw_ops hw_ops = {
 static const struct of_device_id xrp_of_match[] = {
 	{
 		.compatible = "cdns,xrp",
+		.data = xrp_init,
+	}, {
+		.compatible = "cdns,xrp,v1",
+		.data = xrp_init_v1,
 	}, {},
 };
 MODULE_DEVICE_TABLE(of, xrp_of_match);
@@ -1626,11 +1680,24 @@ MODULE_DEVICE_TABLE(acpi, xrp_acpi_match);
 static int xrp_probe(struct platform_device *pdev)
 {
 	struct xvp *xvp = devm_kzalloc(&pdev->dev, sizeof(*xvp), GFP_KERNEL);
-
 	if (!xvp)
 		return -ENOMEM;
 
-	return xrp_init(pdev, xvp, &hw_ops, NULL);
+#ifdef CONFIG_OF
+	{
+		const struct of_device_id *match;
+		int (*init)(struct platform_device *pdev, struct xvp *xvp,
+			    const struct xrp_hw_ops *hw_ops, void *hw_arg);
+
+	        match = of_match_device(xrp_of_match, &pdev->dev);
+		init = match->data;
+		return init(pdev, xvp, &hw_ops, NULL);
+	}
+#endif
+#ifdef CONFIG_ACPI
+	return xrp_init_v1(pdev, xvp, &hw_ops, NULL);
+#endif
+	return -EINVAL;
 }
 
 static int xrp_remove(struct platform_device *pdev)

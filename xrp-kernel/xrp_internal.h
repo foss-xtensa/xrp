@@ -49,6 +49,7 @@ struct xvp {
 	void __iomem *comm;
 	phys_addr_t pmem;
 	phys_addr_t comm_phys;
+	phys_addr_t shared_size;
 
 	struct xrp_address_map address_map;
 
