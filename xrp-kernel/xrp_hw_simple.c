@@ -219,13 +219,14 @@ static const struct xrp_hw_ops hw_ops = {
 	.invalidate_cache = invalidate_cache,
 };
 
-static int init_hw(struct platform_device *pdev, struct xrp_hw_simple *hw)
+static int init_hw(struct platform_device *pdev, struct xrp_hw_simple *hw,
+		   int mem_idx)
 {
 	struct resource *mem;
 	int irq;
 	int ret;
 
-	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+	mem = platform_get_resource(pdev, IORESOURCE_MEM, mem_idx);
 	if (!mem) {
 		ret = -ENODEV;
 		goto err;
@@ -292,36 +293,65 @@ err:
 	return ret;
 }
 
-static int xrp_hw_simple_probe(struct platform_device *pdev)
+static int init(struct platform_device *pdev, struct xrp_hw_simple *hw)
 {
 	int ret;
-	struct xrp_hw_simple *hw =
-		devm_kzalloc(&pdev->dev, sizeof(*hw), GFP_KERNEL);
 
-	if (!hw)
-		return -ENOMEM;
-
-	ret = init_hw(pdev, hw);
+	ret = init_hw(pdev, hw, 0);
 	if (ret < 0)
 		return ret;
 
-	ret = xrp_init(pdev, &hw->xrp, &hw_ops, hw);
-	return ret;
+	return xrp_init(pdev, &hw->xrp, &hw_ops, hw);
 }
 
-static int xrp_hw_simple_remove(struct platform_device *pdev)
+static int init_v1(struct platform_device *pdev, struct xrp_hw_simple *hw)
 {
-	return xrp_deinit(pdev);
+	int ret;
+
+	ret = init_hw(pdev, hw, 1);
+	if (ret < 0)
+		return ret;
+
+	return xrp_init_v1(pdev, &hw->xrp, &hw_ops, hw);
 }
 
 #ifdef CONFIG_OF
 static const struct of_device_id xrp_hw_simple_match[] = {
 	{
 		.compatible = "cdns,xrp-hw-simple",
+		.data = init,
+	}, {
+		.compatible = "cdns,xrp-hw-simple,v1",
+		.data = init_v1,
 	}, {},
 };
 MODULE_DEVICE_TABLE(of, xrp_hw_simple_match);
 #endif
+
+static int xrp_hw_simple_probe(struct platform_device *pdev)
+{
+	struct xrp_hw_simple *hw =
+		devm_kzalloc(&pdev->dev, sizeof(*hw), GFP_KERNEL);
+	const struct of_device_id *match;
+	int (*init)(struct platform_device *pdev, struct xrp_hw_simple *hw);
+
+	if (!hw)
+		return -ENOMEM;
+
+	match = of_match_device(of_match_ptr(xrp_hw_simple_match),
+				&pdev->dev);
+	if (!match)
+		return -ENODEV;
+
+	init = match->data;
+	return init(pdev, hw);
+
+}
+
+static int xrp_hw_simple_remove(struct platform_device *pdev)
+{
+	return xrp_deinit(pdev);
+}
 
 static const struct dev_pm_ops xrp_hw_simple_pm_ops = {
 	SET_RUNTIME_PM_OPS(xrp_runtime_suspend,
