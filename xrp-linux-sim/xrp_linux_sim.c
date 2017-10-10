@@ -424,85 +424,175 @@ static void synchronize(struct xrp_device_description *desc)
 
 }
 
+struct of_node_match {
+	const char *compatible;
+	int (*init)(void *fdt, int offset,
+		    struct xrp_device_description *description);
+};
+
+static int init_cdns_xrp_common(struct xrp_device_description *description)
+{
+	description->comm_ptr = p2v(description->comm_base);
+	if (!description->comm_ptr) {
+		printf("%s: shmem not found for comm area @0x%08x\n",
+		       __func__, description->comm_base);
+		return 0;
+	}
+
+	description->shared_ptr = p2v(description->shared_base);
+	if (!description->shared_ptr) {
+		printf("%s: shmem not found for shared area @0x%08x\n",
+		       __func__, description->shared_base);
+		return 0;
+	}
+	return 1;
+}
+
+static int init_cdns_xrp(void *fdt, int offset,
+			 struct xrp_device_description *description)
+{
+	const void *reg;
+	int len;
+
+	reg = fdt_getprop(fdt, offset, "reg", &len);
+	if (!reg) {
+		printf("%s: %s\n", __func__, fdt_strerror(len));
+		return 0;
+	}
+	if (len < 24) {
+		printf("%s: reg property size is too small (%d)\n",
+		       __func__, len);
+		return 0;
+	}
+
+	*description = (struct xrp_device_description){
+		.io_base = getprop_u32(reg, 0),
+		.comm_base = getprop_u32(reg, 8),
+		.shared_base = getprop_u32(reg, 16),
+		.shared_size = getprop_u32(reg, 20),
+		.hw_mutex = PTHREAD_MUTEX_INITIALIZER,
+	};
+	return init_cdns_xrp_common(description);
+}
+
+static int init_cdns_xrp_v1(void *fdt, int offset,
+			    struct xrp_device_description *description)
+{
+	const void *reg;
+	int len;
+
+	reg = fdt_getprop(fdt, offset, "reg", &len);
+	if (!reg) {
+		printf("%s: %s\n", __func__, fdt_strerror(len));
+		return 0;
+	}
+	if (len < 16) {
+		printf("%s: reg property size is too small (%d)\n",
+		       __func__, len);
+		return 0;
+	}
+
+	*description = (struct xrp_device_description){
+		.comm_base = getprop_u32(reg, 0),
+		.shared_base = getprop_u32(reg, 0) + 4096,
+		.shared_size = getprop_u32(reg, 4) - 4096,
+		.io_base = getprop_u32(reg, 8),
+		.hw_mutex = PTHREAD_MUTEX_INITIALIZER,
+	};
+	return init_cdns_xrp_common(description);
+}
+
+static int init_cdns_xrp_hw_simple_common(void *fdt, int offset,
+					  struct xrp_device_description *description)
+{
+	const void *device_irq;
+	const void *device_irq_mode;
+	int len;
+
+	device_irq_mode = fdt_getprop(fdt, offset, "device-irq-mode", &len);
+	if (!device_irq_mode || len < 4) {
+		printf("%s: valid device-irq-mode not found, not using\n",
+		       __func__);
+		device_irq_mode = NULL;
+	}
+	if (device_irq_mode && getprop_u32(device_irq_mode, 0)) {
+		device_irq = fdt_getprop(fdt, offset, "device-irq", &len);
+		if (!device_irq || len < 12) {
+			printf("%s: valid device-irq not found, not using\n",
+			       __func__);
+			device_irq_mode = NULL;
+			device_irq = NULL;
+		} else {
+			description->device_irq_mode =
+				getprop_u32(device_irq_mode, 0);
+			description->device_irq[0] =
+				getprop_u32(device_irq, 0);
+			description->device_irq[1] =
+				getprop_u32(device_irq, 4);
+			description->device_irq[2] =
+				getprop_u32(device_irq, 8);
+		}
+	}
+	return 1;
+}
+
+static int init_cdns_xrp_hw_simple(void *fdt, int offset,
+				   struct xrp_device_description *description)
+{
+	return init_cdns_xrp(fdt, offset, description) &&
+		init_cdns_xrp_hw_simple_common(fdt, offset, description);
+}
+
+static int init_cdns_xrp_hw_simple_v1(void *fdt, int offset,
+				      struct xrp_device_description *description)
+{
+	return init_cdns_xrp_v1(fdt, offset, description) &&
+		init_cdns_xrp_hw_simple_common(fdt, offset, description);
+}
+
 static void initialize(void)
 {
-	int i;
 	int offset = -1;
 	void *fdt = &dt_blob_start;
+	static const struct of_node_match of_match[] = {
+		{
+			.compatible = "cdns,xrp",
+			.init = init_cdns_xrp
+		}, {
+			.compatible = "cdns,xrp,v1",
+			.init = init_cdns_xrp_v1
+		}, {
+			.compatible = "cdns,xrp-hw-simple",
+			.init = init_cdns_xrp_hw_simple,
+		}, {
+			.compatible = "cdns,xrp-hw-simple,v1",
+			.init = init_cdns_xrp_hw_simple_v1,
+		}, {
+			.compatible = NULL, /* last entry */
+		}
+	};
+	const struct of_node_match *match = of_match;
 
 	initialize_shmem();
 
-	for (i = 0; ; ++i) {
-		const void *reg;
-		const void *device_irq;
-		const void *device_irq_mode;
-		int len;
-
+	for (;;) {
+		int ret;
 		offset = fdt_node_offset_by_compatible(fdt,
-						       offset, "cdns,xrp");
-		if (offset < 0)
-			break;
-
-		reg = fdt_getprop(fdt, offset, "reg", &len);
-		if (!reg) {
-			printf("%s: %s\n", __func__, fdt_strerror(len));
-			break;
-		}
-		if (len < 24) {
-			printf("%s: reg property size is too small (%d)\n",
-			       __func__, len);
-			break;
+						       offset,
+						       match->compatible);
+		if (offset < 0) {
+			if (!(++match)->compatible)
+				break;
+			offset = -1;
+			continue;
 		}
 
-		xrp_device_description[i] = (struct xrp_device_description){
-			.io_base = getprop_u32(reg, 0),
-			.comm_base = getprop_u32(reg, 8),
-			.shared_base = getprop_u32(reg, 16),
-			.shared_size = getprop_u32(reg, 20),
-			.hw_mutex = PTHREAD_MUTEX_INITIALIZER,
-		};
+		ret = match->init(fdt, offset,
+				  xrp_device_description + xrp_device_count);
+		if (ret == 0)
+			continue;
 
-		device_irq_mode = fdt_getprop(fdt, offset, "device-irq-mode", &len);
-		if (!device_irq_mode || len < 4) {
-			printf("%s: valid device-irq-mode not found, not using\n",
-			       __func__);
-			device_irq_mode = NULL;
-		}
-		if (device_irq_mode && getprop_u32(device_irq_mode, 0)) {
-			device_irq = fdt_getprop(fdt, offset, "device-irq", &len);
-			if (!device_irq || len < 12) {
-				printf("%s: valid device-irq not found, not using\n",
-				       __func__);
-				device_irq_mode = NULL;
-				device_irq = NULL;
-			} else {
-				xrp_device_description[i].device_irq_mode =
-					getprop_u32(device_irq_mode, 0);
-				xrp_device_description[i].device_irq[0] =
-					getprop_u32(device_irq, 0);
-				xrp_device_description[i].device_irq[1] =
-					getprop_u32(device_irq, 4);
-				xrp_device_description[i].device_irq[2] =
-					getprop_u32(device_irq, 8);
-			}
-		}
-		xrp_device_description[i].comm_ptr =
-			p2v(xrp_device_description[i].comm_base);
-		if (!xrp_device_description[i].comm_ptr) {
-			printf("%s: shmem not found for comm area @0x%08x\n",
-			       __func__, xrp_device_description[i].comm_base);
-			break;
-		}
-
-		xrp_device_description[i].shared_ptr =
-			p2v(xrp_device_description[i].shared_base);
-		if (!xrp_device_description[i].shared_ptr) {
-			printf("%s: shmem not found for shared area @0x%08x\n",
-			       __func__, xrp_device_description[i].shared_base);
-			break;
-		}
-
-		synchronize(xrp_device_description + i);
+		synchronize(xrp_device_description + xrp_device_count);
 		++xrp_device_count;
 	}
 

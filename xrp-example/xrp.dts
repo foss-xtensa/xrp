@@ -68,10 +68,9 @@
 	xvp@0 {
 		#address-cells = <1>;
 		#size-cells = <1>;
-		compatible = "cdns,xrp";
-		reg = <0xfd001000 0x00000200
-		       0xf0000000 0x00001000
-		       0xf0001000 0x00fff000>;
+		compatible = "cdns,xrp-hw-simple,v1";
+		reg = <0xf0000000 0x01000000
+		       0xfd001000 0x00000200>;
 		device-irq = <0xf2fff100 0 16>; /* offset, bit#, IRQ# */
 		device-irq-mode = <2>;
 		host-irq = <0xfffff000 0>; /* offset, bit# */
@@ -89,10 +88,9 @@
 	xvp@1 {
 		#address-cells = <1>;
 		#size-cells = <1>;
-		compatible = "cdns,xrp";
-		reg = <0xfd002000 0x00000200
-		       0xf1000000 0x00001000
-		       0xf1001000 0x00fff000>;
+		compatible = "cdns,xrp-hw-simple,v1";
+		reg = <0xf1000000 0x01000000
+		       0xfd002000 0x00000200>;
 		device-irq = <0xf2ffe104 0 16>; /* offset, bit#, IRQ# */
 		device-irq-mode = <2>;
 		host-irq = <0xffffe000 0>; /* offset, bit# */
