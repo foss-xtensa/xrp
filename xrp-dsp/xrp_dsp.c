@@ -234,7 +234,7 @@ static void do_handshake(struct xrp_dsp_sync *shared_sync)
 	uint32_t v;
 
 	pr_debug("%s, shared_sync = %p\n", __func__, shared_sync);
-start:
+
 	while (XT_L32AI(&shared_sync->sync, 0) != XRP_DSP_SYNC_START) {
 		dcache_region_invalidate(&shared_sync->sync,
 					 sizeof(shared_sync->sync));
@@ -251,7 +251,7 @@ start:
 		if (v == XRP_DSP_SYNC_HOST_TO_DSP)
 			break;
 		if (v != XRP_DSP_SYNC_DSP_READY)
-			goto start;
+			return;
 	}
 
 	xrp_hw_set_sync_data(shared_sync->hw_sync_data);
