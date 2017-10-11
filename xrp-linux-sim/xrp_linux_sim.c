@@ -373,6 +373,7 @@ static void synchronize(struct xrp_device_description *desc)
 
 	xrp_comm_write32(&shared_sync->sync, XRP_DSP_SYNC_START);
 	mb();
+	xrp_send_device_irq(desc);
 	do {
 		__u32 v = xrp_comm_read32(&shared_sync->sync);
 		if (v == XRP_DSP_SYNC_DSP_READY)
