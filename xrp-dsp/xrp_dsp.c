@@ -23,6 +23,7 @@
 
 #include <stdint.h>
 #include <stdio.h>
+#include <string.h>
 #include <xtensa/tie/xt_sync.h>
 #include <xtensa/xtruntime.h>
 
@@ -184,6 +185,36 @@ void xrp_unmap_buffer(struct xrp_buffer *buffer, void *p,
 	}
 }
 
+void xrp_buffer_get_info(struct xrp_buffer *buffer, enum xrp_buffer_info info,
+			 void *out, size_t out_sz, enum xrp_status *status)
+{
+	enum xrp_status s = XRP_STATUS_FAILURE;
+	size_t sz;
+	void *ptr;
+
+	switch (info) {
+	case XRP_BUFFER_SIZE_SIZE_T:
+		sz = sizeof(buffer->size);
+		ptr = &buffer->size;
+		break;
+
+	case XRP_BUFFER_HOST_POINTER_PTR:
+		sz = sizeof(void *);
+		ptr = &buffer->ptr;
+		break;
+
+	default:
+		goto out;
+	}
+
+	if (sz == out_sz) {
+		memcpy(out, ptr, sz);
+		s = XRP_STATUS_SUCCESS;
+	}
+out:
+	set_status(status, s);
+}
+
 struct xrp_buffer_group *xrp_create_buffer_group(enum xrp_status *status)
 {
 	set_status(status, XRP_STATUS_FAILURE);
@@ -225,6 +256,35 @@ struct xrp_buffer *xrp_get_buffer_from_group(struct xrp_buffer_group *group,
 	}
 	set_status(status, XRP_STATUS_FAILURE);
 	return NULL;
+}
+
+void xrp_buffer_group_get_info(struct xrp_buffer_group *group,
+			       enum xrp_buffer_group_info info, size_t idx,
+			       void *out, size_t out_sz,
+			       enum xrp_status *status)
+{
+	enum xrp_status s = XRP_STATUS_FAILURE;
+	size_t sz;
+	void *ptr;
+
+	switch (info) {
+	case XRP_BUFFER_GROUP_BUFFER_FLAGS_ENUM:
+		if (idx >= group->n_buffers)
+			goto out;
+		sz = sizeof(group->buffer[idx].allowed_access);
+		ptr = &group->buffer[idx].allowed_access;
+		break;
+
+	default:
+		goto out;
+	}
+
+	if (sz == out_sz) {
+		memcpy(out, ptr, sz);
+		s = XRP_STATUS_SUCCESS;
+	}
+out:
+	set_status(status, s);
 }
 
 /* DSP side request handling */

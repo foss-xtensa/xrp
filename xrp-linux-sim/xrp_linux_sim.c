@@ -747,6 +747,41 @@ void xrp_unmap_buffer(struct xrp_buffer *buffer, void *p,
 	}
 }
 
+void xrp_buffer_get_info(struct xrp_buffer *buffer, enum xrp_buffer_info info,
+			 void *out, size_t out_sz, enum xrp_status *status)
+{
+	enum xrp_status s = XRP_STATUS_FAILURE;
+	size_t sz;
+	void *ptr;
+
+	switch (info) {
+	case XRP_BUFFER_SIZE_SIZE_T:
+		sz = sizeof(buffer->size);
+		ptr = &buffer->size;
+		break;
+
+	case XRP_BUFFER_HOST_POINTER_PTR:
+		if (buffer->type != XRP_BUFFER_TYPE_HOST) {
+			static void *p = NULL;
+			ptr = &p;
+		} else {
+			ptr = &buffer->ptr;
+		}
+		sz = sizeof(void *);
+		break;
+
+	default:
+		goto out;
+	}
+
+	if (sz == out_sz) {
+		memcpy(out, ptr, sz);
+		s = XRP_STATUS_SUCCESS;
+	}
+out:
+	set_status(status, s);
+}
+
 
 /* Buffer group API. */
 
@@ -868,6 +903,37 @@ struct xrp_buffer *xrp_get_buffer_from_group(struct xrp_buffer_group *group,
 	}
 	pthread_mutex_unlock(&group->mutex);
 	return buffer;
+}
+
+void xrp_buffer_group_get_info(struct xrp_buffer_group *group,
+			       enum xrp_buffer_group_info info, size_t idx,
+			       void *out, size_t out_sz,
+			       enum xrp_status *status)
+{
+	enum xrp_status s = XRP_STATUS_FAILURE;
+	size_t sz;
+	void *ptr;
+
+	pthread_mutex_lock(&group->mutex);
+	switch (info) {
+	case XRP_BUFFER_GROUP_BUFFER_FLAGS_ENUM:
+		if (idx >= group->n_buffers)
+			goto out;
+		sz = sizeof(group->buffer[idx].access_flags);
+		ptr = &group->buffer[idx].access_flags;
+		break;
+
+	default:
+		goto out;
+	}
+
+	if (sz == out_sz) {
+		memcpy(out, ptr, sz);
+		s = XRP_STATUS_SUCCESS;
+	}
+out:
+	pthread_mutex_unlock(&group->mutex);
+	set_status(status, s);
 }
 
 

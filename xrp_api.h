@@ -50,6 +50,13 @@ enum xrp_access_flags {
 	XRP_WRITE		= 0x2,
 	XRP_READ_WRITE		= 0x3,
 };
+enum xrp_buffer_info {
+	XRP_BUFFER_SIZE_SIZE_T,
+	XRP_BUFFER_HOST_POINTER_PTR,
+};
+enum xrp_buffer_group_info {
+	XRP_BUFFER_GROUP_BUFFER_FLAGS_ENUM,
+};
 
 /*
  * General notes:
@@ -130,6 +137,16 @@ void *xrp_map_buffer(struct xrp_buffer *buffer, size_t offset, size_t size,
 void xrp_unmap_buffer(struct xrp_buffer *buffer, void *p,
 		      enum xrp_status *status);
 
+/*
+ * Get information about the buffer object.
+ *
+ * \param info: information type to retrieve.
+ * \param out: pointer to return information to.
+ * \param out_sz: size of out buffer.
+ */
+void xrp_buffer_get_info(struct xrp_buffer *buffer, enum xrp_buffer_info info,
+			 void *out, size_t out_sz, enum xrp_status *status);
+
 
 /*
  * Buffer group API.
@@ -188,6 +205,19 @@ void xrp_set_buffer_in_group(struct xrp_buffer_group *group,
 struct xrp_buffer *xrp_get_buffer_from_group(struct xrp_buffer_group *group,
 					     size_t idx,
 					     enum xrp_status *status);
+
+/*
+ * Get information about the buffer group object.
+ *
+ * \param info: information type to retrieve.
+ * \param idx: buffer index (if applicable).
+ * \param out: pointer to return information to.
+ * \param out_sz: size of out buffer.
+ */
+void xrp_buffer_group_get_info(struct xrp_buffer_group *group,
+			       enum xrp_buffer_group_info info, size_t idx,
+			       void *out, size_t out_sz,
+			       enum xrp_status *status);
 
 
 /*

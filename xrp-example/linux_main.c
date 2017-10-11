@@ -236,6 +236,7 @@ static void f3(int devid)
 	assert(status == XRP_STATUS_SUCCESS);
 }
 
+/* Test xrp_set_buffer_in_group */
 static void f4(int devid)
 {
 	enum xrp_status status = -1;
@@ -294,6 +295,77 @@ static void f4(int devid)
 	assert(status == XRP_STATUS_SUCCESS);
 }
 
+/* Test xrp_buffer[_group]_get_info */
+static void f5(int devid)
+{
+	enum xrp_status status = -1;
+	struct xrp_device *device;
+	struct xrp_queue *queue;
+	struct xrp_buffer_group *group;
+	struct xrp_buffer *buf1;
+	struct xrp_buffer *buf2;
+	size_t i;
+	size_t sz;
+	void *ptr;
+	enum xrp_access_flags flags;
+
+	device = xrp_open_device(devid, &status);
+	assert(status == XRP_STATUS_SUCCESS);
+	status = -1;
+	queue = xrp_create_queue(device, &status);
+	assert(status == XRP_STATUS_SUCCESS);
+	status = -1;
+	group = xrp_create_buffer_group(&status);
+	assert(status == XRP_STATUS_SUCCESS);
+	status = -1;
+	buf1 = xrp_create_buffer(device, 1, NULL, &status);
+	assert(status == XRP_STATUS_SUCCESS);
+	status = -1;
+	buf2 = xrp_create_buffer(device, sizeof(i), &i, &status);
+	assert(status == XRP_STATUS_SUCCESS);
+	status = -1;
+	i = xrp_add_buffer_to_group(group, buf1, XRP_READ, &status);
+	assert(status == XRP_STATUS_SUCCESS);
+	status = -1;
+
+	xrp_buffer_get_info(buf1, XRP_BUFFER_SIZE_SIZE_T,
+			    &sz, sizeof(sz), &status);
+	assert(status == XRP_STATUS_SUCCESS);
+	status = -1;
+	assert(sz == 1);
+	xrp_buffer_get_info(buf1, XRP_BUFFER_HOST_POINTER_PTR,
+			    &ptr, sizeof(ptr), &status);
+	assert(status == XRP_STATUS_SUCCESS);
+	status = -1;
+	assert(ptr == NULL);
+	xrp_buffer_get_info(buf2, XRP_BUFFER_HOST_POINTER_PTR,
+			    &ptr, sizeof(ptr), &status);
+	assert(status == XRP_STATUS_SUCCESS);
+	status = -1;
+	assert(ptr == &i);
+
+	xrp_buffer_group_get_info(group, XRP_BUFFER_GROUP_BUFFER_FLAGS_ENUM, i,
+				  &flags, sizeof(flags), &status);
+	assert(status == XRP_STATUS_SUCCESS);
+	status = -1;
+	assert(flags == XRP_READ);
+
+	xrp_release_buffer(buf1, &status);
+	assert(status == XRP_STATUS_SUCCESS);
+	status = -1;
+	xrp_release_buffer(buf2, &status);
+	assert(status == XRP_STATUS_SUCCESS);
+	status = -1;
+	xrp_release_buffer_group(group, &status);
+	assert(status == XRP_STATUS_SUCCESS);
+	status = -1;
+	xrp_release_queue(queue, &status);
+	assert(status == XRP_STATUS_SUCCESS);
+	status = -1;
+	xrp_release_device(device, &status);
+	assert(status == XRP_STATUS_SUCCESS);
+}
+
 int main(int argc, char **argv)
 {
 	int devid = 0;
@@ -307,5 +379,7 @@ int main(int argc, char **argv)
 	f3(devid);
 	printf("=======================================================\n");
 	f4(devid);
+	printf("=======================================================\n");
+	f5(devid);
 	return 0;
 }
