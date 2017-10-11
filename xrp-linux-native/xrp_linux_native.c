@@ -103,6 +103,7 @@ struct xrp_queue {
 		struct xrp_request *tail;
 	} request_queue;
 	int exit;
+	int *sync_exit;
 };
 
 struct xrp_event {
@@ -558,12 +559,14 @@ void xrp_release_queue(struct xrp_queue *queue, enum xrp_status *status)
 	if (last_refcount(queue)) {
 		enum xrp_status s;
 
-
 		pthread_mutex_lock(&queue->request_queue_mutex);
 		queue->exit = 1;
 		pthread_cond_broadcast(&queue->request_queue_cond);
 		pthread_mutex_unlock(&queue->request_queue_mutex);
-		pthread_join(queue->thread, NULL);
+		if (pthread_join(queue->thread, NULL) != 0) {
+			*queue->sync_exit = 1;
+			pthread_detach(queue->thread);
+		}
 		pthread_mutex_lock(&queue->request_queue_mutex);
 		if (queue->request_queue.head != NULL)
 			printf("%s: releasing non-empty queue\n", __func__);
@@ -661,13 +664,13 @@ static int xrp_queue_process(struct xrp_queue *queue)
 {
 	struct xrp_request *rq;
 	enum xrp_status status;
-	int exit;
+	int exit = 0;
 
+	queue->sync_exit = &exit;
 	pthread_mutex_lock(&queue->request_queue_mutex);
 	for (;;) {
 		rq = _xrp_dequeue_request(queue);
-		exit = queue->exit;
-		if (rq || exit)
+		if (rq || queue->exit)
 			break;
 		pthread_cond_wait(&queue->request_queue_cond,
 				  &queue->request_queue_mutex);
@@ -696,7 +699,7 @@ static int xrp_queue_process(struct xrp_queue *queue)
 	}
 	free(rq->in_data);
 	free(rq);
-	return 1;
+	return !exit;
 }
 
 

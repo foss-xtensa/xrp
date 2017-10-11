@@ -130,6 +130,7 @@ struct xrp_device {
 		struct xrp_request *tail;
 	} request_queue;
 	int exit;
+	int *sync_exit;
 };
 
 struct xrp_buffer {
@@ -656,7 +657,10 @@ void xrp_release_device(struct xrp_device *device, enum xrp_status *status)
 		device->exit = 1;
 		pthread_cond_broadcast(&device->request_queue_cond);
 		pthread_mutex_unlock(&device->request_queue_mutex);
-		pthread_join(device->thread, NULL);
+		if (pthread_join(device->thread, NULL) != 0) {
+			*device->sync_exit = 1;
+			pthread_detach(device->thread);
+		}
 		pthread_mutex_lock(&device->request_queue_mutex);
 		if (device->request_queue.head != NULL)
 			printf("%s: releasing a device with non-empty queue\n",
@@ -1077,7 +1081,9 @@ static int xrp_queue_process(struct xrp_device *device)
 	struct xrp_dsp_cmd *dsp_cmd = device->description->comm_ptr;
 	struct xrp_request *rq;
 	size_t i;
+	int exit = 0;
 
+	device->sync_exit = &exit;
 	pthread_mutex_lock(&device->request_queue_mutex);
 	for (;;) {
 		rq = _xrp_dequeue_request(device);
@@ -1152,7 +1158,7 @@ static int xrp_queue_process(struct xrp_device *device)
 	}
 	free(rq->user_buffer_allocation);
 	free(rq);
-	return 1;
+	return !exit;
 }
 
 void xrp_enqueue_command(struct xrp_queue *queue,
