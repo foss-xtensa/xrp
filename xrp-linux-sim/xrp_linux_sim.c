@@ -129,6 +129,7 @@ struct xrp_device {
 		struct xrp_request *head;
 		struct xrp_request *tail;
 	} request_queue;
+	int exit;
 };
 
 struct xrp_buffer {
@@ -601,14 +602,14 @@ static void initialize(void)
 
 /* Device API. */
 
-static void xrp_queue_process(struct xrp_device *device);
+static int xrp_queue_process(struct xrp_device *device);
 
 static void *xrp_device_thread(void *p)
 {
 	struct xrp_device *device = p;
 
-	for (;;)
-		xrp_queue_process(device);
+	while (xrp_queue_process(device)) {
+	}
 
 	return NULL;
 }
@@ -651,7 +652,10 @@ void xrp_retain_device(struct xrp_device *device, enum xrp_status *status)
 void xrp_release_device(struct xrp_device *device, enum xrp_status *status)
 {
 	if (last_refcount(device)) {
-		pthread_cancel(device->thread);
+		pthread_mutex_lock(&device->request_queue_mutex);
+		device->exit = 1;
+		pthread_cond_broadcast(&device->request_queue_cond);
+		pthread_mutex_unlock(&device->request_queue_mutex);
 		pthread_join(device->thread, NULL);
 		pthread_mutex_lock(&device->request_queue_mutex);
 		if (device->request_queue.head != NULL)
@@ -1068,31 +1072,24 @@ static struct xrp_request *_xrp_dequeue_request(struct xrp_device *device)
 	return rq;
 }
 
-static void xrp_queue_cleanup(void *p)
-{
-	struct xrp_device *device = p;
-	pthread_mutex_unlock(&device->request_queue_mutex);
-}
-
-static void xrp_queue_process(struct xrp_device *device)
+static int xrp_queue_process(struct xrp_device *device)
 {
 	struct xrp_dsp_cmd *dsp_cmd = device->description->comm_ptr;
 	struct xrp_request *rq;
 	size_t i;
-	int old_state;
 
 	pthread_mutex_lock(&device->request_queue_mutex);
-	pthread_cleanup_push(xrp_queue_cleanup, device);
-	pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, &old_state);
 	for (;;) {
 		rq = _xrp_dequeue_request(device);
-		if (rq)
+		if (rq || device->exit)
 			break;
 		pthread_cond_wait(&device->request_queue_cond,
 				  &device->request_queue_mutex);
 	}
-	pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, NULL);
-	pthread_cleanup_pop(1);
+	pthread_mutex_unlock(&device->request_queue_mutex);
+
+	if (!rq)
+		return 0;
 
 	pthread_mutex_lock(&device->description->hw_mutex);
 	memcpy(dsp_cmd, &rq->dsp_cmd, sizeof(rq->dsp_cmd));
@@ -1155,7 +1152,7 @@ static void xrp_queue_process(struct xrp_device *device)
 	}
 	free(rq->user_buffer_allocation);
 	free(rq);
-	pthread_setcancelstate(old_state, NULL);
+	return 1;
 }
 
 void xrp_enqueue_command(struct xrp_queue *queue,
