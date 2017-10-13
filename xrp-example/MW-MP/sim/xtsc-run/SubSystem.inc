@@ -114,6 +114,7 @@
 --set_memory_parm=page_byte_size=134217728
 --set_memory_parm=host_shared_memory=true
 --set_memory_parm=shared_memory_name=$(SHARED_RAM_L_NAME)
+--set_memory_parm=deny_fast_access=0xf0000000,0xf0000fff,0xf4000000,0xf4000fff
 --create_memory=SharedRAM_L
 
 // Create SystemROM_L
