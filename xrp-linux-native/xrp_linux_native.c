@@ -94,6 +94,8 @@ struct xrp_request {
 struct xrp_queue {
 	struct xrp_refcounted ref;
 	struct xrp_device *device;
+	int use_nsid;
+	char nsid[XRP_NAMESPACE_ID_SIZE];
 
 	pthread_t thread;
 	pthread_mutex_t request_queue_mutex;
@@ -518,6 +520,13 @@ static void *xrp_queue_thread(void *p)
 struct xrp_queue *xrp_create_queue(struct xrp_device *device,
 				   enum xrp_status *status)
 {
+	return xrp_create_ns_queue(device, NULL, status);
+}
+
+struct xrp_queue *xrp_create_ns_queue(struct xrp_device *device,
+				      const void *nsid,
+				      enum xrp_status *status)
+{
 	struct xrp_queue *queue;
 	enum xrp_status s;
 
@@ -540,6 +549,10 @@ struct xrp_queue *xrp_create_queue(struct xrp_device *device,
 		return NULL;
 	}
 	queue->device = device;
+	if (nsid) {
+		queue->use_nsid = 1;
+		memcpy(queue->nsid, nsid, XRP_NAMESPACE_ID_SIZE);
+	}
 
 	pthread_mutex_init(&queue->request_queue_mutex, NULL);
 	pthread_cond_init(&queue->request_queue_cond, NULL);
@@ -624,6 +637,7 @@ static void _xrp_run_command(struct xrp_queue *queue,
 		size_t n_buffers = buffer_group ? buffer_group->n_buffers : 0;
 		struct xrp_ioctl_buffer ioctl_buffer[n_buffers];/* TODO */
 		struct xrp_ioctl_queue ioctl_queue = {
+			.flags = (queue->use_nsid ? XRP_QUEUE_FLAG_NSID : 0),
 			.in_data_size = in_data_size,
 			.out_data_size = out_data_size,
 			.buffer_size = n_buffers *
@@ -631,6 +645,7 @@ static void _xrp_run_command(struct xrp_queue *queue,
 			.in_data_addr = (uintptr_t)in_data,
 			.out_data_addr = (uintptr_t)out_data,
 			.buffer_addr = (uintptr_t)ioctl_buffer,
+			.nsid_addr = (uintptr_t)queue->nsid,
 		};
 		size_t i;
 
