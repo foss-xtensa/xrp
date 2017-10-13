@@ -163,6 +163,8 @@ struct xrp_buffer_group {
 struct xrp_queue {
 	struct xrp_refcounted ref;
 	struct xrp_device *device;
+	int use_nsid;
+	char nsid[XRP_NAMESPACE_ID_SIZE];
 };
 
 struct xrp_event {
@@ -950,6 +952,13 @@ out:
 struct xrp_queue *xrp_create_queue(struct xrp_device *device,
 				   enum xrp_status *status)
 {
+	return xrp_create_ns_queue(device, NULL, status);
+}
+
+struct xrp_queue *xrp_create_ns_queue(struct xrp_device *device,
+				      const void *nsid,
+				      enum xrp_status *status)
+{
 	struct xrp_queue *queue;
 	enum xrp_status s;
 
@@ -972,6 +981,10 @@ struct xrp_queue *xrp_create_queue(struct xrp_device *device,
 		return NULL;
 	}
 	queue->device = device;
+	if (nsid) {
+		queue->use_nsid = 1;
+		memcpy(queue->nsid, nsid, XRP_NAMESPACE_ID_SIZE);
+	}
 	set_status(status, XRP_STATUS_SUCCESS);
 
 	return queue;
@@ -1100,12 +1113,15 @@ static int xrp_queue_process(struct xrp_device *device)
 	pthread_mutex_lock(&device->description->hw_mutex);
 	memcpy(dsp_cmd, &rq->dsp_cmd, sizeof(rq->dsp_cmd));
 	barrier();
-	xrp_comm_write32(&dsp_cmd->flags, XRP_DSP_CMD_FLAG_REQUEST_VALID);
+	xrp_comm_write32(&dsp_cmd->flags,
+			 rq->dsp_cmd.flags | XRP_DSP_CMD_FLAG_REQUEST_VALID);
 	barrier();
 	xrp_send_device_irq(device->description);
 	do {
 		barrier();
-	} while (xrp_comm_read32(&dsp_cmd->flags) !=
+	} while ((xrp_comm_read32(&dsp_cmd->flags) &
+		  (XRP_DSP_CMD_FLAG_REQUEST_VALID |
+		   XRP_DSP_CMD_FLAG_RESPONSE_VALID)) !=
 		 (XRP_DSP_CMD_FLAG_REQUEST_VALID |
 		  XRP_DSP_CMD_FLAG_RESPONSE_VALID));
 
@@ -1151,7 +1167,10 @@ static int xrp_queue_process(struct xrp_device *device)
 	if (rq->event) {
 		struct xrp_event *event = rq->event;
 		pthread_mutex_lock(&event->mutex);
-		event->status = XRP_STATUS_SUCCESS;
+		if (rq->dsp_cmd.flags & XRP_DSP_CMD_FLAG_RESPONSE_DELIVERY_FAIL)
+			event->status = XRP_STATUS_FAILURE;
+		else
+			event->status = XRP_STATUS_SUCCESS;
 		pthread_cond_broadcast(&event->cond);
 		pthread_mutex_unlock(&event->mutex);
 		xrp_release_event(event, NULL);
@@ -1290,7 +1309,10 @@ void xrp_enqueue_command(struct xrp_queue *queue,
 		xrp_retain_event(event, NULL);
 		rq->event = event;
 	}
-	dsp_cmd->flags = 0;
+	dsp_cmd->flags = (queue->use_nsid ? XRP_DSP_CMD_FLAG_REQUEST_NSID : 0);
+	if (queue->use_nsid) {
+		memcpy(dsp_cmd->nsid, queue->nsid, sizeof(dsp_cmd->nsid));
+	}
 	xrp_enqueue_request(device, rq);
 	set_status(status, XRP_STATUS_SUCCESS);
 }
