@@ -26,9 +26,14 @@ XRP API uses the following terms:
 - device: single Xtensa DSP core. Devices are numbered sequentially from 0
           to N - 1. There's an API call that opens device by its number.
 
-- queue: a communication stream between an application and a device. Commands
-         queued into one queue are processed in order and there's no ordering
-         between commands in different queues.
+- namespace: an independent command handler on the DSP side identified by an
+             UUID. Multiple namespaces may be active on the DSP side
+             simultaneously. Namespace may be registered and deregistered
+             dynamically.
+
+- queue: a communication stream between an application and a namespace on a
+         device. Commands queued into one queue are processed in order and
+         there's no ordering between commands in different queues.
 
 - buffer: a descriptor for a contiguous piece of memory. A buffer must be
           mapped before its memory is accessible. A buffer must be unmapped
@@ -305,43 +310,37 @@ Fast simulation mode:
 Operation.
 =========
 
-XRP DSP library implements the main function. When it starts it calls optional
-user initialization function, synchronizes with the host and then runs command
-handling loop. During synchronization process host communicates whether host
+DSP payload implements the main function. To start using XRP it must open the
+XRP device. After that it may register handlers for one or more namespaces and
+start processing incoming XRP messages with xrp_device_dispatch function. It
+may call xrp_device_poll to check for incoming messages and
+xrp_hw_wait_device_irq to go into waiti state when there's no more work to do.
+
+The very first message sequence that host XRP sends to the DSP is for
+synchronization. During synchronization process host communicates whether host
 and DSP use IRQ and IRQ numbers/MMIO register locations. Then host and DSP
 exchange IRQs in directions where IRQs are used.
 
-DSP payload may use XRP as a framework or as a library. Regardless of the mode
-DSP payload must provide the following function:
-- void xrp_run_command(const void *in_data, size_t in_data_size,
-                       void *out_data, size_t out_data_size,
-                       struct xrp_buffer_group *buffer_group,
-                       enum xrp_status *status);
-  It is called from the main loop whenever a command is received. The function
-  takes command description from the in_data buffer and associated buffer group
-  from the buffer_group. It writes command processing results to the out_data
-  buffer and to the relevant buffers of the buffer group. The function may not
-  retain pointers to any buffers passed to it for later use and must release
-  all references to buffers and buffer group it could have made before
-  returning. Status shall reflect whether the command was recognized and
-  processed or not. IOW XRP_STATUS_SUCCESS should be returned in status if
-  out_data is filled in, otherwise there should be XRP_STATUS_FAILURE.
+Namespace handlers registered by the DSP are the functions with the following
+prototype:
+  enum xrp_status xrp_command_handler(void *handler_context,
+                                      const void *in_data, size_t in_data_size,
+                                      void *out_data, size_t out_data_size,
+                                      struct xrp_buffer_group *buffer_group);
 
-In framework mode XRP implements the main function and command processing loop,
-DSP payload may provide the following additional function that XRP DSP
-framework will call:
-- void xrp_user_initialize(enum xrp_status *status);
-  When this function is provided the XRP DSP library calls it once before
-  synchronization with the host and entering the main loop. Set status to
-  XRP_STATUS_SUCCESS before returning from that function if it's OK to
-  continue. Setting status to any other value will cause immediate exit from
-  the main function returning that status.
-
-In library mode the DSP payload implements the main function and it needs to
-initialize XRP device for the current DSP and call xrp_device_dispatch to
-process incoming messages. It may call xrp_device_poll to check for incoming
-messages and xrp_hw_wait_device_irq to go into waiti state when there's no
-more work to do.
+It is called from the xrp_device_dispatch function whenever a command for the
+corresponding namespace is received. The function takes command description
+from the in_data buffer and associated buffer group from the buffer_group. It
+writes command processing results to the out_data buffer and to the relevant
+buffers of the buffer group. The function may not retain pointers to any
+buffers passed to it for later use and must release all references to buffers
+and buffer group it could have made before returning. Return value shall
+reflect whether the command was recognized and processed or not. IOW
+XRP_STATUS_SUCCESS should be returned in status if out_data is filled in,
+otherwise there should be XRP_STATUS_FAILURE. This return value is then
+returned from the xrp_device_dispatch. In case it was XRP_STATUS_FAILURE
+the host also gets XRP_STATUS_FAILURE for the command. handler_context is a
+pointer that was passed to the namespace handler registration function.
 
 Linux application that uses XRP starts with opening XRP devices with
 xrp_open_device function. XRP devices may have different capabilities and run

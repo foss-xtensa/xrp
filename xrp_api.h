@@ -58,6 +58,8 @@ enum xrp_buffer_group_info {
 	XRP_BUFFER_GROUP_BUFFER_FLAGS_ENUM,
 };
 
+#define XRP_NAMESPACE_ID_SIZE	16
+
 /*
  * General notes:
  * - all status pointers can be NULL;
@@ -225,11 +227,21 @@ void xrp_buffer_group_get_info(struct xrp_buffer_group *group,
  */
 
 /*
+ * Create queue to the default namespace of the device.
  * Queue is an ordered device communication channel. Queue is reference
  * counted and is created with reference count of 1.
  */
 struct xrp_queue *xrp_create_queue(struct xrp_device *device,
 				   enum xrp_status *status);
+
+/*
+ * Create queue to the specified namespace of the device.
+ * Queue is an ordered device communication channel. Queue is reference
+ * counted and is created with reference count of 1.
+ */
+struct xrp_queue *xrp_create_ns_queue(struct xrp_device *device,
+				      const void *nsid,
+				      enum xrp_status *status);
 
 /*
  * Increment queue reference count.
@@ -374,6 +386,67 @@ enum xrp_status xrp_device_poll(struct xrp_device *device);
  * the command handler.
  */
 enum xrp_status xrp_device_dispatch(struct xrp_device *device);
+
+/*
+ * Function type for command handler.
+ *
+ * This callback is called on the DSP side to process queued command.
+ * in_data, out_data and buffer_group correspond to the same parameters of the
+ * host side API calls.
+ *
+ * On return from this function buffer group and individual buffer reference
+ * counters shall be restored to their entry values. out_data buffer shall be
+ * updated with command return value.
+ * Neither in_data nor out_data may be referenced after this function returns.
+ *
+ * Return value shall describe whether xrp_command_handler itself was
+ * successful or not, not the command it was requested to run.
+ * I.e. if the command was not recognized or its handler could not be called
+ * due to insufficient memory, that's XRP_STATUS_FAILURE returned in status.
+ * The host will also receive XRP_STATUS_FAILURE as a completion status.
+ * If the command was run that's XRP_STATUS_SUCCESS regardless of the
+ * command-specific status, which should be returned in out_data.
+ *
+ * \param handler_context: context that was passed to the
+ *                         xrp_device_register_namespace
+ */
+typedef enum xrp_status
+(xrp_command_handler)(void *handler_context,
+		      const void *in_data, size_t in_data_size,
+		      void *out_data, size_t out_data_size,
+		      struct xrp_buffer_group *buffer_group);
+
+/*
+ * Register namespace handler.
+ *
+ * There may be only one handler for a namespace, second attempt to register
+ * a handler for the same namespace will fail.
+ *
+ * \param device: device for which namespace handler is registered
+ * \param nsid: namespace identifier, XRP_NAMESPACE_ID_SIZE bytes long
+ * \param handler: pointer to the handler function
+ * \param handler_context: first argument that will be passed to the handler
+ *                         function
+ * \param status: status of the registration operation
+ */
+void xrp_device_register_namespace(struct xrp_device *device,
+				   const void *nsid,
+				   xrp_command_handler *handler,
+				   void *handler_context,
+				   enum xrp_status *status);
+
+/*
+ * Unregister namespace handler.
+ *
+ * Only registered namespace handler may be unregistered.
+ *
+ * \param device: device for which namespace handler is registered
+ * \param nsid: namespace identifier, XRP_NAMESPACE_ID_SIZE bytes long
+ * \param status: status of the unregistration operation
+ */
+void xrp_device_unregister_namespace(struct xrp_device *device,
+				     const void *nsid,
+				     enum xrp_status *status);
 
 
 /* Legacy DSP-specific interface (framework-style) */
