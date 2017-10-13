@@ -29,6 +29,7 @@
 #include <xtensa/xtruntime.h>
 #include "xrp_api.h"
 #include "xrp_dsp_hw.h"
+#include "example_namespace.h"
 
 static void hang(void) __attribute__((noreturn));
 static void hang(void)
@@ -88,14 +89,15 @@ static void register_exception_handlers(void)
 	}
 }
 
-void xrp_run_command(const void *in_data, size_t in_data_size,
-		     void *out_data, size_t out_data_size,
-		     struct xrp_buffer_group *buffer_group,
-		     enum xrp_status *status)
+static enum xrp_status example_v1_handler(void *handler_context,
+					  const void *in_data, size_t in_data_size,
+					  void *out_data, size_t out_data_size,
+					  struct xrp_buffer_group *buffer_group)
 {
 	size_t i;
 	uint32_t sz = 0;
 
+	(void)handler_context;
 	printf("%s, in_data_size = %zu, out_data_size = %zu\n",
 	       __func__, in_data_size, out_data_size);
 
@@ -133,8 +135,7 @@ void xrp_run_command(const void *in_data, size_t in_data_size,
 		xrp_release_buffer(sbuf, NULL);
 		xrp_release_buffer(dbuf, NULL);
 	}
-	if (status != NULL)
-		*status = XRP_STATUS_SUCCESS;
+	return XRP_STATUS_SUCCESS;
 }
 
 int main(void)
@@ -146,6 +147,12 @@ int main(void)
 	device = xrp_open_device(0, &status);
 	if (status != XRP_STATUS_SUCCESS) {
 		printf("xrp_open_device failed\n");
+		return 1;
+	}
+	xrp_device_register_namespace(device, XRP_EXAMPLE_V1_NSID,
+				      example_v1_handler, NULL, &status);
+	if (status != XRP_STATUS_SUCCESS) {
+		printf("xrp_register_namespace failed\n");
 		return 1;
 	}
 	for (;;) {

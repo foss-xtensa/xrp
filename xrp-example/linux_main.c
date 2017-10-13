@@ -27,6 +27,7 @@
 #include <string.h>
 #include <malloc.h>
 #include "xrp_api.h"
+#include "example_namespace.h"
 
 /* Test data transfer from and to in/out buffers */
 static void f1(int devid)
@@ -41,7 +42,7 @@ static void f1(int devid)
 	device = xrp_open_device(devid, &status);
 	assert(status == XRP_STATUS_SUCCESS);
 	status = -1;
-	queue = xrp_create_queue(device, &status);
+	queue = xrp_create_ns_queue(device, XRP_EXAMPLE_V1_NSID, &status);
 	assert(status == XRP_STATUS_SUCCESS);
 	status = -1;
 
@@ -82,7 +83,7 @@ static void f2(int devid)
 	assert(status == XRP_STATUS_SUCCESS);
 	status = -1;
 
-	queue = xrp_create_queue(device, &status);
+	queue = xrp_create_ns_queue(device, XRP_EXAMPLE_V1_NSID, &status);
 	assert(status == XRP_STATUS_SUCCESS);
 	status = -1;
 
@@ -155,7 +156,7 @@ static void f3(int devid)
 	device = xrp_open_device(devid, &status);
 	assert(status == XRP_STATUS_SUCCESS);
 	status = -1;
-	queue = xrp_create_queue(device, &status);
+	queue = xrp_create_ns_queue(device, XRP_EXAMPLE_V1_NSID, &status);
 	assert(status == XRP_STATUS_SUCCESS);
 	status = -1;
 
@@ -251,7 +252,7 @@ static void f4(int devid)
 	device = xrp_open_device(devid, &status);
 	assert(status == XRP_STATUS_SUCCESS);
 	status = -1;
-	queue = xrp_create_queue(device, &status);
+	queue = xrp_create_ns_queue(device, XRP_EXAMPLE_V1_NSID, &status);
 	assert(status == XRP_STATUS_SUCCESS);
 	status = -1;
 	group = xrp_create_buffer_group(&status);
@@ -312,7 +313,7 @@ static void f5(int devid)
 	device = xrp_open_device(devid, &status);
 	assert(status == XRP_STATUS_SUCCESS);
 	status = -1;
-	queue = xrp_create_queue(device, &status);
+	queue = xrp_create_ns_queue(device, XRP_EXAMPLE_V1_NSID, &status);
 	assert(status == XRP_STATUS_SUCCESS);
 	status = -1;
 	group = xrp_create_buffer_group(&status);
