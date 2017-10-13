@@ -65,10 +65,13 @@ struct xrp_dsp_buffer {
 enum {
 	XRP_DSP_CMD_FLAG_REQUEST_VALID = 0x00000001,
 	XRP_DSP_CMD_FLAG_RESPONSE_VALID = 0x00000002,
+	XRP_DSP_CMD_FLAG_REQUEST_NSID = 0x00000004,
+	XRP_DSP_CMD_FLAG_RESPONSE_DELIVERY_FAIL = 0x00000008,
 };
 
 #define XRP_DSP_CMD_INLINE_DATA_SIZE 16
 #define XRP_DSP_CMD_INLINE_BUFFER_COUNT 1
+#define XRP_DSP_CMD_NAMESPACE_ID_SIZE 16
 
 struct xrp_dsp_cmd {
 	__u32 flags;
@@ -88,6 +91,7 @@ struct xrp_dsp_cmd {
 		struct xrp_dsp_buffer buffer_data[XRP_DSP_CMD_INLINE_BUFFER_COUNT];
 		__u8 buffer_alignment[XRP_DSP_CMD_INLINE_DATA_SIZE];
 	};
+	__u8 nsid[XRP_DSP_CMD_NAMESPACE_ID_SIZE];
 };
 
 #endif
