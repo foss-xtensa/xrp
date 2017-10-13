@@ -23,6 +23,7 @@
 
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <xtensa/tie/xt_sync.h>
 #include <xtensa/xtruntime.h>
@@ -55,9 +56,18 @@ struct xrp_refcounted {
 	unsigned long count;
 };
 
+struct xrp_cmd_ns {
+	uint8_t id[XRP_NAMESPACE_ID_SIZE];
+	xrp_command_handler *handler;
+	void *handler_context;
+};
+
 struct xrp_device {
 	struct xrp_refcounted ref;
 	void *dsp_cmd;
+	size_t n_cmd_ns;
+	size_t size_cmd_ns;
+	struct xrp_cmd_ns *cmd_ns;
 };
 
 struct xrp_buffer {
@@ -134,6 +144,133 @@ void xrp_retain_device(struct xrp_device *device, enum xrp_status *status)
 void xrp_release_device(struct xrp_device *device, enum xrp_status *status)
 {
 	set_status(status, release_refcounted(&device->ref));
+}
+
+static int compare_cmd_ns(const void *nsid, struct xrp_cmd_ns *cmd_ns)
+{
+	return memcmp(nsid, cmd_ns->id, sizeof(cmd_ns->id));
+}
+
+static int cmd_ns_match(const void *nsid, struct xrp_cmd_ns *cmd_ns)
+{
+	return cmd_ns && compare_cmd_ns(nsid, cmd_ns) == 0;
+}
+
+#ifdef DEBUG
+static void dump_nsid(const void *p)
+{
+	const uint8_t *id = p;
+
+	printf("%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x",
+	       id[0], id[1], id[2], id[3],
+	       id[4], id[5],
+	       id[6], id[7],
+	       id[8], id[9],
+	       id[10], id[11], id[12], id[13], id[14], id[15]);
+}
+
+static void dump_cmd_ns(const struct xrp_cmd_ns *cmd_ns)
+{
+	dump_nsid(cmd_ns->id);
+	printf(" -> %p(%p)", cmd_ns->handler, cmd_ns->handler_context);
+}
+
+static void dump_cmd_ns_map(const struct xrp_device *device)
+{
+	size_t i;
+
+	printf("n_cmd_ns: %zu, size_cmd_ns: %zu\n",
+	       device->n_cmd_ns, device->size_cmd_ns);
+	for (i = 0; i < device->n_cmd_ns; ++i) {
+		printf("  ");
+		dump_cmd_ns(device->cmd_ns + i);
+		printf("\n");
+	}
+}
+#else
+static void dump_nsid(const void *p)
+{
+	(void)p;
+}
+
+static void dump_cmd_ns(const struct xrp_cmd_ns *cmd_ns)
+{
+	(void)cmd_ns;
+}
+
+static void dump_cmd_ns_map(const struct xrp_device *device)
+{
+	(void)device;
+}
+#endif
+
+static struct xrp_cmd_ns *find_cmd_ns(struct xrp_device *device,
+				      const void *id)
+{
+	size_t a = 0;
+	size_t b = device->n_cmd_ns;
+	struct xrp_cmd_ns *p;
+
+	pr_debug("%s: ", __func__);
+	dump_nsid(id);
+	pr_debug("\n");
+	while (b - a > 1) {
+		size_t c = (a + b) / 2;
+
+		pr_debug("a: %zu, b:%zu, c: %zu\n", a, b, c);
+		p = device->cmd_ns + c;
+		if (compare_cmd_ns(id, p) < 0)
+			b = c;
+		else
+			a = c;
+		pr_debug("...a: %zu, b:%zu\n", a, b);
+	}
+	p = device->cmd_ns + a;
+	if (a < b && compare_cmd_ns(id, p) > 0)
+		++p;
+	pr_debug("%s: found: ", __func__);
+	dump_cmd_ns(p);
+	pr_debug("\n");
+
+	return p;
+}
+
+static int cmd_ns_present(struct xrp_device *device, struct xrp_cmd_ns *cmd_ns)
+{
+	return cmd_ns >= device->cmd_ns &&
+		cmd_ns < device->cmd_ns + device->n_cmd_ns;
+}
+
+static struct xrp_cmd_ns *insert_cmd_ns(struct xrp_device *device,
+					struct xrp_cmd_ns *cmd_ns)
+{
+	size_t i = cmd_ns - device->cmd_ns;
+
+	if (device->n_cmd_ns == device->size_cmd_ns) {
+		size_t new_size = (device->size_cmd_ns + 1) * 2;
+		void *new_cmd_ns = realloc(device->cmd_ns,
+					   new_size * sizeof(*device->cmd_ns));
+
+		if (!new_cmd_ns)
+			return NULL;
+		device->cmd_ns = new_cmd_ns;
+		device->size_cmd_ns = new_size;
+		cmd_ns = device->cmd_ns + i;
+	}
+	memmove(cmd_ns + 1, cmd_ns,
+		sizeof(*cmd_ns) * (device->n_cmd_ns - i));
+	++device->n_cmd_ns;
+	return cmd_ns;
+}
+
+static void remove_cmd_ns(struct xrp_device *device,
+			  struct xrp_cmd_ns *cmd_ns)
+{
+	size_t i = cmd_ns - device->cmd_ns;
+
+	memmove(cmd_ns, cmd_ns + 1,
+		sizeof(*cmd_ns) * (device->n_cmd_ns - i - 1));
+	--device->n_cmd_ns;
 }
 
 struct xrp_buffer *xrp_create_buffer(struct xrp_device *device,
@@ -339,9 +476,9 @@ static inline int xrp_request_valid(struct xrp_dsp_cmd *dsp_cmd,
 
 }
 
-static void complete_request(struct xrp_dsp_cmd *dsp_cmd)
+static void complete_request(struct xrp_dsp_cmd *dsp_cmd, uint32_t flags)
 {
-	uint32_t flags = dsp_cmd->flags | XRP_DSP_CMD_FLAG_RESPONSE_VALID;
+	flags |= XRP_DSP_CMD_FLAG_RESPONSE_VALID;
 
 	dcache_region_writeback(dsp_cmd,
 				sizeof(*dsp_cmd));
@@ -357,7 +494,41 @@ static enum xrp_access_flags dsp_buffer_allowed_access(__u32 flags)
 		XRP_READ : XRP_READ_WRITE;
 }
 
-static enum xrp_status process_command(struct xrp_device *device)
+void xrp_run_command(const void *in_data, size_t in_data_size,
+		     void *out_data, size_t out_data_size,
+		     struct xrp_buffer_group *buffer_group,
+		     enum xrp_status *status) __attribute__((weak));
+
+void xrp_run_command(const void *in_data, size_t in_data_size,
+		     void *out_data, size_t out_data_size,
+		     struct xrp_buffer_group *buffer_group,
+		     enum xrp_status *status)
+{
+	(void)in_data;
+	(void)in_data_size;
+	(void)out_data;
+	(void)out_data_size;
+	(void)buffer_group;
+	*status = XRP_STATUS_FAILURE;
+}
+
+static inline enum xrp_status
+xrp_run_command_handler(void *handler_context,
+			const void *in_data, size_t in_data_size,
+			void *out_data, size_t out_data_size,
+			struct xrp_buffer_group *buffer_group)
+{
+	enum xrp_status status = XRP_STATUS_FAILURE;
+
+	(void)handler_context;
+	xrp_run_command(in_data, in_data_size,
+			out_data, out_data_size,
+			buffer_group, &status);
+	return status;
+}
+
+static enum xrp_status process_command(struct xrp_device *device,
+				       uint32_t flags)
 {
 	enum xrp_status status;
 	struct xrp_dsp_cmd *dsp_cmd = device->dsp_cmd;
@@ -365,7 +536,20 @@ static enum xrp_status process_command(struct xrp_device *device)
 	struct xrp_dsp_buffer *dsp_buffer;
 	struct xrp_buffer_group buffer_group;
 	struct xrp_buffer buffer[n_buffers]; /* TODO */
+	xrp_command_handler *command_handler = xrp_run_command_handler;
+	void *handler_context = NULL;
 	size_t i;
+
+	if (dsp_cmd->flags & XRP_DSP_CMD_FLAG_REQUEST_NSID) {
+		struct xrp_cmd_ns *cmd_ns = find_cmd_ns(device, dsp_cmd->nsid);
+		if (cmd_ns_match(dsp_cmd->nsid, cmd_ns)) {
+			command_handler = cmd_ns->handler;
+			handler_context = cmd_ns->handler_context;
+		} else {
+			flags |= XRP_DSP_CMD_FLAG_RESPONSE_DELIVERY_FAIL;
+			goto out;
+		}
+	}
 
 	if (n_buffers > XRP_DSP_CMD_INLINE_BUFFER_COUNT) {
 		dsp_buffer = (void *)dsp_cmd->buffer_addr;
@@ -405,14 +589,17 @@ static enum xrp_status process_command(struct xrp_device *device)
 		.buffer = buffer,
 	};
 
-	xrp_run_command(dsp_cmd->in_data_size > sizeof(dsp_cmd->in_data) ?
-			(void *)dsp_cmd->in_data_addr : dsp_cmd->in_data,
-			dsp_cmd->in_data_size,
-			dsp_cmd->out_data_size > sizeof(dsp_cmd->out_data) ?
-			(void *)dsp_cmd->out_data_addr : dsp_cmd->out_data,
-			dsp_cmd->out_data_size,
-			&buffer_group,
-			&status);
+	status = command_handler(handler_context,
+				 dsp_cmd->in_data_size > sizeof(dsp_cmd->in_data) ?
+				 (void *)dsp_cmd->in_data_addr : dsp_cmd->in_data,
+				 dsp_cmd->in_data_size,
+				 dsp_cmd->out_data_size > sizeof(dsp_cmd->out_data) ?
+				 (void *)dsp_cmd->out_data_addr : dsp_cmd->out_data,
+				 dsp_cmd->out_data_size,
+				 &buffer_group);
+
+	if (status != XRP_STATUS_SUCCESS)
+		flags |= XRP_DSP_CMD_FLAG_RESPONSE_DELIVERY_FAIL;
 
 	/*
 	 * update flags in the buffer data: what access actually took place,
@@ -453,8 +640,48 @@ static enum xrp_status process_command(struct xrp_device *device)
 		dcache_region_writeback(dsp_buffer,
 					n_buffers * sizeof(*dsp_buffer));
 	}
-	complete_request(dsp_cmd);
+out:
+	complete_request(dsp_cmd, flags);
 	return status;
+}
+
+void xrp_device_register_namespace(struct xrp_device *device,
+				   const void *nsid,
+				   xrp_command_handler *handler,
+				   void *handler_context,
+				   enum xrp_status *status)
+{
+	struct xrp_cmd_ns *cmd_ns = find_cmd_ns(device, nsid);
+
+	if (cmd_ns_present(device, cmd_ns) && cmd_ns_match(nsid, cmd_ns)) {
+		set_status(status, XRP_STATUS_FAILURE);
+	} else {
+		cmd_ns = insert_cmd_ns(device, cmd_ns);
+		if (cmd_ns) {
+			memcpy(cmd_ns->id, nsid, sizeof(cmd_ns->id));
+			cmd_ns->handler = handler;
+			cmd_ns->handler_context = handler_context;
+			dump_cmd_ns_map(device);
+			set_status(status, XRP_STATUS_SUCCESS);
+		} else {
+			set_status(status, XRP_STATUS_FAILURE);
+		}
+	}
+}
+
+void xrp_device_unregister_namespace(struct xrp_device *device,
+				     const void *nsid,
+				     enum xrp_status *status)
+{
+	struct xrp_cmd_ns *cmd_ns = find_cmd_ns(device, nsid);
+
+	if (cmd_ns_present(device, cmd_ns) && cmd_ns_match(nsid, cmd_ns)) {
+		remove_cmd_ns(device, cmd_ns);
+		dump_cmd_ns_map(device);
+		set_status(status, XRP_STATUS_SUCCESS);
+	} else {
+		set_status(status, XRP_STATUS_FAILURE);
+	}
 }
 
 enum xrp_status xrp_device_poll(struct xrp_device *device)
@@ -483,7 +710,7 @@ enum xrp_status xrp_device_dispatch(struct xrp_device *device)
 		do_handshake(device->dsp_cmd);
 		status = XRP_STATUS_SUCCESS;
 	} else {
-		status = process_command(device);
+		status = process_command(device, flags);
 	}
 	return status;
 }
