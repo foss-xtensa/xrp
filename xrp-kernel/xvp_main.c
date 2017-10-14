@@ -1212,20 +1212,15 @@ static long xrp_ioctl_submit_sync(struct file *filp,
 {
 	struct xvp_file *xvp_file = filp->private_data;
 	struct xvp *xvp = xvp_file->xvp;
-	struct xrp_request *rq = kzalloc(sizeof(*rq), GFP_KERNEL);
+	struct xrp_request xrp_rq, *rq = &xrp_rq;
 	long ret = 0;
-
-	if (!rq)
-		return -ENOMEM;
 
 	if (copy_from_user(&rq->ioctl_queue, p, sizeof(*p)))
 		return -EFAULT;
 
 	ret = xrp_map_request(filp, rq, current->mm);
-	if (ret < 0) {
-		kfree(rq);
+	if (ret < 0)
 		return ret;
-	}
 
 	if (loopback < LOOPBACK_NOIO) {
 		mutex_lock(&xvp->comm_lock);
@@ -1259,7 +1254,6 @@ static long xrp_ioctl_submit_sync(struct file *filp,
 		ret = xrp_unmap_request(filp, rq);
 	else
 		xrp_unmap_request_nowb(filp, rq);
-	kfree(rq);
 
 	return ret;
 }
