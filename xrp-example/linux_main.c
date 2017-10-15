@@ -395,6 +395,46 @@ static void f6(int devid)
 	assert(status == XRP_STATUS_SUCCESS);
 }
 
+/* Test command errors */
+static void f7(int devid)
+{
+	enum xrp_status status = -1;
+	struct xrp_device *device;
+	struct xrp_queue *queue;
+	struct example_v2_cmd cmd = {
+		.cmd = EXAMPLE_V2_CMD_OK,
+	};
+
+	device = xrp_open_device(devid, &status);
+	assert(status == XRP_STATUS_SUCCESS);
+	status = -1;
+	queue = xrp_create_ns_queue(device, XRP_EXAMPLE_V2_NSID, &status);
+	assert(status == XRP_STATUS_SUCCESS);
+	status = -1;
+
+	xrp_run_command_sync(queue,
+			     &cmd, sizeof(cmd),
+			     NULL, 0,
+			     NULL, &status);
+	assert(status == XRP_STATUS_SUCCESS);
+	status = -1;
+
+	cmd.cmd = EXAMPLE_V2_CMD_FAIL;
+
+	xrp_run_command_sync(queue,
+			     &cmd, sizeof(cmd),
+			     NULL, 0,
+			     NULL, &status);
+	assert(status == XRP_STATUS_FAILURE);
+	status = -1;
+
+	xrp_release_queue(queue, &status);
+	assert(status == XRP_STATUS_SUCCESS);
+	status = -1;
+	xrp_release_device(device, &status);
+	assert(status == XRP_STATUS_SUCCESS);
+}
+
 int main(int argc, char **argv)
 {
 	int devid = 0;
@@ -412,5 +452,7 @@ int main(int argc, char **argv)
 	f5(devid);
 	printf("=======================================================\n");
 	f6(devid);
+	printf("=======================================================\n");
+	f7(devid);
 	return 0;
 }

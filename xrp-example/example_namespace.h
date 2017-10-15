@@ -29,4 +29,21 @@
 	 0xb5, 0x86, 0x00, 0x21, 0xcc, 0x4a, 0x5f, 0xb6}
 #define XRP_EXAMPLE_V1_NSID (unsigned char [])XRP_EXAMPLE_V1_NSID_INITIALIZER
 
+#define XRP_EXAMPLE_V2_NSID_INITIALIZER \
+	{0x33, 0x56, 0xfc, 0x3c, 0x63, 0x27, 0x40, 0x96, \
+	 0x8a, 0x33, 0x1a, 0x5c, 0xca, 0x3b, 0xa1, 0x64}
+#define XRP_EXAMPLE_V2_NSID (unsigned char [])XRP_EXAMPLE_V2_NSID_INITIALIZER
+
+enum {
+	EXAMPLE_V2_CMD_OK,
+	EXAMPLE_V2_CMD_FAIL,
+};
+
+struct example_v2_cmd {
+	uint32_t cmd;
+};
+
+struct example_v2_rsp {
+};
+
 #endif

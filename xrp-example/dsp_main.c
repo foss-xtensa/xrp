@@ -153,6 +153,31 @@ static enum xrp_status example_v1_handler(void *handler_context,
 	return XRP_STATUS_SUCCESS;
 }
 
+static enum xrp_status example_v2_handler(void *handler_context,
+					  const void *in_data, size_t in_data_size,
+					  void *out_data, size_t out_data_size,
+					  struct xrp_buffer_group *buffer_group)
+{
+	const struct example_v2_cmd *cmd = in_data;
+
+	(void)handler_context;
+	(void)out_data;
+	(void)out_data_size;
+	(void)buffer_group;
+
+	if (in_data_size < sizeof(*cmd)) {
+		return XRP_STATUS_FAILURE;
+	}
+	switch (cmd->cmd) {
+	case EXAMPLE_V2_CMD_OK:
+		return XRP_STATUS_SUCCESS;
+	case EXAMPLE_V2_CMD_FAIL:
+		return XRP_STATUS_FAILURE;
+	default:
+		return XRP_STATUS_FAILURE;
+	}
+}
+
 static enum xrp_status test_ns(struct xrp_device *device)
 {
 	enum xrp_status status;
@@ -207,12 +232,16 @@ int main(void)
 		printf("xrp_register_namespace for XRP_EXAMPLE_V1_NSID failed\n");
 		return 1;
 	}
+	xrp_device_register_namespace(device, XRP_EXAMPLE_V2_NSID,
+				      example_v2_handler, NULL, &status);
+	if (status != XRP_STATUS_SUCCESS) {
+		printf("xrp_register_namespace for XRP_EXAMPLE_V2_NSID failed\n");
+		return 1;
+	}
 	for (;;) {
 		status = xrp_device_dispatch(device);
 		if (status == XRP_STATUS_PENDING)
 			xrp_hw_wait_device_irq();
-		else if (status != XRP_STATUS_SUCCESS)
-			return status;
 	}
 	return 0;
 }
