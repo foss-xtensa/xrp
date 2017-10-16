@@ -39,6 +39,7 @@ struct xrp_queue;
 struct xrp_buffer;
 struct xrp_buffer_group;
 struct xrp_event;
+struct xrp_module;
 
 enum xrp_status {
 	XRP_STATUS_SUCCESS,
@@ -56,6 +57,10 @@ enum xrp_buffer_info {
 };
 enum xrp_buffer_group_info {
 	XRP_BUFFER_GROUP_BUFFER_FLAGS_ENUM,
+};
+enum xrp_module_flags {
+	XRP_MODULE_GLOBAL,
+	XRP_MODULE_LOCAL,
 };
 
 #define XRP_NAMESPACE_ID_SIZE	16
@@ -366,6 +371,96 @@ void xrp_enqueue_command(struct xrp_queue *queue,
  * Use xrp_event_status to get the command execution status.
  */
 void xrp_wait(struct xrp_event *event, enum xrp_status *status);
+
+
+/* Code loading API */
+
+typedef enum xrp_status
+(xrp_module_init_fini)(struct xrp_buffer *init_data);
+
+struct xrp_module_info {
+
+	/* module UUID */
+	const void *modid; /* optional */
+	/* module's ELF image */
+	const void *image;
+	/* module image size */
+	size_t image_sz;
+	/* initialization function */
+	const char *init_function; /* optional */
+	/* finalization function */
+	const char *fini_function; /* optional */
+};
+
+/*
+ * Load module to the DSP.
+ *
+ * Module may be loaded locally or globally.
+ * Locally loaded module gets unloaded when it's released or when the device
+ * it was loaded to is closed. Exported symbols of locally loaded module are
+ * only available for modules that are loaded locally to the same device.
+ * Globally loaded module stays loaded until is is released. Its exported
+ * symbols are available to all globally and locally loaded modules.
+ *
+ * Module is identified by an optional module_info->modid, which is UUID. When
+ * modid is specified it must be unique in its loading scope (locally or
+ * globally). If modid is not specified for the module then there's no way to
+ * invoke xrp_open_module for that module.
+ *
+ * Module's references to external symbols are resolved, module's exported
+ * symbols are added to the corresponding symbol table, module relocations
+ * are fixed up. After that an optional function of type xrp_module_init_fini
+ * which name is provided in the module_info->init_function is called with
+ * init_data as a parameter. If it returns anything other than
+ * XRP_STATUS_SUCCESS then the module loading fails.
+ *
+ * A DSP may be restarted at any moment, but it happens transparently for
+ * the host-side users. All loaded modules are reloaded after the DSP restart
+ * in the original order of their registration and their init functions are
+ * called with the corresponding init_data parameters. Init functions should
+ * treat their init_data parameter buffer as read only, if they modify it
+ * it's their responsibility to preserve init_data validity in case of DSP
+ * restart. init_data buffer is retained until the module is unloaded.
+ *
+ * Modules are reference-counted. When reference count for the module drops to
+ * zero it is unloaded. Locally loaded modules start with reference count
+ * of 1, globally loaded modules start with reference count of 2, the
+ * additional reference is made to allow module to stay loaded when all
+ * struct xrp_module objects referring to it are freed. This additional
+ * reference may be freed with xrp_unload_module call. Just before unloading
+ * happens an optional function of type xrp_module_init_fini which name is
+ * provided in the module_info->fini_function is called with init_data as a
+ * parameter.
+ * A module that references other module's symbol increases reference counter
+ * for that module.
+ */
+struct xrp_module *xrp_load_module(struct xrp_device *device,
+				   enum xrp_module_flags flags,
+				   const struct xrp_module_info *module_info,
+				   struct xrp_buffer *init_data, /* optional */
+				   enum xrp_status *status);
+
+/*
+ * Increment module reference count.
+ */
+void xrp_retain_module(struct xrp_module *module,
+		       enum xrp_status *status);
+
+/*
+ * Decrement module reference count (and free it once the counter gets down
+ * to zero).
+ */
+void xrp_release_module(struct xrp_module *module,
+			enum xrp_status *status);
+
+/* Open module by its modid. */
+struct xrp_module *xrp_open_module(struct xrp_device *device,
+				   const void *modid,
+				   enum xrp_status *status);
+
+/* Request global module unloading. */
+void xrp_unload_module(struct xrp_module *module,
+		       enum xrp_status *status);
 
 
 /* New DSP-specific interface (library-style) */
