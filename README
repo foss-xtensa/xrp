@@ -440,12 +440,12 @@ targets. Example building for xtensa linux:
     KSRC=`pwd`/../kernel/xrp-sim-dc233c make -C xrp-kernel modules
 
 The result is kernel object xrp-kernel/xrp.ko loadable into the kernel it was
-built against. To build both xrp.ko and xrp_hw_simple.ko pass XRP_HW_SIMPLE=m
-to the make:
+built against. To build both xrp.ko and xrp_hw_simple.ko pass
+CONFIG_XRP_HW_SIMPLE=m to the make:
 
   $ ARCH=xtensa CROSS_COMPILE=xtensa-dc233c-elf- \
     KSRC=`pwd`/../kernel/xrp-sim-dc233c \
-    make -C xrp-kernel XRP_HW_SIMPLE=m modules
+    make -C xrp-kernel CONFIG_XRP_HW_SIMPLE=m modules
 
 Building XRP libraries.
 ======================
