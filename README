@@ -245,7 +245,7 @@ Kernel driver requirements.
 ==========================
 
 The linux kernel driver is tested with a number of linux kernel versions from
-3.18 to 4.11 and is known to work on xtensa, 32- and 64-bit ARM linux.
+3.18 to 4.11 and is known to work on xtensa, 32- and 64-bit ARM and x86 linux.
 
 The driver makes the following assumptions:
 - DSP memory where firmware must be loaded (possibly including DRAM and IRAM)
@@ -288,7 +288,7 @@ to be adjusted whenever it is changed:
 Native mode:
 - the device tree. Linux kernel need to have a device tree node for each
   Xtensa DSP managed by the XRP linux kernel driver. Please see
-  xrp-kernel/cdns,xrp.txt for the device tree binding information.
+  xrp-kernel/cdns,xrp*.txt for the device tree binding information.
 - DSP firmware bits of the XRP don't have any hardcoded addresses, but the
   firmware image depends on the linker map.
 
