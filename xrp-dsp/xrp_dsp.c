@@ -547,6 +547,7 @@ static enum xrp_status process_command(struct xrp_device *device,
 			handler_context = cmd_ns->handler_context;
 		} else {
 			flags |= XRP_DSP_CMD_FLAG_RESPONSE_DELIVERY_FAIL;
+			status = XRP_STATUS_FAILURE;
 			goto out;
 		}
 	}
