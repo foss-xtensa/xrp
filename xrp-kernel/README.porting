@@ -1,0 +1,102 @@
+Porting XRP to new hardware.
+===========================
+
+The following tasks that XRP driver performs during the device lifecycle
+need detailed knowledge about the hardware:
+
+- starting and stopping the DSP: need to control power and clock of the DSP,
+  need to know location and layout of the registers that control reset vector
+  selection, reset and runstall signals.
+- loading firmware: depending on the way DSP memory is connected to the host
+  it may vary greatly.
+- sending IRQ to the DSP: need to know the location and layout of the register
+  that controls IRQ signal. Information about IRQ number, IRQ mode, layout and
+  location or the register to clear IRQ on the DSP side must be made available
+  to the DSP.
+- receiving IRQ from the DSP: need to know interrupt number, IRQ mode, layout
+  and location of a register to clear IRQ on the host side.
+- invalidating/flushing cache for DSP memory: may need to be performed in
+  architecture-specific device-specific manner.
+
+The XRP driver is divided into two parts: generic and hardware-specific and
+the actions listed above must be implemented in the hardware-specific part.
+The interface between parts is defined in the header xrp_hw.h
+
+Generic XRP driver defines two formats of configuration information: cdns,xrp
+and cdns,xrp,v1. The difference is in the contents of the device registers
+(regs device tree property, information returned by the platform_get_resource
+function), please see cdns,xrp.txt and cdns,xrp,v1.txt for the details. The
+hardware-specific XRP driver should extend one of these formats and define its
+own format based on it. At the device probe time the hardware-specific XRP
+driver must call xrp_init or xrp_init_v1 (corresponding to the chosen
+configuration information format) and pass it a pointer to the platform device
+being probed, to the xvp structure, to the xrp_hw_ops structure and an opaque
+hw_arg pointer. xrp_init* function will use platform device to get device
+registers information to initialize xvp structure. Platform device drvdata
+will be used by the generic XRP driver, don't change it in the
+hardware-specific XRP driver. In case CONFIG_OF is enabled xrp_init will use
+device tree node associated with the platform device to set up physical
+address map and get firmware image name. Initialization functions return 0 on
+success or a negative error code otherwise. At the device remove time
+hardware-specific XRP driver must call xrp_deinit with the pointer to the
+platform device being removed.
+
+DSP life cycle looks like this on the host side:
+
+  xrp_hw_ops::enable
+  xrp_hw_ops::reset
+  while (DSP is active) {
+    if (a firmware name is configured for the DSP) {
+      xrp_hw_ops::halt
+      xrp_hw_ops::reset
+      (load firmware to DSP)
+      xrp_hw_ops::release
+    }
+    xrp_hw_ops::get_hw_sync_data
+    (synchronization)
+    do {
+      (exchange messages with DSP)
+    } while (DSP is active && the last command didn't time out)
+  }
+  xrp_hw_ops::halt
+  xrp_hw_ops::disable
+
+DSP is enabled in the xrp_runtime_resume function and is disabled in the
+xrp_runtime_suspend function. Hardware-specific XRP driver should register
+these functions as its platform_driver::driver.pm callbacks. Depending on
+whether CONFIG_PM is enabled in the kernel or not these functions will be
+called by the runtime PM kernel code (and it may happen multiple times during
+the device lifetime) or by the xrp_init*/xrp_deinit functions.
+
+All of the xrp_hw_ops callback functions may be blocking. In case the firmware
+cannot be loaded by the generic XRP driver, the hardware-specific XRP can do
+it in the xrp_hw_ops::reset callback.
+
+The data returned from the xrp_hw_ops::get_hw_sync_data must be allocated with
+one of the kmalloc functions family and have format that the DSP side
+hardware-specific part of XRP understands. It will be communicated to the DSP
+and passed to the xrp_hw_set_sync_data DSP-side hardware-specific XRP
+callback. After that the DSP side of XRP must be capable of exchanging IRQs
+with the host in directions chosen in configuration.
+
+The hardware-specific XRP driver must set xvp::host_irq_mode to true before
+calling xrp_init* in order to use IRQ for the host side. In that case the
+hardware-specific XRP driver must install IRQ handler and call xrp_irq_handler
+function from it. The xrp_hw_ops::send_irq callback is used to send IRQ to the
+DSP.
+
+xrp_hw_ops::clean_cache, xrp_hw_ops::flush_cache and
+xrp_hw_ops::invalidate_cache are used to clean (write back), flush (write back
+and invalidate) and invalidate an area of the DSP-specific memory. Standard
+linux cache management functions (from the DMA API) may be used only when the
+DSP shared memory is allocated from the system memory and covered by struct
+page's. If that's not the case the hardware-specific XRP driver may use
+architecture-specific methods of cache management.
+
+Porting XRP kernel driver to new hardware is done by developing
+hardware-specific driver for that hardware with the functionality described
+above. It must be accompanied by the matching hardware-specific library for
+the DSP side. Please see xrp-dsp/README.porting for the details.
+
+There's an example hardware-specific XRP driver xrp_hw_simple that may be used
+as a template.

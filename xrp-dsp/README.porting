@@ -1,0 +1,70 @@
+Porting XRP to new hardware.
+===========================
+
+The following tasks that XRP firmware performs during the device lifecycle
+need detailed knowledge about the hardware:
+
+- DSP operation parameters initialization: need to be synchronized with the
+  hardware-specific XRP kernel driver on the host side.
+- sending IRQ to the host: need to know the location and layout of the
+  register that controls IRQ signal.
+- receiving IRQ from the host: need to know interrupt number, IRQ mode, layout
+  and location of a register to clear IRQ on the DSP side.
+- going to the low-power state when there's nothing to do: need to be aware of
+  other IRQs used on the DSP side.
+
+The XRP DSP library implements generic XRP functionality and expects that the
+above functions are implemented externally.
+
+Typical DSP life cycle looks like this on the DSP side:
+
+  main
+    xrp_open_device
+    for (all static namespaces) {
+      xrp_device_register_namespace
+    }
+    do {
+      if (xrp_device_poll detects a message from host) {
+        xrp_device_dispatch
+          (synchronization)
+            xrp_hw_set_sync_data
+            xrp_hw_wait_device_irq
+            xrp_hw_send_host_irq
+          (regular command)
+            xrp_hw_send_host_irq
+      } else if (there's no other work to do) {
+        xrp_hw_wait_device_irq
+      }
+    } while (DSP is active)
+
+The main function, namespace handlers registration and message processing loop
+are all parts of the DSP payload external to the XRP library. The interface
+between them is defined in xrp_dsp_hw.h
+
+xrp_hw_set_sync_data is called from the message dispatcher when a
+synchronization message is received. It gets a pointer to the configuration
+information provided by the host side hardware-specific XRP driver, it must
+parse it and do required initialization. Synchronization may happen multiple
+times during single DSP life cycle.
+
+xrp_hw_wait_device_irq is called from the message dispatcher when a
+synchronization message is received. It waits for the IRQ from the host. It
+must do it atomically, i.e. even if IRQ was raised before the call to this
+function, the function must detect it and return. Normally the IRQ line
+assigned for that purpose will be masked and the function would need to
+globally disable interrupts, unmask that IRQ line, invoke waiti instruction
+with appropriate level, get to the IRQ handler, clear the IRQ condition in
+case it's level-triggered, mask that IRQ line again and restore the original
+global IRQ mask state.
+
+xrp_hw_send_host_irq is called from the message dispatcher to indicate message
+handling completion to the host.
+
+Porting XRP DSP to new hardware is done by providing hardware-specific
+functions xrp_hw_set_sync_data, xrp_hw_wait_device_irq and
+xrp_hw_send_host_irq for that hardware with the functionality described
+above.
+
+There's an example hardware-specific DSP XRP library xrp_hw_simple that works
+together with the host side xrp_hw_simple kernel driver and may be used as a
+template.
