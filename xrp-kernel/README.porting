@@ -44,14 +44,13 @@ platform device being removed.
 DSP life cycle looks like this on the host side:
 
   xrp_hw_ops::enable
-  xrp_hw_ops::reset
   while (DSP is active) {
+    xrp_hw_ops::halt
+    xrp_hw_ops::reset
     if (a firmware name is configured for the DSP) {
-      xrp_hw_ops::halt
-      xrp_hw_ops::reset
       (load firmware to DSP)
-      xrp_hw_ops::release
     }
+    xrp_hw_ops::release
     xrp_hw_ops::get_hw_sync_data
     (synchronization)
     do {

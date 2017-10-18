@@ -1428,10 +1428,10 @@ static int xrp_boot_firmware(struct xvp *xvp)
 	int ret;
 	struct xrp_dsp_sync __iomem *shared_sync = xvp->comm;
 
-	if (xvp->firmware_name) {
-		xrp_halt_dsp(xvp);
-		xrp_reset_dsp(xvp);
+	xrp_halt_dsp(xvp);
+	xrp_reset_dsp(xvp);
 
+	if (xvp->firmware_name) {
 		if (loopback < LOOPBACK_NOFIRMWARE) {
 			ret = xrp_request_firmware(xvp);
 			if (ret < 0)
@@ -1442,8 +1442,9 @@ static int xrp_boot_firmware(struct xvp *xvp)
 			xrp_comm_write32(&shared_sync->sync, XRP_DSP_SYNC_IDLE);
 			mb();
 		}
-		xrp_release_dsp(xvp);
 	}
+	xrp_release_dsp(xvp);
+
 	if (loopback < LOOPBACK_NOIO) {
 		ret = xrp_synchronize(xvp);
 		if (ret < 0) {
@@ -1485,8 +1486,6 @@ int xrp_runtime_resume(struct device *dev)
 		dev_err(xvp->dev, "couldn't enable DSP\n");
 		return ret;
 	}
-
-	xrp_reset_dsp(xvp);
 
 	ret = xrp_boot_firmware(xvp);
 	if (ret < 0)
