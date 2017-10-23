@@ -289,6 +289,7 @@ static int init_hw(struct platform_device *pdev, struct xrp_hw_simple *hw,
 	} else {
 		dev_info(&pdev->dev, "using polling mode on the host side\n");
 	}
+	ret = 0;
 err:
 	return ret;
 }
