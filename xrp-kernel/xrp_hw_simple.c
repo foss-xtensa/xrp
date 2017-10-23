@@ -316,6 +316,17 @@ static int init_v1(struct platform_device *pdev, struct xrp_hw_simple *hw)
 	return xrp_init_v1(pdev, &hw->xrp, &hw_ops, hw);
 }
 
+static int init_cma(struct platform_device *pdev, struct xrp_hw_simple *hw)
+{
+	int ret;
+
+	ret = init_hw(pdev, hw, 0);
+	if (ret < 0)
+		return ret;
+
+	return xrp_init_cma(pdev, &hw->xrp, &hw_ops, hw);
+}
+
 #ifdef CONFIG_OF
 static const struct of_device_id xrp_hw_simple_match[] = {
 	{
@@ -324,6 +335,9 @@ static const struct of_device_id xrp_hw_simple_match[] = {
 	}, {
 		.compatible = "cdns,xrp-hw-simple,v1",
 		.data = init_v1,
+	}, {
+		.compatible = "cdns,xrp-hw-simple,cma",
+		.data = init_cma,
 	}, {},
 };
 MODULE_DEVICE_TABLE(of, xrp_hw_simple_match);
