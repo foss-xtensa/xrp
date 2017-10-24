@@ -50,7 +50,7 @@ typedef uint64_t __u64;
 #include "xrp_api.h"
 #include "../xrp-kernel/xrp_kernel_dsp_interface.h"
 #include "../xrp-kernel/xrp_hw_simple_dsp_interface.h"
-#include "xrp_alloc.h"
+#include "xrp_private_alloc.h"
 
 #if defined(__STDC_NO_ATOMICS__)
 #warning The compiler does not support atomics, reference counting may not be thread safe
@@ -120,7 +120,7 @@ struct xrp_request {
 struct xrp_device {
 	struct xrp_refcounted ref;
 	struct xrp_device_description *description;
-	struct xrp_allocation_pool shared_pool;
+	struct xrp_allocation_pool *shared_pool;
 
 	pthread_t thread;
 	pthread_mutex_t request_queue_mutex;
@@ -636,9 +636,9 @@ struct xrp_device *xrp_open_device(int idx, enum xrp_status *status)
 		return NULL;
 	}
 	device->description = xrp_device_description + idx;
-	xrp_init_pool(&device->shared_pool,
-		      device->description->shared_base,
-		      device->description->shared_size);
+	xrp_init_private_pool(&device->shared_pool,
+			      device->description->shared_base,
+			      device->description->shared_size);
 
 	pthread_mutex_init(&device->request_queue_mutex, NULL);
 	pthread_cond_init(&device->request_queue_cond, NULL);
@@ -670,7 +670,7 @@ void xrp_release_device(struct xrp_device *device, enum xrp_status *status)
 		pthread_mutex_unlock(&device->request_queue_mutex);
 		pthread_mutex_destroy(&device->request_queue_mutex);
 		pthread_cond_destroy(&device->request_queue_cond);
-		xrp_free_pool(&device->shared_pool);
+		xrp_free_pool(device->shared_pool);
 	}
 	set_status(status, release_refcounted(device));
 }
@@ -697,7 +697,7 @@ struct xrp_buffer *xrp_create_buffer(struct xrp_device *device,
 	}
 
 	if (!host_ptr) {
-		long rc = xrp_allocate(&device->shared_pool, size, 0x10,
+		long rc = xrp_allocate(device->shared_pool, size, 0x10,
 				       &buf->xrp_allocation);
 		if (rc < 0) {
 			release_refcounted(buf);
@@ -1203,7 +1203,7 @@ void xrp_enqueue_command(struct xrp_queue *queue,
 		xrp_retain_buffer_group(buffer_group, NULL);
 
 	if (in_data_size > XRP_DSP_CMD_INLINE_DATA_SIZE) {
-		long rc = xrp_allocate(&device->shared_pool, in_data_size,
+		long rc = xrp_allocate(device->shared_pool, in_data_size,
 				       0x10, &rq->in_data_allocation);
 		if (rc < 0) {
 			set_status(status, XRP_STATUS_FAILURE);
@@ -1218,7 +1218,7 @@ void xrp_enqueue_command(struct xrp_queue *queue,
 	memcpy(in_data_ptr, in_data, in_data_size);
 
 	if (out_data_size > XRP_DSP_CMD_INLINE_DATA_SIZE) {
-		long rc = xrp_allocate(&device->shared_pool, out_data_size,
+		long rc = xrp_allocate(device->shared_pool, out_data_size,
 				       0x10, &rq->out_data_allocation);
 		if (rc < 0) {
 			set_status(status, XRP_STATUS_FAILURE);
@@ -1236,7 +1236,7 @@ void xrp_enqueue_command(struct xrp_queue *queue,
 
 	n_buffers = buffer_group ? buffer_group->n_buffers : 0;
 	if (n_buffers > XRP_DSP_CMD_INLINE_BUFFER_COUNT) {
-		long rc = xrp_allocate(&device->shared_pool,
+		long rc = xrp_allocate(device->shared_pool,
 				       n_buffers * sizeof(struct xrp_dsp_buffer),
 				       0x10, &rq->buffer_allocation);
 		if (rc < 0) {
@@ -1265,7 +1265,7 @@ void xrp_enqueue_command(struct xrp_queue *queue,
 		if (buffer_group->buffer[i].buffer->type == XRP_BUFFER_TYPE_DEVICE) {
 			addr = buffer_group->buffer[i].buffer->xrp_allocation->start;
 		} else {
-			long rc = xrp_allocate(&device->shared_pool,
+			long rc = xrp_allocate(device->shared_pool,
 					       buffer_group->buffer[i].buffer->size,
 					       0x10, rq->user_buffer_allocation + i);
 

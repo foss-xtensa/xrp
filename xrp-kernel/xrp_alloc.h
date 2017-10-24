@@ -50,30 +50,46 @@ static inline int atomic_dec_and_test(atomic_t *v)
 
 #endif
 
+struct xrp_allocation_pool;
 struct xrp_allocation;
 
+struct xrp_allocation_ops {
+	long (*alloc)(struct xrp_allocation_pool *allocation_pool,
+		      u32 size, u32 align, struct xrp_allocation **alloc);
+	void (*free)(struct xrp_allocation *allocation);
+	void (*free_pool)(struct xrp_allocation_pool *allocation_pool);
+	phys_addr_t (*offset)(const struct xrp_allocation *allocation);
+};
+
 struct xrp_allocation_pool {
-	struct mutex free_list_lock;
-	phys_addr_t start;
-	u32 size;
-	struct xrp_allocation *free_list;
+	const struct xrp_allocation_ops *ops;
 };
 
 struct xrp_allocation {
+	struct xrp_allocation_pool *pool;
+	struct xrp_allocation *next;
 	phys_addr_t start;
 	u32 size;
 	atomic_t ref;
-	struct xrp_allocation *next;
-	struct xrp_allocation_pool *pool;
 };
 
-long xrp_init_pool(struct xrp_allocation_pool *allocation_pool,
-		   phys_addr_t start, u32 size);
-void xrp_free_pool(struct xrp_allocation_pool *allocation_pool);
+static inline void xrp_free_pool(struct xrp_allocation_pool *allocation_pool)
+{
+	allocation_pool->ops->free_pool(allocation_pool);
+}
 
-void xrp_free(struct xrp_allocation *allocation);
-long xrp_allocate(struct xrp_allocation_pool *allocation_pool,
-		  u32 size, u32 align, struct xrp_allocation **alloc);
+static inline void xrp_free(struct xrp_allocation *allocation)
+{
+	return allocation->pool->ops->free(allocation);
+}
+
+static inline long xrp_allocate(struct xrp_allocation_pool *allocation_pool,
+				u32 size, u32 align,
+				struct xrp_allocation **alloc)
+{
+	return allocation_pool->ops->alloc(allocation_pool,
+					   size, align, alloc);
+}
 
 static inline void xrp_allocation_get(struct xrp_allocation *xrp_allocation)
 {
@@ -83,12 +99,12 @@ static inline void xrp_allocation_get(struct xrp_allocation *xrp_allocation)
 static inline void xrp_allocation_put(struct xrp_allocation *xrp_allocation)
 {
 	if (atomic_dec_and_test(&xrp_allocation->ref))
-		xrp_free(xrp_allocation);
+		xrp_allocation->pool->ops->free(xrp_allocation);
 }
 
 static inline phys_addr_t xrp_allocation_offset(const struct xrp_allocation *allocation)
 {
-	return allocation->start - allocation->pool->start;
+	return allocation->pool->ops->offset(allocation);
 }
 
 #endif

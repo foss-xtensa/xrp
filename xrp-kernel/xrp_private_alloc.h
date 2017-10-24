@@ -1,7 +1,5 @@
 /*
- * Internal XRP structures definition.
- *
- * Copyright (c) 2015 - 2017 Cadence Design Systems, Inc.
+ * Copyright (c) 2017 Cadence Design Systems Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -26,38 +24,12 @@
  * the GNU General Public License version 2 or later.
  */
 
-#ifndef XRP_INTERNAL_H
-#define XRP_INTERNAL_H
+#ifndef XRP_PRIVATE_ALLOC_H
+#define XRP_PRIVATE_ALLOC_H
 
-#include <linux/miscdevice.h>
-#include <linux/mutex.h>
-#include "xrp_address_map.h"
+#include "xrp_alloc.h"
 
-struct device;
-struct firmware;
-struct xrp_hw_ops;
-struct xrp_allocation_pool;
-
-struct xvp {
-	struct device *dev;
-	const char *firmware_name;
-	const struct firmware *firmware;
-	struct miscdevice miscdev;
-	const struct xrp_hw_ops *hw_ops;
-	void *hw_arg;
-
-	void __iomem *comm;
-	phys_addr_t pmem;
-	phys_addr_t comm_phys;
-	phys_addr_t shared_size;
-
-	struct xrp_address_map address_map;
-
-	bool host_irq_mode;
-	struct completion completion;
-
-	struct xrp_allocation_pool *pool;
-	struct mutex comm_lock;
-};
+long xrp_init_private_pool(struct xrp_allocation_pool **pool,
+			   phys_addr_t start, u32 size);
 
 #endif

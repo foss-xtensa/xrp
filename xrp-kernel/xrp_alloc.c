@@ -36,6 +36,7 @@
 
 #include <errno.h>
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -71,7 +72,7 @@ static void kfree(void *p)
 
 #endif
 
-#include "xrp_alloc.h"
+#include "xrp_private_alloc.h"
 
 #ifndef __KERNEL__
 
@@ -95,49 +96,35 @@ static void atomic_set(atomic_t *p, uint32_t v)
 	*((volatile atomic_t *)p) = v;
 }
 
+#define container_of(ptr, type, member) ({				\
+	void *__mptr = (void *)(ptr);					\
+	((type *)(__mptr - offsetof(type, member))); })
+
 #endif
 
-static inline void xrp_pool_lock(struct xrp_allocation_pool *pool)
+struct xrp_private_pool {
+	struct xrp_allocation_pool pool;
+	struct mutex free_list_lock;
+	phys_addr_t start;
+	u32 size;
+	struct xrp_allocation *free_list;
+};
+
+static inline void xrp_pool_lock(struct xrp_private_pool *pool)
 {
 	mutex_lock(&pool->free_list_lock);
 }
 
-static inline void xrp_pool_unlock(struct xrp_allocation_pool *pool)
+static inline void xrp_pool_unlock(struct xrp_private_pool *pool)
 {
 	mutex_unlock(&pool->free_list_lock);
 }
 
-long xrp_init_pool(struct xrp_allocation_pool *pool,
-		   phys_addr_t start, u32 size)
+static void xrp_private_free(struct xrp_allocation *xrp_allocation)
 {
-	struct xrp_allocation *allocation = kmalloc(sizeof(*allocation),
-						    GFP_KERNEL);
-
-	if (!allocation)
-		return -ENOMEM;
-
-	*allocation = (struct xrp_allocation){
-		.start = start,
-		.size = size,
-		.pool = pool,
-	};
-	*pool = (struct xrp_allocation_pool){
-		.start = start,
-		.size = size,
-		.free_list = allocation,
-	};
-	mutex_init(&pool->free_list_lock);
-	return 0;
-}
-
-void xrp_free_pool(struct xrp_allocation_pool *pool)
-{
-	kfree(pool->free_list);
-}
-
-void xrp_free(struct xrp_allocation *xrp_allocation)
-{
-	struct xrp_allocation_pool *pool = xrp_allocation->pool;
+	struct xrp_private_pool *pool = container_of(xrp_allocation->pool,
+						     struct xrp_private_pool,
+						     pool);
 	struct xrp_allocation **pcur;
 
 	pr_debug("%s: %pap x %d\n", __func__,
@@ -191,9 +178,13 @@ void xrp_free(struct xrp_allocation *xrp_allocation)
 	xrp_pool_unlock(pool);
 }
 
-long xrp_allocate(struct xrp_allocation_pool *pool,
-		  u32 size, u32 align, struct xrp_allocation **alloc)
+static long xrp_private_alloc(struct xrp_allocation_pool *pool,
+			      u32 size, u32 align,
+			      struct xrp_allocation **alloc)
 {
+	struct xrp_private_pool *ppool = container_of(pool,
+						      struct xrp_private_pool,
+						      pool);
 	struct xrp_allocation **pcur;
 	struct xrp_allocation *cur = NULL;
 	struct xrp_allocation *new;
@@ -212,10 +203,10 @@ long xrp_allocate(struct xrp_allocation_pool *pool,
 	align = ALIGN(align, PAGE_SIZE);
 	size = ALIGN(size, PAGE_SIZE);
 
-	xrp_pool_lock(pool);
+	xrp_pool_lock(ppool);
 
 	/* on exit free list is fixed */
-	for (pcur = &pool->free_list; *pcur; pcur = &(*pcur)->next) {
+	for (pcur = &ppool->free_list; *pcur; pcur = &(*pcur)->next) {
 		cur = *pcur;
 		aligned_start = ALIGN(cur->start, align);
 
@@ -260,7 +251,7 @@ long xrp_allocate(struct xrp_allocation_pool *pool,
 		}
 	}
 
-	xrp_pool_unlock(pool);
+	xrp_pool_unlock(ppool);
 
 	if (!found) {
 		kfree(cur);
@@ -288,5 +279,60 @@ long xrp_allocate(struct xrp_allocation_pool *pool,
 	xrp_allocation_get(cur);
 	*alloc = cur;
 
+	return 0;
+}
+
+static void xrp_private_free_pool(struct xrp_allocation_pool *pool)
+{
+	struct xrp_private_pool *ppool = container_of(pool,
+						      struct xrp_private_pool,
+						      pool);
+	kfree(ppool->free_list);
+	kfree(ppool);
+}
+
+static phys_addr_t xrp_private_offset(const struct xrp_allocation *allocation)
+{
+	struct xrp_private_pool *ppool = container_of(allocation->pool,
+						      struct xrp_private_pool,
+						      pool);
+	return allocation->start - ppool->start;
+}
+
+static const struct xrp_allocation_ops xrp_private_pool_ops = {
+	.alloc = xrp_private_alloc,
+	.free = xrp_private_free,
+	.free_pool = xrp_private_free_pool,
+	.offset = xrp_private_offset,
+};
+
+long xrp_init_private_pool(struct xrp_allocation_pool **ppool,
+			   phys_addr_t start, u32 size)
+{
+	struct xrp_private_pool *pool = kmalloc(sizeof(*pool), GFP_KERNEL);
+	struct xrp_allocation *allocation = kmalloc(sizeof(*allocation),
+						    GFP_KERNEL);
+
+	if (!pool || !allocation) {
+		kfree(pool);
+		kfree(allocation);
+		return -ENOMEM;
+	}
+
+	*allocation = (struct xrp_allocation){
+		.pool = &pool->pool,
+		.start = start,
+		.size = size,
+	};
+	*pool = (struct xrp_private_pool){
+		.pool = {
+			.ops = &xrp_private_pool_ops,
+		},
+		.start = start,
+		.size = size,
+		.free_list = allocation,
+	};
+	mutex_init(&pool->free_list_lock);
+	*ppool = &pool->pool;
 	return 0;
 }

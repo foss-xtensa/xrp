@@ -52,6 +52,7 @@
 #include "xrp_internal.h"
 #include "xrp_kernel_defs.h"
 #include "xrp_kernel_dsp_interface.h"
+#include "xrp_private_alloc.h"
 
 #define DRIVER_NAME "xrp"
 #define XVP_TIMEOUT_JIFFIES (HZ * 10)
@@ -312,7 +313,7 @@ static long xrp_ioctl_alloc(struct file *filp,
 	pr_debug("%s: size = %d, align = %x\n", __func__,
 		 xrp_ioctl_alloc.size, xrp_ioctl_alloc.align);
 
-	err = xrp_allocate(&xvp_file->xvp->pool,
+	err = xrp_allocate(xvp_file->xvp->pool,
 			   xrp_ioctl_alloc.size,
 			   xrp_ioctl_alloc.align,
 			   &xrp_allocation);
@@ -580,7 +581,7 @@ static long xvp_copy_virt_to_phys(struct xvp_file *xvp_file,
 	struct xrp_allocation *allocation;
 	long rc;
 
-	rc = xrp_allocate(&xvp_file->xvp->pool,
+	rc = xrp_allocate(xvp_file->xvp->pool,
 			  size + align, align, &allocation);
 	if (rc < 0)
 		return rc;
@@ -1563,9 +1564,11 @@ static int xrp_init_common(struct platform_device *pdev, struct xvp *xvp,
 	pr_debug("%s: comm = %pap/%p\n", __func__, &xvp->comm_phys, xvp->comm);
 	pr_debug("%s: xvp->pmem = %pap\n", __func__, &xvp->pmem);
 
-	ret = xrp_init_pool(&xvp->pool, xvp->pmem, xvp->shared_size);
+	ret = xrp_init_private_pool(&xvp->pool, xvp->pmem,
+				    xvp->shared_size);
 	if (ret < 0)
 		goto err;
+	}
 
 	ret = xrp_init_address_map(xvp->dev, &xvp->address_map);
 	if (ret < 0)
@@ -1606,7 +1609,7 @@ err_pm_disable:
 err_free_map:
 	xrp_free_address_map(&xvp->address_map);
 err_free_pool:
-	xrp_free_pool(&xvp->pool);
+	xrp_free_pool(xvp->pool);
 err:
 	dev_err(&pdev->dev, "%s: ret = %d\n", __func__, ret);
 	return ret;
@@ -1636,7 +1639,7 @@ int xrp_deinit(struct platform_device *pdev)
 
 	misc_deregister(&xvp->miscdev);
 	release_firmware(xvp->firmware);
-	xrp_free_pool(&xvp->pool);
+	xrp_free_pool(xvp->pool);
 	xrp_free_address_map(&xvp->address_map);
 	--xvp_nodeid;
 	return 0;
