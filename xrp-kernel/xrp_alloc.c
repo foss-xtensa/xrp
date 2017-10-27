@@ -158,7 +158,8 @@ static void xrp_private_free(struct xrp_allocation *xrp_allocation)
 		}
 
 		if (!cur || xrp_allocation->start < cur->start) {
-			if (cur && xrp_allocation->start + xrp_allocation->size == cur->start) {
+			if (cur && xrp_allocation->start + xrp_allocation->size ==
+			    cur->start) {
 				pr_debug("merging block head: %pap x 0x%x ->\n",
 					 &cur->start, cur->size);
 				cur->size += xrp_allocation->size;
@@ -214,31 +215,40 @@ static long xrp_private_alloc(struct xrp_allocation_pool *pool,
 		    aligned_start - cur->start + size <= cur->size) {
 			if (aligned_start == cur->start) {
 				if (aligned_start + size == cur->start + cur->size) {
-					pr_debug("reusing complete block: %pap x %x\n", &cur->start, cur->size);
+					pr_debug("reusing complete block: %pap x %x\n",
+						 &cur->start, cur->size);
 					*pcur = cur->next;
 				} else {
-					pr_debug("cutting block head: %pap x %x ->\n", &cur->start, cur->size);
+					pr_debug("cutting block head: %pap x %x ->\n",
+						 &cur->start, cur->size);
 					cur->size -= aligned_start + size - cur->start;
 					cur->start = aligned_start + size;
-					pr_debug("... -> %pap x %x\n", &cur->start, cur->size);
+					pr_debug("... -> %pap x %x\n",
+						 &cur->start, cur->size);
 					cur = NULL;
 				}
 			} else {
 				if (aligned_start + size == cur->start + cur->size) {
-					pr_debug("cutting block tail: %pap x %x ->\n", &cur->start, cur->size);
+					pr_debug("cutting block tail: %pap x %x ->\n",
+						 &cur->start, cur->size);
 					cur->size = aligned_start - cur->start;
-					pr_debug("... -> %pap x %x\n", &cur->start, cur->size);
+					pr_debug("... -> %pap x %x\n",
+						 &cur->start, cur->size);
 					cur = NULL;
 				} else {
-					pr_debug("splitting block into two: %pap x %x ->\n", &cur->start, cur->size);
+					pr_debug("splitting block into two: %pap x %x ->\n",
+						 &cur->start, cur->size);
 					new->start = aligned_start + size;
-					new->size = cur->start + cur->size - new->start;
+					new->size = cur->start +
+						cur->size - new->start;
 
 					cur->size = aligned_start - cur->start;
 
 					new->next = cur->next;
 					cur->next = new;
-					pr_debug("... -> %pap x %x + %pap x %x\n", &cur->start, cur->size, &new->start, new->size);
+					pr_debug("... -> %pap x %x + %pap x %x\n",
+						 &cur->start, cur->size,
+						 &new->start, new->size);
 
 					cur = NULL;
 					new = NULL;
