@@ -22,24 +22,25 @@ The XRP driver is divided into two parts: generic and hardware-specific and
 the actions listed above must be implemented in the hardware-specific part.
 The interface between parts is defined in the header xrp_hw.h
 
-Generic XRP driver defines two formats of configuration information: cdns,xrp
-and cdns,xrp,v1. The difference is in the contents of the device registers
+Generic XRP driver defines three formats of configuration information:
+cdns,xrp, cdns,xrp,v1 and cdns,xrp,cma. The difference is in the way the
+shared memory region is specified and in the contents of the device registers
 (regs device tree property, information returned by the platform_get_resource
-function), please see cdns,xrp.txt and cdns,xrp,v1.txt for the details. The
-hardware-specific XRP driver should extend one of these formats and define its
-own format based on it. At the device probe time the hardware-specific XRP
-driver must call xrp_init or xrp_init_v1 (corresponding to the chosen
-configuration information format) and pass it a pointer to the platform device
-being probed, to the xvp structure, to the xrp_hw_ops structure and an opaque
-hw_arg pointer. xrp_init* function will use platform device to get device
-registers information to initialize xvp structure. Platform device drvdata
-will be used by the generic XRP driver, don't change it in the
-hardware-specific XRP driver. In case CONFIG_OF is enabled xrp_init will use
-device tree node associated with the platform device to set up physical
-address map and get firmware image name. Initialization functions return 0 on
-success or a negative error code otherwise. At the device remove time
-hardware-specific XRP driver must call xrp_deinit with the pointer to the
-platform device being removed.
+function), please see cdns,xrp.txt, cdns,xrp,v1.txt and cdns,xrp,cma.txt for
+the details. The hardware-specific XRP driver should extend one of these
+formats and define its own format based on it. At the device probe time the
+hardware-specific XRP driver must call xrp_init, xrp_init_v1 or xrp_init_cma
+(corresponding to the chosen configuration information format) and pass it a
+pointer to the platform device being probed, to the xvp structure, to the
+xrp_hw_ops structure and an opaque hw_arg pointer. xrp_init* function will
+use platform device to get device registers information to initialize xvp
+structure. Platform device drvdata will be used by the generic XRP driver,
+don't change it in the hardware-specific XRP driver. In case CONFIG_OF is
+enabled xrp_init will use device tree node associated with the platform device
+to set up physical address map and get firmware image name. Initialization
+functions return 0 on success or a negative error code otherwise. At the
+device remove time hardware-specific XRP driver must call xrp_deinit with the
+pointer to the platform device being removed.
 
 DSP life cycle looks like this on the host side:
 
