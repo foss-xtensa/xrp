@@ -32,6 +32,7 @@
 #include <linux/dma-mapping.h>
 #include <linux/firmware.h>
 #include <linux/fs.h>
+#include <linux/hashtable.h>
 #include <linux/highmem.h>
 #include <linux/interrupt.h>
 #include <linux/io.h>
@@ -94,6 +95,11 @@ struct xvp_file {
 	struct xrp_allocation *busy_list;
 };
 
+struct xrp_known_file {
+	void *filp;
+	struct hlist_node node;
+};
+
 static int firmware_reboot = 1;
 module_param(firmware_reboot, int, 0644);
 MODULE_PARM_DESC(firmware_reboot, "Reboot firmware on command timeout.");
@@ -107,6 +113,9 @@ enum {
 static int loopback = 0;
 module_param(loopback, int, 0644);
 MODULE_PARM_DESC(loopback, "Don't use actual DSP, perform everything locally.");
+
+static DEFINE_HASHTABLE(xrp_known_files, 10);
+static DEFINE_SPINLOCK(xrp_known_files_lock);
 
 static unsigned xvp_nodeid;
 
@@ -167,6 +176,53 @@ static inline void xrp_send_device_irq(struct xvp *xvp)
 {
 	if (xvp->hw_ops->send_irq)
 		xvp->hw_ops->send_irq(xvp->hw_arg);
+}
+
+static void xrp_add_known_file(struct file *filp)
+{
+	struct xrp_known_file *p = kmalloc(sizeof(*p), GFP_KERNEL);
+
+	if (!p)
+		return;
+
+	p->filp = filp;
+	spin_lock(&xrp_known_files_lock);
+	hash_add(xrp_known_files, &p->node, (unsigned long)filp);
+	spin_unlock(&xrp_known_files_lock);
+}
+
+static void xrp_remove_known_file(struct file *filp)
+{
+	struct xrp_known_file *p;
+	struct xrp_known_file *pf = NULL;
+
+	spin_lock(&xrp_known_files_lock);
+	hash_for_each_possible(xrp_known_files, p, node, (unsigned long)filp) {
+		if (p->filp == filp) {
+			hash_del(&p->node);
+			pf = p;
+			break;
+		}
+	}
+	spin_unlock(&xrp_known_files_lock);
+	if (pf)
+		kfree(pf);
+}
+
+static bool xrp_is_known_file(struct file *filp)
+{
+	bool ret = false;
+	struct xrp_known_file *p;
+
+	spin_lock(&xrp_known_files_lock);
+	hash_for_each_possible(xrp_known_files, p, node, (unsigned long)filp) {
+		if (p->filp == filp) {
+			ret = true;
+			break;
+		}
+	}
+	spin_unlock(&xrp_known_files_lock);
+	return ret;
 }
 
 static int xrp_synchronize(struct xvp *xvp)
@@ -692,9 +748,11 @@ static long __xrp_share_block(struct file *filp,
 {
 	phys_addr_t phys = ~0ul;
 	struct xvp_file *xvp_file = filp->private_data;
+	struct xvp *xvp = xvp_file->xvp;
 	struct mm_struct *mm = current->mm;
 	struct vm_area_struct *vma = find_vma(mm, virt);
 	bool do_cache = true;
+	long rc = -EINVAL;
 
 	if (!vma) {
 		pr_debug("%s: no vma for vaddr/size = 0x%08lx/0x%08lx\n",
@@ -726,21 +784,48 @@ static long __xrp_share_block(struct file *filp,
 		break;
 	}
 	/*
-	 * And it need to be allocated from the same file descriptor.
+	 * And it need to be allocated from the same file descriptor, or
+	 * at least from a file descriptor managed by the XRP.
 	 */
-	if (vma && vma->vm_file == filp) {
-		struct xrp_allocation *xrp_allocation =
-			vma->vm_private_data;
+	if (vma &&
+	    (vma->vm_file == filp || xrp_is_known_file(vma->vm_file))) {
+		struct xvp_file *vm_file = vma->vm_file->private_data;
+		struct xrp_allocation *xrp_allocation = vma->vm_private_data;
 
-		mapping->type = XRP_MAPPING_NATIVE;
-		mapping->xrp_allocation = xrp_allocation;
-		xrp_allocation_get(mapping->xrp_allocation);
-		phys = xvp_file->xvp->pmem + (vma->vm_pgoff << PAGE_SHIFT) +
+		phys = vm_file->xvp->pmem + (vma->vm_pgoff << PAGE_SHIFT) +
 			virt - vma->vm_start;
-	} else {
+		pr_debug("%s: XRP allocation at 0x%08lx, paddr: %pap\n",
+			 __func__, virt, &phys);
+		/*
+		 * If it was allocated from a different XRP file it may belong
+		 * to a different device and not be directly accessible.
+		 * Check if it is.
+		 */
+		if (vma->vm_file != filp) {
+			const struct xrp_address_map_entry *address_map =
+				xrp_get_address_mapping(&xvp->address_map,
+							phys);
+
+			if (!address_map ||
+			    xrp_compare_address(phys + size - 1, address_map))
+				pr_debug("%s: untranslatable addr: %pap\n",
+					 __func__, &phys);
+			else
+				rc = 0;
+
+		} else {
+			rc = 0;
+		}
+
+		if (rc == 0) {
+			mapping->type = XRP_MAPPING_NATIVE;
+			mapping->xrp_allocation = xrp_allocation;
+			xrp_allocation_get(mapping->xrp_allocation);
+		}
+	}
+	if (rc < 0) {
 		struct xrp_alien_mapping *alien_mapping =
 			&mapping->alien_mapping;
-		long rc;
 
 		/* Otherwise this is alien allocation. */
 		pr_debug("%s: non-XVP allocation at 0x%08lx\n",
@@ -787,9 +872,6 @@ static long __xrp_share_block(struct file *filp,
 		 __func__, mapping, mapping->type);
 
 	if (do_cache) {
-		struct xvp_file *xvp_file = filp->private_data;
-		struct xvp *xvp = xvp_file->xvp;
-
 		if (flags & XRP_FLAG_WRITE) {
 			xvp->hw_ops->flush_cache((void *)virt, phys, size);
 		} else if (flags & XRP_FLAG_READ) {
@@ -1375,6 +1457,7 @@ static int xvp_open(struct inode *inode, struct file *filp)
 	xvp_file->xvp = xvp;
 	spin_lock_init(&xvp_file->busy_list_lock);
 	filp->private_data = xvp_file;
+	xrp_add_known_file(filp);
 	return 0;
 }
 
@@ -1384,6 +1467,7 @@ static int xvp_close(struct inode *inode, struct file *filp)
 
 	pr_debug("%s\n", __func__);
 
+	xrp_remove_known_file(filp);
 	devm_kfree(xvp_file->xvp->dev, xvp_file);
 	pm_runtime_put_sync(xvp_file->xvp->dev);
 	return 0;
