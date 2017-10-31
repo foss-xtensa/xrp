@@ -372,6 +372,22 @@ to create a bounce buffer that will be presented to the DSP and copy data
 to/from there. Device specific shared memory is guaranteed to be directly
 accessible to the DSP firmware code and not require use of intermediate bounce
 buffers.
+A kernel bounce buffer preserves up to 12 bits of the original buffer's
+address alignment, that is the number of contiguous least significant bits of
+the bounce buffer address that are equal to zero is not less than that of the
+original buffer address or 12, whichever is smaller. If that number is less
+than 4 then 4 least significant bits of the original address are preserved.
+Here's an example table of possible bounce buffer addresses for various
+original buffer addresses:
+
+    original      bounce  comment
+
+  0xxxxxxxx1  0xxxxxxxx1  (4 LS bits are preserved)
+  0xxxxxxxxc  0xxxxxxxxc  (4 LS bits are preserved)
+  0xxxxxxx20  0xxxxxxx00  (at least 5 LS bits are 0)
+  0xxxxxx100  0xxxxxx900  (at least 8 LS bits are 0)
+  0xxxxxx800  0xxxxxx800  (at least 11 LS bits are 0)
+
 In order to access memory of the xrp_buffer object the buffer or part of it
 must be mapped with the xrp_map_buffer function. A buffer may be mapped for
 read only or read/write access. The host specifies allowed access when it adds
