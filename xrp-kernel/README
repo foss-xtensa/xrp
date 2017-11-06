@@ -1,7 +1,13 @@
 Driver parameters:
 
+- firmware_command_timeout, int: a number of seconds that the host waits for
+  the DSP to respond to a synchronization request or a command. Can be changed
+  at runtime through the following sysfs entry:
+    /sys/module/xrp/parameters/firmware_command_timeout
+
 - firmware_reboot, 0/1: controls whether the driver reboots firmware on
-  command timeout. Enabled by default and can be changed in runtime.
+  command timeout. Enabled by default and can be changed at runtime through
+  the following sysfs entry: /sys/module/xrp/parameters/firmware_reboot
 
 - loopback, 0/1/2/3: controls level of interaction between the driver and
   the firmware.

@@ -58,7 +58,7 @@
 #include "xrp_private_alloc.h"
 
 #define DRIVER_NAME "xrp"
-#define XVP_TIMEOUT_JIFFIES (HZ * 10)
+#define XRP_DEFAULT_TIMEOUT 10
 
 #ifndef __io_virt
 #define __io_virt(a) ((void __force *)(a))
@@ -99,6 +99,10 @@ struct xrp_known_file {
 	void *filp;
 	struct hlist_node node;
 };
+
+static int firmware_command_timeout = XRP_DEFAULT_TIMEOUT;
+module_param(firmware_command_timeout, int, 0644);
+MODULE_PARM_DESC(firmware_command_timeout, "Firmware command timeout in seconds.");
 
 static int firmware_reboot = 1;
 module_param(firmware_reboot, int, 0644);
@@ -229,7 +233,7 @@ static int xrp_synchronize(struct xvp *xvp)
 {
 	size_t sz;
 	void *hw_sync_data;
-	unsigned long deadline = jiffies + XVP_TIMEOUT_JIFFIES;
+	unsigned long deadline = jiffies + firmware_command_timeout * HZ;
 	struct xrp_dsp_sync __iomem *shared_sync = xvp->comm;
 	int ret;
 	u32 v;
@@ -276,7 +280,7 @@ static int xrp_synchronize(struct xvp *xvp)
 
 	if (xvp->host_irq_mode) {
 		int res = wait_for_completion_timeout(&xvp->completion,
-						      XVP_TIMEOUT_JIFFIES);
+						      firmware_command_timeout * HZ);
 		if (res == 0) {
 			dev_err(xvp->dev,
 				"host IRQ mode is requested, but DSP couldn't deliver IRQ during synchronization\n");
@@ -998,7 +1002,7 @@ static long xvp_complete_cmd_irq(struct completion *completion,
 				 bool (*cmd_complete)(void *p),
 				 void *p)
 {
-	long timeout = XVP_TIMEOUT_JIFFIES;
+	long timeout = firmware_command_timeout * HZ;
 
 	do {
 		timeout = wait_for_completion_interruptible_timeout(completion,
@@ -1015,7 +1019,7 @@ static long xvp_complete_cmd_irq(struct completion *completion,
 static long xvp_complete_cmd_poll(bool (*cmd_complete)(void *p),
 				  void *p)
 {
-	unsigned long deadline = jiffies + XVP_TIMEOUT_JIFFIES;
+	unsigned long deadline = jiffies + firmware_command_timeout * HZ;
 
 	do {
 		if (cmd_complete(p))
