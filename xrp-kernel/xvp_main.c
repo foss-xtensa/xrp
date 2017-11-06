@@ -1572,15 +1572,19 @@ int xrp_runtime_resume(struct device *dev)
 	struct xvp *xvp = dev_get_drvdata(dev);
 	int ret;
 
+	mutex_lock(&xvp->comm_lock);
 	ret = xvp_enable_dsp(xvp);
 	if (ret < 0) {
 		dev_err(xvp->dev, "couldn't enable DSP\n");
-		return ret;
+		goto out;
 	}
 
 	ret = xrp_boot_firmware(xvp);
 	if (ret < 0)
 		xvp_disable_dsp(xvp);
+
+out:
+	mutex_unlock(&xvp->comm_lock);
 
 	return ret;
 }
