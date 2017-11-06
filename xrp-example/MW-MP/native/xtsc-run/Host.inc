@@ -1,5 +1,9 @@
 // Build Host's components
 
+#ifndef Host_BINARY_ARGS
+#define Host_BINARY_ARGS
+#endif
+
 // Create proc Host
 --xtensa_core=D_233L_pif128_LC
 --xtensa_params=
