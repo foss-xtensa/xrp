@@ -1335,7 +1335,9 @@ static long xrp_ioctl_submit_sync(struct file *filp,
 	if (loopback < LOOPBACK_NOIO) {
 		mutex_lock(&xvp->comm_lock);
 
-		if (!xvp->off) {
+		if (xvp->off) {
+			ret = -ENODEV;
+		} else {
 			xrp_fill_hw_request(xvp->comm, rq, &xvp->address_map);
 
 			xrp_send_device_irq(xvp);
