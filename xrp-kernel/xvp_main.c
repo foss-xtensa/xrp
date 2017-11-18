@@ -1573,6 +1573,9 @@ static const struct file_operations xvp_fops = {
 	.owner  = THIS_MODULE,
 	.llseek = no_llseek,
 	.unlocked_ioctl = xvp_ioctl,
+#ifdef CONFIG_COMPAT
+	.compat_ioctl = xvp_ioctl,
+#endif
 	.mmap = xvp_mmap,
 	.open = xvp_open,
 	.release = xvp_close,
