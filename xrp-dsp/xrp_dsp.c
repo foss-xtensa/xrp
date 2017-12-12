@@ -171,8 +171,12 @@ static void dump_nsid(const void *p)
 
 static void dump_cmd_ns(const struct xrp_cmd_ns *cmd_ns)
 {
-	dump_nsid(cmd_ns->id);
-	printf(" -> %p(%p)", cmd_ns->handler, cmd_ns->handler_context);
+	if (cmd_ns) {
+		dump_nsid(cmd_ns->id);
+		printf(" -> %p(%p)", cmd_ns->handler, cmd_ns->handler_context);
+	} else {
+		printf("NULL");
+	}
 }
 
 static void dump_cmd_ns_map(const struct xrp_device *device)
