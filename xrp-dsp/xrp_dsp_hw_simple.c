@@ -92,10 +92,10 @@ void xrp_hw_wait_device_irq(void)
 		return;
 
 	pr_debug("%s: waiting for device IRQ...\n", __func__);
-	old_intlevel = XTOS_SET_INTLEVEL(15);
-	_xtos_ints_on(1u << device_irq);
+	old_intlevel = XTOS_SET_INTLEVEL(XCHAL_NUM_INTLEVELS - 1);
+	_xtos_interrupt_enable(device_irq);
 	XT_WAITI(0);
-	_xtos_ints_off(1u << device_irq);
+	_xtos_interrupt_disable(device_irq);
 	XTOS_RESTORE_INTLEVEL(old_intlevel);
 }
 
@@ -134,8 +134,7 @@ void xrp_hw_set_sync_data(void *p)
 	}
 
 	if (device_irq_mode != XRP_IRQ_NONE) {
-		_xtos_ints_off(1u << device_irq);
+		_xtos_interrupt_disable(device_irq);
 		_xtos_set_interrupt_handler(device_irq, xrp_irq_handler);
-		_xtos_dispatch_level1_interrupts();
 	}
 }
