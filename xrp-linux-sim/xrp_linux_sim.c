@@ -57,6 +57,16 @@ typedef uint64_t __u64;
 #define _Atomic
 #endif
 
+#ifdef DEBUG
+#define pr_debug printf
+#else
+static inline int pr_debug(const char *p, ...)
+{
+	(void)p;
+	return 0;
+}
+#endif
+
 enum {
 	XRP_IRQ_NONE,
 	XRP_IRQ_LEVEL,
@@ -224,16 +234,6 @@ static inline int last_refcount(const void *buf)
 	return ref->count == 1;
 }
 
-static inline void xrp_comm_write32(volatile void *addr, __u32 v)
-{
-	*(volatile __u32 *)addr = v;
-}
-
-static inline __u32 xrp_comm_read32(volatile void *addr)
-{
-	return *(volatile __u32 *)addr;
-}
-
 static uint32_t getprop_u32(const void *value, int offset)
 {
 	fdt32_t v;
@@ -242,7 +242,7 @@ static uint32_t getprop_u32(const void *value, int offset)
 	return fdt32_to_cpu(v);
 }
 
-static struct xrp_shmem *find_shmem(phys_addr_t addr)
+static struct xrp_shmem *find_shmem_by_phys(phys_addr_t addr)
 {
 	int i;
 
@@ -254,15 +254,52 @@ static struct xrp_shmem *find_shmem(phys_addr_t addr)
 	return NULL;
 }
 
+static struct xrp_shmem *find_shmem_by_virt(const void *p)
+{
+	int i;
+
+	for (i = 0; i < xrp_shmem_count; ++i) {
+		size_t d = (const char *)p - (const char *)xrp_shmem[i].ptr;
+
+		if (p >= xrp_shmem[i].ptr &&
+		    d < xrp_shmem[i].size)
+			return xrp_shmem + i;
+	}
+	return NULL;
+}
+
 static void *p2v(phys_addr_t addr)
 {
-	struct xrp_shmem *shmem = find_shmem(addr);
+	struct xrp_shmem *shmem = find_shmem_by_phys(addr);
 
 	if (shmem) {
 		return shmem->ptr + addr - shmem->start;
 	} else {
 		return NULL;
 	}
+}
+
+static phys_addr_t v2p(const void *p)
+{
+	struct xrp_shmem *shmem = find_shmem_by_virt(p);
+
+	if (shmem) {
+		return shmem->start +
+			(const char *)p - (const char *)shmem->ptr;
+	} else {
+		return 0;
+	}
+}
+
+static inline void xrp_comm_write32(volatile void *addr, __u32 v)
+{
+	pr_debug("%s: 0x%08x, %08x\n", __func__, v2p((const void *)addr), v);
+	*(volatile __u32 *)addr = v;
+}
+
+static inline __u32 xrp_comm_read32(const volatile void *addr)
+{
+	return *(volatile __u32 *)addr;
 }
 
 static void initialize_shmem(void)
