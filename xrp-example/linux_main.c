@@ -377,7 +377,7 @@ static void f6(int devid)
 	device = xrp_open_device(devid, &status);
 	assert(status == XRP_STATUS_SUCCESS);
 	status = -1;
-	queue = queue = xrp_create_queue(device, &status);
+	queue = xrp_create_queue(device, &status);
 	assert(status == XRP_STATUS_SUCCESS);
 	status = -1;
 
