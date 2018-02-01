@@ -97,6 +97,7 @@ struct xrp_device_description {
 
 	uint32_t device_irq_mode;
 	uint32_t device_irq[3];
+	uint32_t device_irq_host_offset;
 	pthread_mutex_t hw_mutex;
 };
 
@@ -384,7 +385,7 @@ static void initialize_shmem(void)
 
 static inline void xrp_send_device_irq(struct xrp_device_description *desc)
 {
-	void *device_irq = p2v(desc->io_base + desc->device_irq[0]);
+	void *device_irq = p2v(desc->io_base + desc->device_irq_host_offset);
 
 	switch (desc->device_irq_mode) {
 	case XRP_IRQ_EDGE:
@@ -548,6 +549,7 @@ static int init_cdns_xrp_hw_simple_common(void *fdt, int offset,
 					  struct xrp_device_description *description)
 {
 	const void *device_irq;
+	const void *device_irq_host_offset;
 	const void *device_irq_mode;
 	int len;
 
@@ -573,6 +575,19 @@ static int init_cdns_xrp_hw_simple_common(void *fdt, int offset,
 				getprop_u32(device_irq, 4);
 			description->device_irq[2] =
 				getprop_u32(device_irq, 8);
+
+			device_irq_host_offset = fdt_getprop(fdt, offset,
+							     "device-irq-host-offset",
+							     &len);
+			if (!device_irq_host_offset || len < 4) {
+				description->device_irq_host_offset =
+					description->device_irq[0];
+				printf("%s: valid device-irq-host-offset not found, not using\n",
+				       __func__);
+			} else {
+				description->device_irq_host_offset =
+					getprop_u32(device_irq_host_offset, 0);
+			}
 		}
 	}
 	return 1;

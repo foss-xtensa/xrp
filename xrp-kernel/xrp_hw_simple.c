@@ -59,11 +59,13 @@ struct xrp_hw_simple {
 	/* how IRQ is used to notify the device of incoming data */
 	enum xrp_irq_mode device_irq_mode;
 	/*
-	 * offset of IRQ register in MMIO region (host side)
+	 * offset of device IRQ register in MMIO region (device side)
 	 * bit number
 	 * device IRQ#
 	 */
 	u32 device_irq[3];
+	/* offset of devuce IRQ register in MMIO region (host side) */
+	u32 device_irq_host_offset;
 	/* how IRQ is used to notify the host of incoming data */
 	enum xrp_irq_mode host_irq_mode;
 	/*
@@ -125,11 +127,11 @@ static void send_irq(void *hw_arg)
 
 	switch (hw->device_irq_mode) {
 	case XRP_IRQ_EDGE:
-		reg_write32(hw, hw->device_irq[0], 0);
+		reg_write32(hw, hw->device_irq_host_offset, 0);
 		/* fallthrough */
 	case XRP_IRQ_LEVEL:
 		wmb();
-		reg_write32(hw, hw->device_irq[0],
+		reg_write32(hw, hw->device_irq_host_offset,
 			    BIT(hw->device_irq[1]));
 		break;
 	default:
@@ -241,6 +243,19 @@ static int init_hw(struct platform_device *pdev, struct xrp_hw_simple *hw,
 					 hw->device_irq,
 					 ARRAY_SIZE(hw->device_irq));
 	if (ret == 0) {
+		u32 device_irq_host_offset;
+
+		ret = of_property_read_u32(pdev->dev.of_node,
+					   "device-irq-host-offset",
+					   &device_irq_host_offset);
+		if (ret == 0) {
+			hw->device_irq_host_offset = &device_irq_host_offset;
+		} else {
+			hw->device_irq_host_offset = hw->device_irq[0];
+			ret = 0;
+		}
+	}
+	if (ret == 0) {
 		u32 device_irq_mode;
 
 		ret = of_property_read_u32(pdev->dev.of_node,
@@ -253,8 +268,9 @@ static int init_hw(struct platform_device *pdev, struct xrp_hw_simple *hw,
 	}
 	if (ret == 0) {
 		dev_dbg(&pdev->dev,
-			"%s: device IRQ MMIO offset = 0x%08x, bit = %d, device IRQ = %d, IRQ mode = %d",
-			__func__, hw->device_irq[0], hw->device_irq[1],
+			"%s: device IRQ MMIO host offset = 0x%08x, offset = 0x%08x, bit = %d, device IRQ = %d, IRQ mode = %d",
+			__func__, hw->device_irq_host_offset,
+			hw->device_irq[0], hw->device_irq[1],
 			hw->device_irq[2], hw->device_irq_mode);
 	} else {
 		dev_info(&pdev->dev,
