@@ -50,6 +50,8 @@ void *xrp_dsp_comm_base = &xrp_dsp_comm_base_magic;
 
 static int manage_cache;
 
+#define MAX_STACK_BUFFERS 16
+
 /* DSP side XRP API implementation */
 
 struct xrp_refcounted {
@@ -539,7 +541,8 @@ static enum xrp_status process_command(struct xrp_device *device,
 	size_t n_buffers = dsp_cmd->buffer_size / sizeof(struct xrp_dsp_buffer);
 	struct xrp_dsp_buffer *dsp_buffer;
 	struct xrp_buffer_group buffer_group;
-	struct xrp_buffer buffer[n_buffers]; /* TODO */
+	struct xrp_buffer sbuffer[n_buffers <= MAX_STACK_BUFFERS ? n_buffers : 1];
+	struct xrp_buffer *buffer = sbuffer;
 	xrp_command_handler *command_handler = xrp_run_command_handler;
 	void *handler_context = NULL;
 	size_t i;
@@ -568,6 +571,14 @@ static enum xrp_status process_command(struct xrp_device *device,
 		dcache_region_invalidate((void *)dsp_cmd->in_data_addr,
 					 dsp_cmd->in_data_size);
 	}
+	if (n_buffers > MAX_STACK_BUFFERS) {
+		buffer = malloc(n_buffers * sizeof(*buffer));
+		if (!buffer) {
+			status = XRP_STATUS_FAILURE;
+			goto out;
+		}
+	}
+
 	/* Create buffers from incoming buffer data, put them to group.
 	 * Passed flags add some restrictions to possible buffer mapping
 	 * modes:
@@ -644,6 +655,9 @@ static enum xrp_status process_command(struct xrp_device *device,
 	if (n_buffers > XRP_DSP_CMD_INLINE_BUFFER_COUNT) {
 		dcache_region_writeback(dsp_buffer,
 					n_buffers * sizeof(*dsp_buffer));
+	}
+	if (n_buffers > MAX_STACK_BUFFERS) {
+		free(buffer);
 	}
 out:
 	complete_request(dsp_cmd, flags);
