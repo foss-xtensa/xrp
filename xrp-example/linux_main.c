@@ -350,6 +350,11 @@ static void f5(int devid)
 	assert(status == XRP_STATUS_SUCCESS);
 	status = -1;
 	assert(flags == XRP_READ);
+	xrp_buffer_group_get_info(group, XRP_BUFFER_GROUP_SIZE_SIZE_T, 0,
+				  &sz, sizeof(sz), &status);
+	assert(status == XRP_STATUS_SUCCESS);
+	status = -1;
+	assert(sz == 1);
 
 	xrp_release_buffer(buf1, &status);
 	assert(status == XRP_STATUS_SUCCESS);

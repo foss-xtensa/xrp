@@ -985,6 +985,11 @@ void xrp_buffer_group_get_info(struct xrp_buffer_group *group,
 		ptr = &group->buffer[idx].access_flags;
 		break;
 
+	case XRP_BUFFER_GROUP_SIZE_SIZE_T:
+		sz = sizeof(group->n_buffers);
+		ptr = &group->n_buffers;
+		break;
+
 	default:
 		goto out;
 	}

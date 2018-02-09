@@ -56,6 +56,7 @@ enum xrp_buffer_info {
 };
 enum xrp_buffer_group_info {
 	XRP_BUFFER_GROUP_BUFFER_FLAGS_ENUM,
+	XRP_BUFFER_GROUP_SIZE_SIZE_T,
 };
 
 #define XRP_NAMESPACE_ID_SIZE	16

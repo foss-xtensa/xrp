@@ -150,7 +150,12 @@ static enum xrp_status example_v1_handler(void *handler_context,
 		xrp_release_buffer(sbuf, NULL);
 		xrp_release_buffer(dbuf, NULL);
 	}
-	return XRP_STATUS_SUCCESS;
+
+	sz = 0;
+	xrp_buffer_group_get_info(buffer_group, XRP_BUFFER_GROUP_SIZE_SIZE_T,
+				  0, &sz, sizeof(sz), NULL);
+
+	return sz == i ? XRP_STATUS_SUCCESS : XRP_STATUS_FAILURE;
 }
 
 static enum xrp_status example_v2_handler(void *handler_context,
