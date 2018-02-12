@@ -249,7 +249,7 @@ static int init_hw(struct platform_device *pdev, struct xrp_hw_simple *hw,
 					   "device-irq-host-offset",
 					   &device_irq_host_offset);
 		if (ret == 0) {
-			hw->device_irq_host_offset = &device_irq_host_offset;
+			hw->device_irq_host_offset = device_irq_host_offset;
 		} else {
 			hw->device_irq_host_offset = hw->device_irq[0];
 			ret = 0;
