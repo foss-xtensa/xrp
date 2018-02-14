@@ -27,6 +27,7 @@
 #include <linux/dma-mapping.h>
 #include <linux/kernel.h>
 #include <linux/slab.h>
+#include <linux/version.h>
 #include "xrp_cma_alloc.h"
 
 struct xrp_cma_allocation {
@@ -56,7 +57,18 @@ static long xrp_cma_alloc(struct xrp_allocation_pool *allocation_pool,
 		return -ENOMEM;
 
 	new = &new_cma->allocation;
-	kvaddr = dma_alloc_attrs(pool->dev, size, &dma_addr, GFP_KERNEL, 0);
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4,8,0)
+	{
+		DEFINE_DMA_ATTRS(attrs);
+
+		dma_set_attr(DMA_ATTR_NO_KERNEL_MAPPING, &attrs);
+		kvaddr = dma_alloc_attrs(pool->dev, size, &dma_addr,
+					 GFP_KERNEL, &attrs);
+	}
+#else
+	kvaddr = dma_alloc_attrs(pool->dev, size, &dma_addr, GFP_KERNEL,
+				 DMA_ATTR_NO_KERNEL_MAPPING);
+#endif
 	if (!kvaddr) {
 		kfree(new_cma);
 		return -ENOMEM;
@@ -80,10 +92,20 @@ static void xrp_cma_free(struct xrp_allocation *xrp_allocation)
 						    struct xrp_cma_allocation,
 						    allocation);
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4,8,0)
+	DEFINE_DMA_ATTRS(attrs);
+
+	dma_set_attr(DMA_ATTR_NO_KERNEL_MAPPING, &attrs);
 	dma_free_attrs(pool->dev, xrp_allocation->size,
 		       a->kvaddr,
 		       phys_to_dma(pool->dev, xrp_allocation->start),
-		       0);
+		       &attrs);
+#else
+	dma_free_attrs(pool->dev, xrp_allocation->size,
+		       a->kvaddr,
+		       phys_to_dma(pool->dev, xrp_allocation->start),
+		       DMA_ATTR_NO_KERNEL_MAPPING);
+#endif
 	kfree(a);
 }
 
