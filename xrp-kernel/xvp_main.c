@@ -1742,6 +1742,10 @@ err_free_map:
 	xrp_free_address_map(&xvp->address_map);
 err_free_pool:
 	xrp_free_pool(xvp->pool);
+	if (xvp->comm_phys && !xvp->pmem) {
+		dma_free_attrs(xvp->dev, PAGE_SIZE, xvp->comm,
+			       phys_to_dma(xvp->dev, xvp->comm_phys), 0);
+	}
 err:
 	dev_err(&pdev->dev, "%s: ret = %d\n", __func__, ret);
 	return ret;
@@ -1779,6 +1783,10 @@ int xrp_deinit(struct platform_device *pdev)
 	misc_deregister(&xvp->miscdev);
 	release_firmware(xvp->firmware);
 	xrp_free_pool(xvp->pool);
+	if (xvp->comm_phys && !xvp->pmem) {
+		dma_free_attrs(xvp->dev, PAGE_SIZE, xvp->comm,
+			       phys_to_dma(xvp->dev, xvp->comm_phys), 0);
+	}
 	xrp_free_address_map(&xvp->address_map);
 	--xvp_nodeid;
 	return 0;
