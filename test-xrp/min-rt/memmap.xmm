@@ -1,0 +1,52 @@
+VECSELECT=1
+VECBASE=0xd0000400
+
+PLACE SECTIONS(.bss)     WITH_SECTION(.dram1.bss)
+PLACE SECTIONS(.data)    WITH_SECTION(.dram1.data)
+PLACE SECTIONS(.rodata)  WITH_SECTION(.dram1.rodata)
+PLACE SECTIONS(STACK)    WITH_SECTION(.dram1.bss)
+PLACE SECTIONS(HEAP)     WITH_SECTION(.dram1.bss)
+
+BEGIN dram1
+0xcff80000: dataRam : dram1 : 0x40000 : writable;
+  dram1_0 : C : 0xcff80000 - 0xcffbffff : STACK :  HEAP : .dram1.rodata .rodata .dram1.literal .dram1.data .data .dram1.bss .bss;
+END dram1
+
+BEGIN dram0
+0xcffc0000: dataRam : dram0 : 0x40000 : writable;
+  dram0_0 : C : 0xcffc0000 - 0xcfffffff : .dram0.rodata .dram0.literal .dram0.data .dram0.bss;
+END dram0
+
+BEGIN iram0
+0xd0000000: instRam : iram0 : 0x8000 : executable, writable;
+  iram0_00 : C : 0xd0000000 - 0xd00003ff : ;
+  iram0_01 : F : 0xd0000400 - 0xd0000577 : .WindowVectors.text;
+  iram0_02 : C : 0xd0000578 - 0xd000057f : .Level2InterruptVector.literal;
+  iram0_03 : F : 0xd0000580 - 0xd00005b7 : .Level2InterruptVector.text;
+  iram0_04 : C : 0xd00005b8 - 0xd00005bf : .DebugExceptionVector.literal;
+  iram0_05 : F : 0xd00005c0 - 0xd00005f7 : .DebugExceptionVector.text;
+  iram0_06 : C : 0xd00005f8 - 0xd00005ff : .NMIExceptionVector.literal;
+  iram0_07 : F : 0xd0000600 - 0xd0000637 : .NMIExceptionVector.text;
+  iram0_08 : C : 0xd0000638 - 0xd000063f : .KernelExceptionVector.literal;
+  iram0_09 : F : 0xd0000640 - 0xd0000677 : .KernelExceptionVector.text;
+  iram0_10 : C : 0xd0000678 - 0xd000067f : .UserExceptionVector.literal;
+  iram0_11 : F : 0xd0000680 - 0xd00006b7 : .UserExceptionVector.text;
+  iram0_12 : C : 0xd00006b8 - 0xd00006ff : .DoubleExceptionVector.literal;
+  iram0_13 : F : 0xd0000700 - 0xd000073f : .DoubleExceptionVector.text;
+  iram0_14 : F : 0xd0000740 - 0xd0000a3f : .ResetVector.text;
+  iram0_15 : C : 0xd0000a40 - 0xd0007fff : .iram0.literal  .iram0.text;
+END iram0
+
+BEGIN srom
+0xd0080000: sysrom : srom : 0x1000000 : executable;
+  srom0 : C : 0xd0080000 - 0xd107ffff : .srom.rodata .srom.literal .srom.text .rom.store;
+END srom
+
+BEGIN sram
+0xe0000000: sysram : sram : 0x20000000 : executable, writable;
+END sram
+
+BEGIN lmem
+0x01180000: sysram : lmem : 0x80000 : executable, writable;
+  lmem0 : C : 0x01180000 - 0x011fffff : .sram.rodata .sram.literal .sram.text .sram.data .literal .text .sram.bss;
+END lmem

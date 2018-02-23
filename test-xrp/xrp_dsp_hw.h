@@ -1,8 +1,5 @@
 /*
- * XRP interface between hardware-specific linux and DSP parts of example
- * hardware
- *
- * Copyright (c) 2017 Cadence Design Systems, Inc.
+ * Copyright (c) 2017 Cadence Design Systems Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -22,37 +19,13 @@
  * CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
  * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
- *
- * Alternatively you can use and distribute this file under the terms of
- * the GNU General Public License version 2 or later.
  */
 
-#ifndef _XRP_KERNEL_DCT_HW_DSP_INTERFACE
-#define _XRP_KERNEL_DCT_HW_DSP_INTERFACE
+#ifndef XRP_DSP_HW_H
+#define XRP_DSP_HW_H
 
-enum {
-	XRP_DSP_SYNC_IRQ_MODE_NONE = 0x0,
-	XRP_DSP_SYNC_IRQ_MODE_LEVEL = 0x1,
-	XRP_DSP_SYNC_IRQ_MODE_EDGE = 0x2,
-};
-
-//ZQI:
-//get all individual register fields from dts 
-struct xrp_hw_dct_sync_data {
-	__u32 device_mmio_base;
-	__u32 device_irq_ism[2];
-	__u32 device_irq_ris[2];
-	__u32 device_irq_mis[2];
-	__u32 device_irq_isc[2];
-	__u32 device_irq_iss[2];
-  __u32 device_irq_mode;
-	__u32 device_irq;
-	__u32 host_irq_ism[2];
-	__u32 host_irq_ris[2];
-	__u32 host_irq_mis[2];
-	__u32 host_irq_isc[2];
-	__u32 host_irq_iss[2];
-	__u32 host_irq_mode;
-};
+void xrp_hw_send_host_irq(void);
+void xrp_hw_wait_device_irq(void);
+void xrp_hw_set_sync_data(void *p);
 
 #endif
