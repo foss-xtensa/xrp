@@ -29,7 +29,8 @@ xrp-$(CONFIG_OF) += xrp_firmware.o
 xrp-$(CONFIG_CMA) += xrp_cma_alloc.o
 
 obj-m += xrp.o
-obj-$(CONFIG_XRP_HW_SIMPLE) += xrp_hw_simple.o
+#obj-$(CONFIG_XRP_HW_SIMPLE) += xrp_hw_simple.o
+obj-$(CONFIG_XRP_HW_SIMPLE) += xrp_hw_dct.o
 
 ccflags-$(CONFIG_XRP_DEBUG) += -DDEBUG
 
