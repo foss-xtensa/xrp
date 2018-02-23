@@ -1,0 +1,102 @@
+This README file defines what I have experimented so far w.r.t. porting xrp driver.
+
+Charles Qi 2/22/2018
+
+1. clone XRP git repo
+=======================
+The DCT flow is built around git. To make changes to XRP code base, I forked the XRP
+github repo to git@github.com:zhengstake/xrp.git and created a branch  dct_port_0222.
+
+The local repo can be referenced from DCT flow by creating symbolic links to .git under
+feeds/packages:
+ lede/feeds/sdip/sdip-xrp-application/git-src <local xrp repo>/.git
+ lede/feeds/sdip/sdip-xrp-driver/git-src <local xrp repo>/.git
+
+2. Code change
+=======================
+So far there are two main modifications.
+under xrp-kernel, I have created  xrp_hw_dct.c and xrp_hw_dct_dsp_interface.h for the
+low level driver. The generic driver is not touched. The main changes are how the
+MMIO field related to DSP control, IRQ handling are mapped and communicated.
+
+Unlike the simple HW driver, the DCT platform control regsisters are more spread out and
+shared by many modules. Fields within the registers are also interleaved for different DSPs.
+Please refer to DCT Platform PG for details:
+ a. the reset and runstall registgers are in SCU DSP control
+ b. the host <-> DSP IPI interrupts are in DSP control
+
+Currently on the host side, the acccess to the two MMIO regions are down through syscon regmap,
+consistent with the existing IVP driver. Additionally, a device_mmio_base and offset to
+IRQ control registers are defined in dts.  DSP reset, runstall and IRQ send, ack routines are
+modified in xrp_hw_dct.c.
+
+The new HW driver uses the cma binding, defining a shared reserve memory region in DDR for
+ARM <=> DSP communication and data sharing. the 'reg' field in dts is not used. xrp_init_cma
+in xrp_main.c is called by the HW driver at probe.
+
+reset and runstall are not used by Xtensa DSP code. So only DSP control base is included in 
+xrp_hw_dct_sync_data structure as device_mmio_base.
+
+On DSP side, a low level driver is derived from the simple driver. The code is under test-xrp/xrp_dsp_hw_dct.c.
+The DCT platform uses a set of registers to control interrupts between ARM and DSP. These are 
+documented in the PG. The offset and bit locations of the registers are defined in dts and 
+passed to DSP in xrp_hw_dct_sync_data. Currently only set and clear registers are used to control IRQ singaling. 
+Further modification may be needed to include usage of mask registers.
+ 
+3.XRP driver and IVP driver co-existance
+============================================
+The DCT platform uses an low level IVP driver to allow ARM host and Vision DSP to communicate.
+Existing image/vision demos utilizes V4L2 streaming framework on top of IVP driver to 
+send video frames to DSP for processing. Then displays the processed frames.
+
+We'd like to preserve the IVP driver and V4L2 framework while integrate the XRP function.
+The best approach is to integrate low-level HW driver function into the IVP driver. Then allow
+both XRP generic driver and whatever on top of the XRP to communicate through the IVP driver.
+This is considered a TBD Phase 2 effort.
+
+For initial integration, the plan is to split the 4 DSPs, two for IVP driver + V4L2, the other two
+for XRP generic + HW driver.
+
+The split is shown in xrp-example/sdip-xrp.dtsi.
+
+The sdip-xrp.dtsi should be copied to 
+ede/build_dir/target-aarch64_cortex-a53+neon-vfpv4_musl-1.1.16/linux-sdip_sdip64/linux-4.9.47/arch/arm64/boot/dts/dct
+
+and included in sdip-v2.dts.
+
+The Linux target should be rebuild to utilize this new dts.
+
+
+4. Integration of host side code to DCT flow
+============================================
+
+with help from Ralph, the latest XRP kernel module and host app have been integrated
+into DCT flow. The package can be pulled for git server:
+
+./scripts/feeds update sdip
+./scripts/feeds install -a -p sdip
+make menuconfig
+make -j8
+ 
+Note: make menuconfig is used to select XRP driver and app under Xtensa tab.
+
+You can clean and compile these two modules with:
+make package/sdip-xrp-application/clean V=s make package/sdip-xrp-application/compile V=s
+make package/sdip-xrp-driver/clean V=s make package/sdip-xrp-driver/compile V=s
+
+If you setup the git-src symbolic link properly, you will be able to see the local code
+being picked up under 
+lede/build_dir/target-aarch64_cortex-a53+neon-vfpv4_musl-1.1.16/sdip-xrp-application-2018-02-15 
+lede/build_dir/target-aarch64_cortex-a53+neon-vfpv4_musl-1.1.16/linux-sdip_sdip64/sdip-xrp-driver-2018-02-15
+
+respectively.
+
+5. Integration of DSP side code to DCT flow
+============================================
+Xtensa side of XRP framework and driver code are integrated under 
+lede/build_dir/target-aarch64_cortex-a53+neon-vfpv4_musl-1.1.16/sdip-xtensa-2017-06-08/test-xrp.
+
+I created a cmake based flow to build the driver and framework into a sigle elf, using the LSP designed for 
+any test demos.
+
+The test_xrp directory is copied into dct_port_0222 branch just for completeness.
