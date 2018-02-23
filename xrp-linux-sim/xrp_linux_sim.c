@@ -1365,8 +1365,8 @@ void xrp_enqueue_command(struct xrp_queue *queue,
 		event->status = XRP_STATUS_PENDING;
 		*evt = event;
 		xrp_retain_event(event, NULL);
-		rq->event = event;
 	}
+	rq->event = event;
 	dsp_cmd->flags = (queue->use_nsid ? XRP_DSP_CMD_FLAG_REQUEST_NSID : 0);
 	if (queue->use_nsid) {
 		memcpy(dsp_cmd->nsid, queue->nsid, sizeof(dsp_cmd->nsid));

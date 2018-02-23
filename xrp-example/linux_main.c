@@ -109,6 +109,8 @@ static void f2(int devid)
 	assert(status == XRP_STATUS_SUCCESS);
 	status = -1;
 
+	xrp_enqueue_command(queue, NULL, 0, NULL, 0, group, NULL, &status);
+	assert(status == XRP_STATUS_SUCCESS);
 	xrp_enqueue_command(queue, NULL, 0, NULL, 0, group, event + 0, &status);
 	assert(status == XRP_STATUS_SUCCESS);
 	status = -1;
