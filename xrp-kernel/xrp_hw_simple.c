@@ -37,7 +37,6 @@
 #include <asm/cacheflush.h>
 #include "xrp_hw.h"
 #include "xrp_hw_simple_dsp_interface.h"
-#include "xrp_internal.h"
 
 #define DRIVER_NAME "xrp-hw-simple"
 
@@ -52,7 +51,7 @@ enum xrp_irq_mode {
 };
 
 struct xrp_hw_simple {
-	struct xvp xrp;
+	struct xvp *xrp;
 	phys_addr_t regs_phys;
 	void __iomem *regs;
 
@@ -150,7 +149,7 @@ static void ack_irq(void *hw_arg)
 static irqreturn_t irq_handler(int irq, void *dev_id)
 {
 	struct xrp_hw_simple *hw = dev_id;
-	irqreturn_t ret = xrp_irq_handler(irq, &hw->xrp);
+	irqreturn_t ret = xrp_irq_handler(irq, hw->xrp);
 
 	if (ret == IRQ_HANDLED)
 		ack_irq(hw);
@@ -221,12 +220,12 @@ static const struct xrp_hw_ops hw_ops = {
 	.invalidate_cache = invalidate_cache,
 };
 
-static int init_hw(struct platform_device *pdev, struct xrp_hw_simple *hw,
-		   int mem_idx)
+static long init_hw(struct platform_device *pdev, struct xrp_hw_simple *hw,
+		    int mem_idx, enum xrp_init_flags *init_flags)
 {
 	struct resource *mem;
 	int irq;
-	int ret;
+	long ret;
 
 	mem = platform_get_resource(pdev, IORESOURCE_MEM, mem_idx);
 	if (!mem) {
@@ -301,7 +300,7 @@ static int init_hw(struct platform_device *pdev, struct xrp_hw_simple *hw,
 			dev_err(&pdev->dev, "request_irq %d failed\n", irq);
 			goto err;
 		}
-		hw->xrp.host_irq_mode = true;
+		*init_flags |= XRP_INIT_USE_HOST_IRQ;
 	} else {
 		dev_info(&pdev->dev, "using polling mode on the host side\n");
 	}
@@ -310,37 +309,40 @@ err:
 	return ret;
 }
 
-static int init(struct platform_device *pdev, struct xrp_hw_simple *hw)
+static long init(struct platform_device *pdev, struct xrp_hw_simple *hw)
 {
-	int ret;
+	long ret;
+	enum xrp_init_flags init_flags = 0;
 
-	ret = init_hw(pdev, hw, 0);
+	ret = init_hw(pdev, hw, 0, &init_flags);
 	if (ret < 0)
 		return ret;
 
-	return xrp_init(pdev, &hw->xrp, &hw_ops, hw);
+	return xrp_init(pdev, init_flags, &hw_ops, hw);
 }
 
-static int init_v1(struct platform_device *pdev, struct xrp_hw_simple *hw)
+static long init_v1(struct platform_device *pdev, struct xrp_hw_simple *hw)
 {
-	int ret;
+	long ret;
+	enum xrp_init_flags init_flags = 0;
 
-	ret = init_hw(pdev, hw, 1);
+	ret = init_hw(pdev, hw, 1, &init_flags);
 	if (ret < 0)
 		return ret;
 
-	return xrp_init_v1(pdev, &hw->xrp, &hw_ops, hw);
+	return xrp_init_v1(pdev, init_flags, &hw_ops, hw);
 }
 
-static int init_cma(struct platform_device *pdev, struct xrp_hw_simple *hw)
+static long init_cma(struct platform_device *pdev, struct xrp_hw_simple *hw)
 {
-	int ret;
+	long ret;
+	enum xrp_init_flags init_flags = 0;
 
-	ret = init_hw(pdev, hw, 0);
+	ret = init_hw(pdev, hw, 0, &init_flags);
 	if (ret < 0)
 		return ret;
 
-	return xrp_init_cma(pdev, &hw->xrp, &hw_ops, hw);
+	return xrp_init_cma(pdev, init_flags, &hw_ops, hw);
 }
 
 #ifdef CONFIG_OF
@@ -364,7 +366,8 @@ static int xrp_hw_simple_probe(struct platform_device *pdev)
 	struct xrp_hw_simple *hw =
 		devm_kzalloc(&pdev->dev, sizeof(*hw), GFP_KERNEL);
 	const struct of_device_id *match;
-	int (*init)(struct platform_device *pdev, struct xrp_hw_simple *hw);
+	long (*init)(struct platform_device *pdev, struct xrp_hw_simple *hw);
+	long ret;
 
 	if (!hw)
 		return -ENOMEM;
@@ -375,7 +378,14 @@ static int xrp_hw_simple_probe(struct platform_device *pdev)
 		return -ENODEV;
 
 	init = match->data;
-	return init(pdev, hw);
+	ret = init(pdev, hw);
+	if (IS_ERR_VALUE(ret)) {
+		xrp_deinit(pdev);
+		return ret;
+	} else {
+		hw->xrp = ERR_PTR(ret);
+		return 0;
+	}
 
 }
 

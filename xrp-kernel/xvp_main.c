@@ -1680,17 +1680,26 @@ static int xrp_init_regs_cma(struct platform_device *pdev, struct xvp *xvp)
 	return xrp_init_cma_pool(&xvp->pool, xvp->dev);
 }
 
-static int xrp_init_common(struct platform_device *pdev, struct xvp *xvp,
-			   const struct xrp_hw_ops *hw_ops, void *hw_arg,
-			   int (*xrp_init_regs)(struct platform_device *pdev,
-						struct xvp *xvp))
+static long xrp_init_common(struct platform_device *pdev,
+			    enum xrp_init_flags init_flags,
+			    const struct xrp_hw_ops *hw_ops, void *hw_arg,
+			    int (*xrp_init_regs)(struct platform_device *pdev,
+						 struct xvp *xvp))
 {
-	int ret;
+	long ret;
 	char nodename[sizeof("xvp") + 3 * sizeof(int)];
+	struct xvp *xvp = devm_kzalloc(&pdev->dev, sizeof(*xvp), GFP_KERNEL);
+
+	if (!xvp) {
+		ret = -ENOMEM;
+		goto err;
+	}
 
 	xvp->dev = &pdev->dev;
 	xvp->hw_ops = hw_ops;
 	xvp->hw_arg = hw_arg;
+	if (init_flags & XRP_INIT_USE_HOST_IRQ)
+		xvp->host_irq_mode = true;
 	platform_set_drvdata(pdev, xvp);
 	mutex_init(&xvp->comm_lock);
 	init_completion(&xvp->completion);
@@ -1712,7 +1721,7 @@ static int xrp_init_common(struct platform_device *pdev, struct xvp *xvp,
 		dev_dbg(xvp->dev,
 			"no firmware-name property, not loading firmware");
 	} else if (ret < 0) {
-		dev_err(xvp->dev, "invalid firmware name (%d)", ret);
+		dev_err(xvp->dev, "invalid firmware name (%ld)", ret);
 		goto err_free_map;
 	}
 
@@ -1735,7 +1744,7 @@ static int xrp_init_common(struct platform_device *pdev, struct xvp *xvp,
 	ret = misc_register(&xvp->miscdev);
 	if (ret < 0)
 		goto err_pm_disable;
-	return 0;
+	return PTR_ERR(xvp);
 err_pm_disable:
 	pm_runtime_disable(xvp->dev);
 err_free_map:
@@ -1747,28 +1756,28 @@ err_free_pool:
 			       phys_to_dma(xvp->dev, xvp->comm_phys), 0);
 	}
 err:
-	dev_err(&pdev->dev, "%s: ret = %d\n", __func__, ret);
+	dev_err(&pdev->dev, "%s: ret = %ld\n", __func__, ret);
 	return ret;
 }
 
-int xrp_init(struct platform_device *pdev, struct xvp *xvp,
-	     const struct xrp_hw_ops *hw_ops, void *hw_arg)
+long xrp_init(struct platform_device *pdev, enum xrp_init_flags flags,
+	      const struct xrp_hw_ops *hw_ops, void *hw_arg)
 {
-	return xrp_init_common(pdev, xvp, hw_ops, hw_arg, xrp_init_regs_v0);
+	return xrp_init_common(pdev, flags, hw_ops, hw_arg, xrp_init_regs_v0);
 }
 EXPORT_SYMBOL(xrp_init);
 
-int xrp_init_v1(struct platform_device *pdev, struct xvp *xvp,
-		const struct xrp_hw_ops *hw_ops, void *hw_arg)
+long xrp_init_v1(struct platform_device *pdev, enum xrp_init_flags flags,
+		 const struct xrp_hw_ops *hw_ops, void *hw_arg)
 {
-	return xrp_init_common(pdev, xvp, hw_ops, hw_arg, xrp_init_regs_v1);
+	return xrp_init_common(pdev, flags, hw_ops, hw_arg, xrp_init_regs_v1);
 }
 EXPORT_SYMBOL(xrp_init_v1);
 
-int xrp_init_cma(struct platform_device *pdev, struct xvp *xvp,
-		 const struct xrp_hw_ops *hw_ops, void *hw_arg)
+long xrp_init_cma(struct platform_device *pdev, enum xrp_init_flags flags,
+		  const struct xrp_hw_ops *hw_ops, void *hw_arg)
 {
-	return xrp_init_common(pdev, xvp, hw_ops, hw_arg, xrp_init_regs_cma);
+	return xrp_init_common(pdev, flags, hw_ops, hw_arg, xrp_init_regs_cma);
 }
 EXPORT_SYMBOL(xrp_init_cma);
 
