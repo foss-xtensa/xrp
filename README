@@ -253,6 +253,7 @@ The linux kernel driver is tested with a number of linux kernel versions from
 3.18 to 4.11 and is known to work on xtensa, 32- and 64-bit ARM and x86 linux.
 
 The driver makes the following assumptions:
+- DSP has the same endianness as the host.
 - DSP memory where firmware must be loaded (possibly including DRAM and IRAM)
   is writable from the linux host. Host may access that memory at physical
   addresses different from their physical addresses used by the DSP (i.e.
@@ -461,6 +462,10 @@ CONFIG_XRP_HW_SIMPLE=m to the make:
   $ ARCH=xtensa CROSS_COMPILE=xtensa-dc233c-elf- \
     KSRC=`pwd`/../kernel/xrp-sim-dc233c \
     make -C xrp-kernel CONFIG_XRP_HW_SIMPLE=m modules
+
+The following XRP kernel module features have additional requirements for the
+kernel configuration:
+- CMA binding needs CONFIG_CMA and CONFIG_DMA_CMA enabled.
 
 Building XRP libraries.
 ======================
