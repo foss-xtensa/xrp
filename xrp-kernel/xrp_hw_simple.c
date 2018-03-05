@@ -290,8 +290,13 @@ static long init_hw(struct platform_device *pdev, struct xrp_hw_simple *hw,
 		else
 			ret = -ENOENT;
 	}
-	irq = platform_get_irq(pdev, 0);
-	if (irq >= 0 && ret == 0) {
+
+	if (ret == 0 && hw->host_irq_mode != XRP_IRQ_NONE)
+		irq = platform_get_irq(pdev, 0);
+	else
+		irq = -1;
+
+	if (irq >= 0) {
 		dev_dbg(&pdev->dev, "%s: host IRQ = %d, ",
 			__func__, irq);
 		ret = devm_request_irq(&pdev->dev, irq, irq_handler,
