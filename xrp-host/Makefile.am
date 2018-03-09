@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2017 Cadence Design Systems Inc.
+# Copyright (c) 2017 - 2018 Cadence Design Systems Inc.
 #
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
@@ -21,10 +21,34 @@
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 
-AM_CPPFLAGS = -I$(srcdir)/.. -I$(srcdir)/../xrp-kernel
+AM_CPPFLAGS = -I$(srcdir)/.. -I$(srcdir) -I$(srcdir)/thread-pthread
 AM_CFLAGS = -W -Wall
 
 include_HEADERS = ../xrp_api.h
-lib_LIBRARIES = libxrp-linux-native.a
+lib_LIBRARIES =
 
-libxrp_linux_native_a_SOURCES = xrp_linux_native.c
+if BUILD_SIM
+lib_LIBRARIES += libxrp-linux-sim.a
+endif
+if BUILD_NAT
+lib_LIBRARIES += libxrp-linux-native.a
+endif
+
+libxrp_linux_native_a_CPPFLAGS = $(AM_CPPFLAGS) \
+				 -I$(srcdir)/native \
+				 -I$(srcdir)/../xrp-kernel
+libxrp_linux_native_a_CFLAGS = $(AM_CFLAGS) \
+			       -pthread
+libxrp_linux_native_a_SOURCES = xrp_host_common.c \
+				xrp_threaded_queue.c \
+				native/xrp_linux_native.c
+
+libxrp_linux_sim_a_CPPFLAGS = $(AM_CPPFLAGS) \
+			      -I$(srcdir)/sim \
+			      -I$(srcdir)/../xrp-kernel
+libxrp_linux_sim_a_CFLAGS = $(AM_CFLAGS) \
+			    -pthread
+libxrp_linux_sim_a_SOURCES = xrp_host_common.c \
+			     xrp_threaded_queue.c \
+			     sim/xrp_linux_sim.c \
+			     sim/xrp_alloc.c

@@ -32,8 +32,7 @@ AC_PROG_RANLIB
 AC_CONFIG_FILES([Makefile
 		xrp-dsp/Makefile
 		xrp-example/Makefile
-		xrp-linux-native/Makefile
-		xrp-linux-sim/Makefile])
+		xrp-host/Makefile])
 
 AC_ARG_ENABLE(dsp,
 	      [AS_HELP_STRING([--enable-dsp],

@@ -70,8 +70,8 @@ xrp_linux_nat_LDFLAGS = -pthread
 xrp_linux_sim_CFLAGS = -pthread
 xrp_linux_sim_LDFLAGS = -pthread
 
-xrp_linux_nat_LDADD = ../xrp-linux-native/libxrp-linux-native.a
-xrp_linux_sim_LDADD = ../xrp-linux-sim/libxrp-linux-sim.a -lrt -lfdt
+xrp_linux_nat_LDADD = ../xrp-host/libxrp-linux-native.a
+xrp_linux_sim_LDADD = ../xrp-host/libxrp-linux-sim.a -lrt -lfdt
 
 xrp_dtb.$(OBJEXT): xrp.dtb
 xrp.dtb: $(srcdir)/xrp.dts

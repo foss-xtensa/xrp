@@ -303,7 +303,7 @@ Fast simulation mode:
   the configuration is maintained in the same format as in native mode. But in
   addition to a device node for each managed Xtensa DSP there must be a device
   node for all segments of memory shared with Xtensa simulators. Please see
-  xrp-linux-sim/cdns,sim-shmem.txt for the device tree binding information.
+  xrp-host/sim/cdns,sim-shmem.txt for the device tree binding information.
 - DSP firmware bits of the XRP built for fast simulation have the base address
   of the communication area in the shared memory built into it. See how
   DSP_COMM_BASE is used.
@@ -427,17 +427,21 @@ Code structure.
 ==============
 
 +-dts/              -- device tree compiler/flat device tree library. May be
-|                      used with xrp-linux-sim when the host version of libfdt
+|                      used with xrp-host/sim when the host version of libfdt
 |                      is missing or too old.
 +-xrp-dsp/          -- Xtensa DSP side XRP implementation.
 +-xrp-example/      -- linux and DSP side example code for both native and fast
 |                      simulation modes.
++-xrp-host/         -- host-side implementations of the XRP interface and
+| |                    common code for these implementations.
+| +-native/         -- linux implementation of the XRP interface for the native
+| |                    mode.
+| +-sim/            -- linux implementation of the XRP interface for the fast
+| |                    simulation mode.
+| `-thread-pthread/ -- multithreading abstraction implementations based on
+|                      POSIX thread library.
 +-xrp-kernel/       -- linux kernel driver for the native XRP implementation.
 | `-test/           -- standalone tests for the driver.
-+-xrp-linux-native/ -- linux implementation of the XRP interface for the native
-|                      mode.
-+-xrp-linux-sim/    -- linux implementation of the XRP interface for the fast
-|                      simulation mode.
 `-xrp_api.h         -- XRP API definition.
 
 Building kernel driver.
@@ -495,13 +499,13 @@ respectively.
 
 - linux side code needs a toolchain for the target linux. Without additional
   switches the following will produce linux XRP library for native mode,
-  xrp-linux-native/libxrp-linux-native.a:
+  xrp-host/libxrp-linux-native.a:
 
   $ ./configure
   $ make
 
   The following will produce linux XRP library for fast simulation mode,
-  xrp-linux-sim/libxrp-linux-sim.a:
+  xrp-host/libxrp-linux-sim.a:
 
   $ ./configure --enable-sim --disable-native
   $ make
