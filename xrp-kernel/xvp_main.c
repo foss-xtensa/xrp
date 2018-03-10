@@ -1818,15 +1818,10 @@ static void flush_cache(void *vaddr, phys_addr_t paddr, unsigned long sz)
 {
 }
 
-static void invalidate_cache(void *vaddr, phys_addr_t paddr, unsigned long sz)
-{
-}
-
 static const struct xrp_hw_ops hw_ops = {
 	.get_hw_sync_data = get_hw_sync_data,
 	.clean_cache = clean_cache,
 	.flush_cache = flush_cache,
-	.invalidate_cache = invalidate_cache,
 };
 
 #ifdef CONFIG_OF

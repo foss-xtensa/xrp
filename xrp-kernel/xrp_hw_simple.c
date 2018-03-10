@@ -168,11 +168,6 @@ static void flush_cache(void *vaddr, phys_addr_t paddr, unsigned long sz)
 	__flush_dcache_range((unsigned long)vaddr, sz);
 	__invalidate_dcache_range((unsigned long)vaddr, sz);
 }
-
-static void invalidate_cache(void *vaddr, phys_addr_t paddr, unsigned long sz)
-{
-	__invalidate_dcache_range((unsigned long)vaddr, sz);
-}
 #elif defined(__arm__)
 static void clean_cache(void *vaddr, phys_addr_t paddr, unsigned long sz)
 {
@@ -185,12 +180,6 @@ static void flush_cache(void *vaddr, phys_addr_t paddr, unsigned long sz)
 	__cpuc_flush_dcache_area(vaddr, sz);
 	outer_flush_range(paddr, paddr + sz);
 }
-
-static void invalidate_cache(void *vaddr, phys_addr_t paddr, unsigned long sz)
-{
-	__cpuc_flush_dcache_area(vaddr, sz);
-	outer_inv_range(paddr, paddr + sz);
-}
 #else
 #warning "cache operations are not implemented for this architecture"
 static void clean_cache(void *vaddr, phys_addr_t paddr, unsigned long sz)
@@ -198,10 +187,6 @@ static void clean_cache(void *vaddr, phys_addr_t paddr, unsigned long sz)
 }
 
 static void flush_cache(void *vaddr, phys_addr_t paddr, unsigned long sz)
-{
-}
-
-static void invalidate_cache(void *vaddr, phys_addr_t paddr, unsigned long sz)
 {
 }
 #endif
@@ -217,7 +202,6 @@ static const struct xrp_hw_ops hw_ops = {
 
 	.clean_cache = clean_cache,
 	.flush_cache = flush_cache,
-	.invalidate_cache = invalidate_cache,
 };
 
 static long init_hw(struct platform_device *pdev, struct xrp_hw_simple *hw,

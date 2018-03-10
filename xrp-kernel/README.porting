@@ -85,13 +85,12 @@ hardware-specific XRP driver must install IRQ handler and call xrp_irq_handler
 function from it. The xrp_hw_ops::send_irq callback is used to send IRQ to the
 DSP.
 
-xrp_hw_ops::clean_cache, xrp_hw_ops::flush_cache and
-xrp_hw_ops::invalidate_cache are used to clean (write back), flush (write back
-and invalidate) and invalidate an area of the DSP-specific memory. Standard
-linux cache management functions (from the DMA API) may be used only when the
-DSP shared memory is allocated from the system memory and covered by struct
-page's. If that's not the case the hardware-specific XRP driver may use
-architecture-specific methods of cache management.
+xrp_hw_ops::clean_cache and xrp_hw_ops::flush_cache are used to clean (write
+back) and flush (write back and invalidate) an area of user memory shared with
+the DSP. Standard linux cache management functions (from the DMA API) may be
+used only when the DSP shared memory is allocated from the system memory and
+covered by struct page's. If that's not the case the hardware-specific XRP
+driver may use architecture-specific methods of cache management.
 
 Porting XRP kernel driver to new hardware is done by developing
 hardware-specific driver for that hardware with the functionality described

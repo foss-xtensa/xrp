@@ -53,8 +53,6 @@ struct xrp_hw_ops {
 
 	void (*clean_cache)(void *vaddr, phys_addr_t paddr, unsigned long sz);
 	void (*flush_cache)(void *vaddr, phys_addr_t paddr, unsigned long sz);
-	void (*invalidate_cache)(void *vaddr, phys_addr_t paddr,
-				 unsigned long sz);
 };
 
 enum xrp_init_flags {
