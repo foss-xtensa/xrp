@@ -90,7 +90,11 @@ back) and flush (write back and invalidate) an area of user memory shared with
 the DSP. Standard linux cache management functions (from the DMA API) may be
 used only when the DSP shared memory is allocated from the system memory and
 covered by struct page's. If that's not the case the hardware-specific XRP
-driver may use architecture-specific methods of cache management.
+driver may use architecture-specific methods of cache management. These
+functions are optional. If they are not provided then memory allocated from
+the driver is mapped into the userspace without caching and other userspace
+memory is shared directly with the DSP only when it's not cached, otherwise
+a kernel bounce buffer is used.
 
 Porting XRP kernel driver to new hardware is done by developing
 hardware-specific driver for that hardware with the functionality described

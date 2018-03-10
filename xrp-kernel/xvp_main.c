@@ -125,6 +125,29 @@ static unsigned xvp_nodeid;
 
 static int xrp_boot_firmware(struct xvp *xvp);
 
+static const enum dma_data_direction xrp_dma_direction[] = {
+	[0] = DMA_NONE,
+	[XRP_FLAG_READ] = DMA_TO_DEVICE,
+	[XRP_FLAG_WRITE] = DMA_FROM_DEVICE,
+	[XRP_FLAG_READ_WRITE] = DMA_BIDIRECTIONAL,
+};
+
+static inline void xrp_dma_sync_for_device(struct xvp *xvp, phys_addr_t phys,
+					   unsigned long size,
+					   unsigned long flags)
+{
+	dma_sync_single_for_device(xvp->dev, phys, size,
+				   xrp_dma_direction[flags & XRP_FLAG_READ_WRITE]);
+}
+
+static inline void xrp_dma_sync_for_cpu(struct xvp *xvp, phys_addr_t phys,
+					unsigned long size,
+					unsigned long flags)
+{
+	dma_sync_single_for_cpu(xvp->dev, phys, size,
+				xrp_dma_direction[flags & XRP_FLAG_READ_WRITE]);
+}
+
 static inline void xrp_comm_write32(volatile void __iomem *addr, u32 v)
 {
 	__raw_writel(v, addr);
@@ -554,7 +577,8 @@ out:
 
 static long _xrp_copy_user_phys(struct xvp *xvp,
 				unsigned long vaddr, unsigned long size,
-				phys_addr_t paddr, bool to_phys)
+				phys_addr_t paddr, unsigned long flags,
+				bool to_phys)
 {
 	if (pfn_valid(__phys_to_pfn(paddr))) {
 		struct page *page = pfn_to_page(__phys_to_pfn(paddr));
@@ -562,8 +586,7 @@ static long _xrp_copy_user_phys(struct xvp *xvp,
 		size_t offs;
 
 		if (!to_phys)
-			dma_sync_single_for_cpu(xvp->dev, paddr, size,
-						DMA_FROM_DEVICE);
+			xrp_dma_sync_for_cpu(xvp, paddr, size, flags);
 		for (offs = 0; offs < size; ++page) {
 			void *p = kmap(page);
 			size_t sz = PAGE_SIZE - page_offs;
@@ -592,8 +615,7 @@ static long _xrp_copy_user_phys(struct xvp *xvp,
 				return -EFAULT;
 		}
 		if (to_phys)
-			dma_sync_single_for_device(xvp->dev, paddr, size,
-						   DMA_TO_DEVICE);
+			xrp_dma_sync_for_device(xvp, paddr, size, flags);
 	} else {
 		void __iomem *p = ioremap(paddr, size);
 		unsigned long rc;
@@ -619,16 +641,16 @@ static long _xrp_copy_user_phys(struct xvp *xvp,
 
 static long xrp_copy_user_to_phys(struct xvp *xvp,
 				  unsigned long vaddr, unsigned long size,
-				  phys_addr_t paddr)
+				  phys_addr_t paddr, unsigned long flags)
 {
-	return _xrp_copy_user_phys(xvp, vaddr, size, paddr, true);
+	return _xrp_copy_user_phys(xvp, vaddr, size, paddr, flags, true);
 }
 
 static long xrp_copy_user_from_phys(struct xvp *xvp,
 				    unsigned long vaddr, unsigned long size,
-				    phys_addr_t paddr)
+				    phys_addr_t paddr, unsigned long flags)
 {
-	return _xrp_copy_user_phys(xvp, vaddr, size, paddr, false);
+	return _xrp_copy_user_phys(xvp, vaddr, size, paddr, flags, false);
 }
 
 static long xvp_copy_virt_to_phys(struct xvp_file *xvp_file,
@@ -654,7 +676,7 @@ static long xvp_copy_virt_to_phys(struct xvp_file *xvp_file,
 
 	if (flags & XRP_FLAG_READ) {
 		if (xrp_copy_user_to_phys(xvp_file->xvp,
-					  vaddr, size, phys)) {
+					  vaddr, size, phys, flags)) {
 			xrp_allocation_put(allocation);
 			return -EFAULT;
 		}
@@ -726,15 +748,19 @@ static long xrp_share_kernel(struct file *filp,
 		mapping->type = XRP_MAPPING_KERNEL;
 		*paddr = phys;
 
-		if (flags & XRP_FLAG_WRITE) {
-			xvp->hw_ops->flush_cache((void *)virt, phys, size);
-		} else if (flags & XRP_FLAG_READ) {
-			xvp->hw_ops->clean_cache((void *)virt, phys, size);
-		}
+		xrp_dma_sync_for_device(xvp, phys, size, flags);
 	}
 	pr_debug("%s: mapping = %p, mapping->type = %d\n",
 		 __func__, mapping, mapping->type);
 	return err;
+}
+
+static bool vma_needs_cache_ops(struct vm_area_struct *vma)
+{
+	pgprot_t prot = vma->vm_page_prot;
+
+	return pgprot_val(prot) != pgprot_val(pgprot_noncached(prot)) &&
+		pgprot_val(prot) != pgprot_val(pgprot_writecombine(prot));
 }
 
 /* Share blocks of memory, from host to IVP or back.
@@ -835,17 +861,23 @@ static long __xrp_share_block(struct file *filp,
 		pr_debug("%s: non-XVP allocation at 0x%08lx\n",
 			 __func__, virt);
 
-		if (vma && vma->vm_flags & (VM_IO | VM_PFNMAP)) {
-			rc = xvp_pfn_virt_to_phys(xvp_file, vma,
-						  virt, size,
-						  &phys,
-						  alien_mapping);
+		if (xvp->hw_ops->clean_cache ||
+		    (vma && !vma_needs_cache_ops(vma))) {
+			if (vma && vma->vm_flags & (VM_IO | VM_PFNMAP)) {
+				rc = xvp_pfn_virt_to_phys(xvp_file, vma,
+							  virt, size,
+							  &phys,
+							  alien_mapping);
+			} else {
+				up_read(&mm->mmap_sem);
+				rc = xvp_gup_virt_to_phys(xvp_file, virt,
+							  size, &phys,
+							  alien_mapping);
+				down_read(&mm->mmap_sem);
+			}
 		} else {
-			up_read(&mm->mmap_sem);
-			rc = xvp_gup_virt_to_phys(xvp_file, virt,
-						  size, &phys,
-						  alien_mapping);
-			down_read(&mm->mmap_sem);
+			pr_debug("%s: not mapping directly: no HW cache ops\n",
+				 __func__);
 		}
 
 		/*
@@ -875,7 +907,7 @@ static long __xrp_share_block(struct file *filp,
 	pr_debug("%s: mapping = %p, mapping->type = %d\n",
 		 __func__, mapping, mapping->type);
 
-	if (do_cache) {
+	if (do_cache && xvp->hw_ops->clean_cache) {
 		if (flags & XRP_FLAG_WRITE) {
 			xvp->hw_ops->flush_cache((void *)virt, phys, size);
 		} else if (flags & XRP_FLAG_READ) {
@@ -886,7 +918,8 @@ static long __xrp_share_block(struct file *filp,
 }
 
 static long xrp_writeback_alien_mapping(struct xvp_file *xvp_file,
-					struct xrp_alien_mapping *alien_mapping)
+					struct xrp_alien_mapping *alien_mapping,
+					unsigned long flags)
 {
 	struct page *page;
 	size_t nr_pages;
@@ -914,7 +947,8 @@ static long xrp_writeback_alien_mapping(struct xvp_file *xvp_file,
 		if (xrp_copy_user_from_phys(xvp_file->xvp,
 					    alien_mapping->vaddr,
 					    alien_mapping->size,
-					    alien_mapping->paddr))
+					    alien_mapping->paddr,
+					    flags))
 			ret = -EINVAL;
 		break;
 
@@ -944,7 +978,8 @@ static long __xrp_unshare_block(struct file *filp, struct xrp_mapping *mapping,
 	case XRP_MAPPING_ALIEN:
 		if (flags & XRP_FLAG_WRITE)
 			ret = xrp_writeback_alien_mapping(filp->private_data,
-							  &mapping->alien_mapping);
+							  &mapping->alien_mapping,
+							  flags);
 
 		xrp_alien_mapping_destroy(&mapping->alien_mapping);
 		break;
@@ -1443,10 +1478,15 @@ static int xvp_mmap(struct file *filp, struct vm_area_struct *vma)
 						pfn << PAGE_SHIFT,
 						vma->vm_end - vma->vm_start);
 	if (xrp_allocation) {
+		struct xvp *xvp = xvp_file->xvp;
+		pgprot_t prot = vma->vm_page_prot;
+
+		if (!xvp->hw_ops->clean_cache)
+			prot = pgprot_writecombine(prot);
+
 		err = remap_pfn_range(vma, vma->vm_start, pfn,
 				      vma->vm_end - vma->vm_start,
-				      vma->vm_page_prot);
-
+				      prot);
 
 		vma->vm_private_data = xrp_allocation;
 		vma->vm_ops = &xvp_vm_ops;
