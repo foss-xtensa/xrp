@@ -79,11 +79,11 @@ and passed to the xrp_hw_set_sync_data DSP-side hardware-specific XRP
 callback. After that the DSP side of XRP must be capable of exchanging IRQs
 with the host in directions chosen in configuration.
 
-The hardware-specific XRP driver must set xvp::host_irq_mode to true before
-calling xrp_init* in order to use IRQ for the host side. In that case the
-hardware-specific XRP driver must install IRQ handler and call xrp_irq_handler
-function from it. The xrp_hw_ops::send_irq callback is used to send IRQ to the
-DSP.
+The hardware-specific XRP driver must pass XRP_INIT_USE_HOST_IRQ flag in the
+init_flags parameter of the xrp_init* in order to use IRQ for the DSP-to-host
+notification. The hardware-specific XRP driver must install IRQ handler and
+call xrp_irq_handler function from it. The xrp_hw_ops::send_irq callback is
+used to send IRQ to the DSP.
 
 xrp_hw_ops::clean_cache and xrp_hw_ops::flush_cache are used to clean (write
 back) and flush (write back and invalidate) an area of user memory shared with
