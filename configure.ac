@@ -29,6 +29,7 @@ AC_CONFIG_SRCDIR([configure.ac])
 AC_PROG_CC
 AM_PROG_AS
 AC_PROG_RANLIB
+AC_CANONICAL_HOST
 AC_CONFIG_FILES([Makefile
 		xrp-dsp/Makefile
 		xrp-example/Makefile
@@ -69,6 +70,38 @@ AC_ARG_ENABLE(example,
 		     [build_example=true])],
 	      [build_example=no])
 AM_CONDITIONAL([BUILD_EXAMPLE], [test x$build_example = xtrue])
+
+AC_ARG_ENABLE(threads,
+	      [AS_HELP_STRING([--enable-threads],
+			      [enable thread support [detect]])],
+	      [AS_IF([test "x${enableval}" = xno],
+		     [use_threads=false],
+		     [use_threads=true])],
+	      [])
+
+case "$host_os" in
+linux*)
+	HOST_OS=linux
+	use_threads=${use_threads:-true}
+	AS_IF([test "x${use_threads}" = xtrue],
+	      [THREADS_IMPL=pthread
+	       THREADS_CFLAGS=-pthread
+	       THREADS_LDFLAGS=-pthread])
+	;;
+elf)
+	HOST_OS=elf
+	use_threads=${use_threads:-false}
+	AS_IF([test "x${use_threads}" = xtrue],
+	      [AC_MSG_ERROR([*** threads are not supported for ELF hosts])])
+	;;
+esac
+AC_SUBST(HOST_OS)
+AC_SUBST(THREADS_IMPL,["${THREADS_IMPL:-single}"])
+AC_SUBST(THREADS_CFLAGS)
+AC_SUBST(THREADS_LDFLAGS)
+AM_CONDITIONAL([HOST_OS_LINUX], [test x$HOST_OS = xlinux])
+
+AM_CONDITIONAL([USE_THREADS], [test x$use_threads = xtrue])
 
 AS_IF([test x$build_native = xtrue -o x$build_sim = xtrue],
       [

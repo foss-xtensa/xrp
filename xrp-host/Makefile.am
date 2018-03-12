@@ -21,8 +21,8 @@
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 
-AM_CPPFLAGS = -I$(srcdir)/.. -I$(srcdir) -I$(srcdir)/thread-pthread
-AM_CFLAGS = -W -Wall
+AM_CPPFLAGS = -I$(srcdir)/.. -I$(srcdir) -I$(srcdir)/thread-@THREADS_IMPL@
+AM_CFLAGS = -W -Wall $(THREADS_CFLAGS)
 
 include_HEADERS = ../xrp_api.h
 lib_LIBRARIES =
@@ -34,21 +34,25 @@ if BUILD_NAT
 lib_LIBRARIES += libxrp-linux-native.a
 endif
 
+if USE_THREADS
+queue_sources = xrp_threaded_queue.c
+else
+queue_sources = xrp_sync_queue.c
+endif
+
 libxrp_linux_native_a_CPPFLAGS = $(AM_CPPFLAGS) \
 				 -I$(srcdir)/native \
 				 -I$(srcdir)/../xrp-kernel
-libxrp_linux_native_a_CFLAGS = $(AM_CFLAGS) \
-			       -pthread
+libxrp_linux_native_a_CFLAGS = $(AM_CFLAGS)
 libxrp_linux_native_a_SOURCES = xrp_host_common.c \
-				xrp_threaded_queue.c \
+				$(queue_sources) \
 				native/xrp_linux_native.c
 
 libxrp_linux_sim_a_CPPFLAGS = $(AM_CPPFLAGS) \
 			      -I$(srcdir)/sim \
 			      -I$(srcdir)/../xrp-kernel
-libxrp_linux_sim_a_CFLAGS = $(AM_CFLAGS) \
-			    -pthread
+libxrp_linux_sim_a_CFLAGS = $(AM_CFLAGS)
 libxrp_linux_sim_a_SOURCES = xrp_host_common.c \
-			     xrp_threaded_queue.c \
+			     $(queue_sources) \
 			     sim/xrp_linux_sim.c \
 			     sim/xrp_alloc.c

@@ -438,8 +438,9 @@ Code structure.
 | |                    mode.
 | +-sim/            -- linux implementation of the XRP interface for the fast
 | |                    simulation mode.
-| `-thread-pthread/ -- multithreading abstraction implementations based on
-|                      POSIX thread library.
+| +-thread-pthread/ -- multithreading abstraction implementations based on
+| |                    POSIX thread library.
+| `-thread-single/  -- dummy multithreading abstraction implementations.
 +-xrp-kernel/       -- linux kernel driver for the native XRP implementation.
 | `-test/           -- standalone tests for the driver.
 `-xrp_api.h         -- XRP API definition.

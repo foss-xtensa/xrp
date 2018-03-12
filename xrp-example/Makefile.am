@@ -45,6 +45,9 @@ bin_PROGRAMS += xrp-dsp-nat
 endif
 
 else
+AM_CFLAGS += $(THREADS_CFLAGS)
+AM_LDFLAGS = $(THREADS_LDFLAGS)
+
 if BUILD_SIM
 BUILT_SOURCES = xrp.dtb
 CLEANFILES = xrp.dtb
@@ -63,12 +66,6 @@ xrp_dsp_sim_LDADD = ../xrp-dsp/libxrp-dsp.a ../xrp-dsp/libxrp-dsp-hw-simple.a
 
 xrp_linux_nat_SOURCES = linux_main.c
 xrp_linux_sim_SOURCES = linux_main.c xrp_dtb.s
-
-xrp_linux_nat_CFLAGS = -pthread
-xrp_linux_nat_LDFLAGS = -pthread
-
-xrp_linux_sim_CFLAGS = -pthread
-xrp_linux_sim_LDFLAGS = -pthread
 
 xrp_linux_nat_LDADD = ../xrp-host/libxrp-linux-native.a
 xrp_linux_sim_LDADD = ../xrp-host/libxrp-linux-sim.a -lrt -lfdt
