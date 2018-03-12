@@ -54,5 +54,6 @@ libxrp_linux_sim_a_CPPFLAGS = $(AM_CPPFLAGS) \
 libxrp_linux_sim_a_CFLAGS = $(AM_CFLAGS)
 libxrp_linux_sim_a_SOURCES = xrp_host_common.c \
 			     $(queue_sources) \
+			     sim/xrp_host_sim.c \
 			     sim/xrp_linux_sim.c \
 			     sim/xrp_alloc.c
