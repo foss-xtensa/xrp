@@ -17,6 +17,8 @@ need detailed knowledge about the hardware:
   and location of a register to clear IRQ on the host side.
 - invalidating/flushing cache for DSP memory: may need to be performed in
   architecture-specific device-specific manner.
+- copying data/code to hardware-specific memory or setting it to a specific
+  value. This may require specific alignment/access width for written data.
 
 The XRP driver is divided into two parts: generic and hardware-specific and
 the actions listed above must be implemented in the hardware-specific part.
@@ -95,6 +97,11 @@ functions are optional. If they are not provided then memory allocated from
 the driver is mapped into the userspace without caching and other userspace
 memory is shared directly with the DSP only when it's not cached, otherwise
 a kernel bounce buffer is used.
+
+xrp_hw_ops::memcpy_toio and xrp_hw_ops::memset_io are optional functions used
+for copying data/code to the hardware-specific memory. memcpy_toio and
+memset_io with addresses/sizes aligned to 4 are used when these functions are
+not specialized.
 
 Porting XRP kernel driver to new hardware is done by developing
 hardware-specific driver for that hardware with the functionality described

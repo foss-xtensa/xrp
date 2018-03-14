@@ -34,6 +34,7 @@
 #include <linux/of.h>
 #include <linux/of_address.h>
 #include "xrp_address_map.h"
+#include "xrp_hw.h"
 #include "xrp_internal.h"
 #include "xrp_firmware.h"
 #include "xrp_kernel_dsp_interface.h"
@@ -113,10 +114,20 @@ static int xrp_load_segment_to_iomem(struct xvp *xvp, Elf32_Phdr *phdr)
 			&pa, (u32)phdr->p_memsz);
 		return -EINVAL;
 	}
-	memcpy_toio(p, (void *)xvp->firmware->data + phdr->p_offset,
-		    ALIGN(phdr->p_filesz, 4));
-	memset_io(p + ALIGN(phdr->p_filesz, 4), 0,
-		  ALIGN(phdr->p_memsz - ALIGN(phdr->p_filesz, 4), 4));
+	if (xvp->hw_ops->memcpy_tohw)
+		xvp->hw_ops->memcpy_tohw(p, (void *)xvp->firmware->data +
+					 phdr->p_offset, phdr->p_filesz);
+	else
+		memcpy_toio(p, (void *)xvp->firmware->data + phdr->p_offset,
+			    ALIGN(phdr->p_filesz, 4));
+
+	if (xvp->hw_ops->memset_hw)
+		xvp->hw_ops->memset_hw(p + phdr->p_filesz, 0,
+				       phdr->p_memsz - phdr->p_filesz);
+	else
+		memset_io(p + ALIGN(phdr->p_filesz, 4), 0,
+			  ALIGN(phdr->p_memsz - ALIGN(phdr->p_filesz, 4), 4));
+
 	iounmap(p);
 	return 0;
 }

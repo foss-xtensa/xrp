@@ -29,6 +29,7 @@
 #ifndef _XRP_HW
 #define _XRP_HW
 
+#include <linux/irqreturn.h>
 #include <linux/platform_device.h>
 #include <linux/types.h>
 
@@ -53,6 +54,11 @@ struct xrp_hw_ops {
 
 	void (*clean_cache)(void *vaddr, phys_addr_t paddr, unsigned long sz);
 	void (*flush_cache)(void *vaddr, phys_addr_t paddr, unsigned long sz);
+
+	/* memcpy data/code to device-specific memory */
+	void (*memcpy_tohw)(void __iomem *dst, const void *src, size_t sz);
+	/* memset device-specific memory */
+	void (*memset_hw)(void __iomem *dst, int c, size_t sz);
 };
 
 enum xrp_init_flags {
