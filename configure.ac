@@ -100,6 +100,9 @@ AC_SUBST(DSP_COMM_BASE, ["${DSP_COMM_BASE:-0xf0000000}"])
 AC_ARG_VAR(DSP_COMM_BASE, [DSP communication base address for fast simulation
 	   example firmware])
 
+AC_SUBST(DSP_CACHEATTR, ["${DSP_CACHEATTR:-0x44441141}"])
+AC_ARG_VAR(DSP_CACHEATTR, [default DSP memmap cacheattr for example firmware])
+
 AC_ARG_VAR(DTC, [Device Tree Compiler to use])
 
 AC_OUTPUT

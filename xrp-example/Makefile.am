@@ -30,7 +30,7 @@ if BUILD_DSP
 AM_CPPFLAGS += -I$(srcdir)/../xrp-dsp
 AM_CFLAGS += --xtensa-core=$(DSP_CORE)
 AM_LDFLAGS = --xtensa-core=$(DSP_CORE) -mlsp=$(DSP_LSP) \
-	     -Wl,--defsym,_memmap_cacheattr_reset=0x44441141
+	     -Wl,--defsym,_memmap_cacheattr_reset=$(DSP_CACHEATTR)
 
 xrp_dsp_sim_LDFLAGS = $(AM_LDFLAGS) \
 		      -Wl,--defsym,xrp_dsp_comm_base_magic=$(DSP_COMM_BASE)
