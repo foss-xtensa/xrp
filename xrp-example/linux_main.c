@@ -24,8 +24,8 @@
 #include <assert.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
-#include <malloc.h>
 #include "xrp_api.h"
 #include "example_namespace.h"
 
