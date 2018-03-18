@@ -59,6 +59,7 @@ struct xvp {
 	struct xrp_allocation_pool *pool;
 	struct mutex comm_lock;
 	bool off;
+	int nodeid;
 };
 
 #endif

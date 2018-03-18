@@ -34,6 +34,7 @@
 #include <linux/fs.h>
 #include <linux/hashtable.h>
 #include <linux/highmem.h>
+#include <linux/idr.h>
 #include <linux/interrupt.h>
 #include <linux/io.h>
 #include <linux/kernel.h>
@@ -121,7 +122,7 @@ MODULE_PARM_DESC(loopback, "Don't use actual DSP, perform everything locally.");
 static DEFINE_HASHTABLE(xrp_known_files, 10);
 static DEFINE_SPINLOCK(xrp_known_files_lock);
 
-static unsigned xvp_nodeid;
+static DEFINE_IDA(xvp_nodeid);
 
 static int xrp_boot_firmware(struct xvp *xvp);
 
@@ -1729,6 +1730,7 @@ static long xrp_init_common(struct platform_device *pdev,
 	long ret;
 	char nodename[sizeof("xvp") + 3 * sizeof(int)];
 	struct xvp *xvp = devm_kzalloc(&pdev->dev, sizeof(*xvp), GFP_KERNEL);
+	int nodeid;
 
 	if (!xvp) {
 		ret = -ENOMEM;
@@ -1772,7 +1774,13 @@ static long xrp_init_common(struct platform_device *pdev,
 			goto err_pm_disable;
 	}
 
-	sprintf(nodename, "xvp%u", xvp_nodeid++);
+	nodeid = ida_simple_get(&xvp_nodeid, 0, 0, GFP_KERNEL);
+	if (nodeid < 0) {
+		ret = nodeid;
+		goto err_pm_disable;
+	}
+	xvp->nodeid = nodeid;
+	sprintf(nodename, "xvp%u", nodeid);
 
 	xvp->miscdev = (struct miscdevice){
 		.minor = MISC_DYNAMIC_MINOR,
@@ -1783,8 +1791,10 @@ static long xrp_init_common(struct platform_device *pdev,
 
 	ret = misc_register(&xvp->miscdev);
 	if (ret < 0)
-		goto err_pm_disable;
+		goto err_free_id;
 	return PTR_ERR(xvp);
+err_free_id:
+	ida_simple_remove(&xvp_nodeid, nodeid);
 err_pm_disable:
 	pm_runtime_disable(xvp->dev);
 err_free_map:
@@ -1837,7 +1847,7 @@ int xrp_deinit(struct platform_device *pdev)
 			       phys_to_dma(xvp->dev, xvp->comm_phys), 0);
 	}
 	xrp_free_address_map(&xvp->address_map);
-	--xvp_nodeid;
+	ida_simple_remove(&xvp_nodeid, xvp->nodeid);
 	return 0;
 }
 EXPORT_SYMBOL(xrp_deinit);
