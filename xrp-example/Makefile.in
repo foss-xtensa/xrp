@@ -144,7 +144,7 @@ xrp_linux_nat_DEPENDENCIES =  \
 xrp_linux_nat_LINK = $(CCLD) $(xrp_linux_nat_CFLAGS) $(CFLAGS) \
 	$(xrp_linux_nat_LDFLAGS) $(LDFLAGS) -o $@
 am_xrp_linux_sim_OBJECTS = xrp_linux_sim-linux_main.$(OBJEXT) \
-	xrp.$(OBJEXT)
+	xrp_dtb.$(OBJEXT)
 xrp_linux_sim_OBJECTS = $(am_xrp_linux_sim_OBJECTS)
 xrp_linux_sim_DEPENDENCIES = ../xrp-linux-sim/libxrp-linux-sim.a
 xrp_linux_sim_LINK = $(CCLD) $(xrp_linux_sim_CFLAGS) $(CFLAGS) \
@@ -322,14 +322,14 @@ AM_CFLAGS = -W -Wall $(am__append_2)
 @BUILD_DSP_TRUE@xrp_dsp_nat_LDFLAGS = $(AM_LDFLAGS) \
 @BUILD_DSP_TRUE@		      -Wl,--defsym,xrp_dsp_comm_base_magic=0x20161006
 
-@BUILD_DSP_FALSE@@BUILD_SIM_TRUE@BUILT_SOURCES = xrp.s
-@BUILD_DSP_FALSE@@BUILD_SIM_TRUE@CLEANFILES = xrp.s
+@BUILD_DSP_FALSE@@BUILD_SIM_TRUE@BUILT_SOURCES = xrp.dtb
+@BUILD_DSP_FALSE@@BUILD_SIM_TRUE@CLEANFILES = xrp.dtb
 xrp_dsp_nat_SOURCES = dsp_main.c
 xrp_dsp_sim_SOURCES = dsp_main.c
 xrp_dsp_nat_LDADD = ../xrp-dsp/libxrp-dsp.a ../xrp-dsp/libxrp-dsp-hw-simple.a
 xrp_dsp_sim_LDADD = ../xrp-dsp/libxrp-dsp.a ../xrp-dsp/libxrp-dsp-hw-simple.a
 xrp_linux_nat_SOURCES = linux_main.c
-xrp_linux_sim_SOURCES = linux_main.c xrp.s
+xrp_linux_sim_SOURCES = linux_main.c xrp_dtb.s
 xrp_linux_nat_CFLAGS = -pthread
 xrp_linux_nat_LDFLAGS = -pthread
 xrp_linux_sim_CFLAGS = -pthread
@@ -699,8 +699,8 @@ uninstall-am: uninstall-binPROGRAMS
 	uninstall-binPROGRAMS
 
 
-xrp.s: $(srcdir)/xrp.dts
-	$(AM_V_GEN)$(DTC) -o $@ -O asm $<
+xrp.dtb: $(srcdir)/xrp.dts
+	$(AM_V_GEN)$(DTC) -o $@ -O dtb $<
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.
