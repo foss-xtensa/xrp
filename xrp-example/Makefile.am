@@ -46,8 +46,8 @@ endif
 
 else
 if BUILD_SIM
-BUILT_SOURCES = xrp.s
-CLEANFILES = xrp.s
+BUILT_SOURCES = xrp.dtb
+CLEANFILES = xrp.dtb
 bin_PROGRAMS += xrp-linux-sim
 endif
 if BUILD_NAT
@@ -62,7 +62,7 @@ xrp_dsp_nat_LDADD = ../xrp-dsp/libxrp-dsp.a ../xrp-dsp/libxrp-dsp-hw-simple.a
 xrp_dsp_sim_LDADD = ../xrp-dsp/libxrp-dsp.a ../xrp-dsp/libxrp-dsp-hw-simple.a
 
 xrp_linux_nat_SOURCES = linux_main.c
-xrp_linux_sim_SOURCES = linux_main.c xrp.s
+xrp_linux_sim_SOURCES = linux_main.c xrp_dtb.s
 
 xrp_linux_nat_CFLAGS = -pthread
 xrp_linux_nat_LDFLAGS = -pthread
@@ -73,5 +73,5 @@ xrp_linux_sim_LDFLAGS = -pthread
 xrp_linux_nat_LDADD = ../xrp-linux-native/libxrp-linux-native.a
 xrp_linux_sim_LDADD = ../xrp-linux-sim/libxrp-linux-sim.a -lrt -lfdt
 
-xrp.s: $(srcdir)/xrp.dts
-	$(AM_V_GEN)$(DTC) -o $@ -O asm $<
+xrp.dtb: $(srcdir)/xrp.dts
+	$(AM_V_GEN)$(DTC) -o $@ -O dtb $<
