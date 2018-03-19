@@ -103,6 +103,24 @@ AM_CONDITIONAL([HOST_OS_LINUX], [test x$HOST_OS = xlinux])
 
 AM_CONDITIONAL([USE_THREADS], [test x$use_threads = xtrue])
 
+AC_ARG_WITH([libfdt],
+	    AS_HELP_STRING([--with-libfdt], [Prefix of libfdt headers/library]),
+	    [case "${withval}" in
+	     (no)
+		AC_MSG_ERROR([*** libfdt is a required dependency])
+		;;
+	     (yes)
+		AC_MSG_ERROR([*** --with-libfdt requires you to specify a path])
+		;;
+	     (*)
+		LIBFDT_CPPFLAGS="-I${withval}/include"
+		LIBFDT_LDFLAGS="-L${withval}/lib"
+		;;
+	     esac],[])
+
+AC_SUBST(LIBFDT_CPPFLAGS)
+AC_SUBST(LIBFDT_LDFLAGS)
+
 AS_IF([test x$build_dsp = xfalse],
       [
       AC_MSG_CHECKING([for working _Atomic support])
@@ -124,12 +142,18 @@ AS_IF([test x$build_dsp = xfalse -a x$build_standalone = xtrue],
 
 AS_IF([test x$build_dsp = xfalse -a x$build_example = xtrue -a x$build_standalone = xtrue],
       [
-      AC_CHECK_HEADER([libfdt.h],, [AC_MSG_FAILURE([No usable libfdt.h is found])])
+      saved_CPPFLAGS="$CPPFLAGS"
+      saved_LDFLAGS="$LDFLAGS"
       saved_LIBS="$LIBS"
+      CPPFLAGS="$CPPFLAGS $LIBFDT_CPPFLAGS"
+      LDFLAGS="$LDFLAGS $LIBFDT_LDFLAGS"
+      AC_CHECK_HEADER([libfdt.h],, [AC_MSG_FAILURE([No usable libfdt.h is found])])
       AC_CHECK_LIB([fdt], [fdt_node_offset_by_compatible],,
 		   AC_MSG_FAILURE([No usable libfdt is found]))
       AC_CHECK_FUNCS([fdt_getprop fdt_strerror],,
 		     AC_MSG_FAILURE([No usable libfdt is found]))
+      CPPFLAGS="$saved_CPPFLAGS"
+      LDFLAGS="$saved_LDFLAGS"
       LIBS="$saved_LIBS"
       AC_CHECK_PROG(DTC, [dtc], [dtc], [no])
       AS_IF([test x$DTC = xno],

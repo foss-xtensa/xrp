@@ -41,6 +41,7 @@ queue_sources = xrp_sync_queue.c
 endif
 
 libxrp_host_standalone_a_CPPFLAGS = $(AM_CPPFLAGS) \
+				    $(LIBFDT_CPPFLAGS) \
 				    -I$(srcdir)/standalone \
 				    -I$(srcdir)/../xrp-kernel
 libxrp_host_standalone_a_SOURCES = xrp_host_common.c \

@@ -72,7 +72,7 @@ xrp_host_hosted_SOURCES = host_main.c
 xrp_host_standalone_SOURCES = host_main.c xrp_dtb.s
 
 xrp_host_hosted_LDFLAGS = $(AM_LDFLAGS) $(THREADS_LDFLAGS)
-xrp_host_standalone_LDFLAGS = $(AM_LDFLAGS) $(THREADS_LDFLAGS)
+xrp_host_standalone_LDFLAGS = $(AM_LDFLAGS) $(THREADS_LDFLAGS) $(LIBFDT_LDFLAGS)
 
 xrp_host_hosted_LDADD = ../xrp-host/libxrp-host-hosted.a
 xrp_host_standalone_LDADD = ../xrp-host/libxrp-host-standalone.a -lfdt
