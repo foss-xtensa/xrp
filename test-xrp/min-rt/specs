@@ -1,5 +1,4 @@
-#
-# Copyright (c) 2017 Cadence Design Systems Inc.
+# Customer ID=12289; Build=0x65b6c; Copyright (c) 2001-2015 Cadence Design Systems, Inc.
 #
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
@@ -19,25 +18,19 @@
 # CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
 # TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-#
-# Alternatively you can use and distribute this file under the terms of
-# the GNU General Public License version 2 or later.
-#
 
-xrp-y += xvp_main.o xrp_address_map.o xrp_alloc.o
-xrp-$(CONFIG_OF) += xrp_firmware.o
-xrp-$(CONFIG_CMA) += xrp_cma_alloc.o
 
-obj-m += xrp.o
-#obj-$(CONFIG_XRP_HW_SIMPLE) += xrp_hw_simple.o
-obj-$(CONFIG_XRP_HW_SIMPLE) += xrp_hw_dct.o
+# The %O suffix on the start and end files indicates that the system's
+# standard suffix for object files (e.g., ".o") should be appended.
+# The %s suffix tells the compiler driver to search for the file in the
+# list of known locations for startfiles.
 
-ccflags-$(CONFIG_XRP_DEBUG) += -DDEBUG
+*startfile:
+crt1-boards%O%s crti%O%s crtbegin%O%s _sharedvectors%O%s _vectors%O%s
 
-KSRC ?= /lib/modules/$(shell uname -r)/build
+*endfile:
+crtend%O%s crtn%O%s
 
-modules:
-	$(MAKE) -C $(KSRC) M=`pwd` modules
+*lib:
+-lc -lgloss -lminrt -lc -lhandler-reset -lhandlers-board -lminrt -lhal -lc -lidma
 
-%:
-	$(MAKE) -C $(KSRC) M=`pwd` $@

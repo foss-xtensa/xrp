@@ -1,0 +1,6 @@
+$XTENSA_TOOLS/bin/xtsc-run --xtensa-system=$XTENSA_TOOLS/config \
+    --set_xtsc_parm=turbo=true \
+    --define=P6_0_BINARY=build-dsp-sim/xrp-example/xrp-dsp-sim0 \
+    --define=P6_1_BINARY=build-dsp-sim/xrp-example/xrp-dsp-sim1 \
+    --include=./xrp-example/MW-MP/sim/xtsc-run/SubSystem.inc
+
