@@ -79,6 +79,7 @@ struct xrp_device_description {
 	uint32_t device_irq_host_offset;
 	xrp_mutex hw_mutex;
 	struct xrp_allocation_pool *shared_pool;
+	int sync;
 };
 
 static struct xrp_device_description xrp_device_description[4];
@@ -205,6 +206,7 @@ static void synchronize(struct xrp_device_description *desc)
 #endif
 	xrp_comm_write32(&shared_sync->sync, XRP_DSP_SYNC_IDLE);
 
+	desc->sync = 1;
 }
 
 struct of_node_match {
@@ -392,7 +394,6 @@ static void initialize(void)
 		if (ret == 0)
 			continue;
 
-		synchronize(xrp_device_description + xrp_device_count);
 		++xrp_device_count;
 	}
 }
@@ -413,6 +414,8 @@ struct xrp_device *xrp_open_device(int idx, enum xrp_status *status)
 		set_status(status, XRP_STATUS_FAILURE);
 		return NULL;
 	}
+	if (!xrp_device_description[idx].sync)
+		synchronize(xrp_device_description + idx);
 
 	device = alloc_refcounted(sizeof(*device));
 	if (!device) {
