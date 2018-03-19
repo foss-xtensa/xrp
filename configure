@@ -623,6 +623,7 @@ ac_subst_vars='am__EXEEXT_FALSE
 am__EXEEXT_TRUE
 LTLIBOBJS
 LIBOBJS
+DSP_CACHEATTR
 DSP_COMM_BASE
 DSP_LSP
 DSP_CORE
@@ -750,6 +751,7 @@ CPP
 DSP_CORE
 DSP_LSP
 DSP_COMM_BASE
+DSP_CACHEATTR
 DTC'
 
 
@@ -1392,6 +1394,8 @@ Some influential environment variables:
   DSP_COMM_BASE
               DSP communication base address for fast simulation example
               firmware
+  DSP_CACHEATTR
+              default DSP memmap cacheattr for example firmware
   DTC         Device Tree Compiler to use
 
 Use these variables to override the choices made by `configure' or to help
@@ -4683,6 +4687,10 @@ DSP_LSP="${DSP_LSP:-\$(srcdir)/MW-MP/P6_0/xtensa-elf/lib/sim-stacklocal}"
 
 
 DSP_COMM_BASE="${DSP_COMM_BASE:-0xf0000000}"
+
+
+
+DSP_CACHEATTR="${DSP_CACHEATTR:-0x44441141}"
 
 
 
