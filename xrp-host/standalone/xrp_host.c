@@ -45,7 +45,7 @@ typedef uint64_t __u64;
 #include "xrp_kernel_dsp_interface.h"
 #include "xrp_hw_simple_dsp_interface.h"
 #include "xrp_private_alloc.h"
-#include "xrp_host_sim.h"
+#include "xrp_host.h"
 
 #ifdef DEBUG
 #define pr_debug printf

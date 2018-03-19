@@ -32,43 +32,50 @@ AM_CFLAGS += --xtensa-core=$(DSP_CORE)
 AM_LDFLAGS = --xtensa-core=$(DSP_CORE) -mlsp=$(DSP_LSP) \
 	     -Wl,--defsym,_memmap_cacheattr_reset=$(DSP_CACHEATTR)
 
-xrp_dsp_sim_LDFLAGS = $(AM_LDFLAGS) \
-		      -Wl,--defsym,xrp_dsp_comm_base_magic=$(DSP_COMM_BASE)
+xrp_dsp_standalone_LDFLAGS = $(AM_LDFLAGS) \
+			     -Wl,--defsym,xrp_dsp_comm_base_magic=$(DSP_COMM_BASE)
 
-xrp_dsp_nat_LDFLAGS = $(AM_LDFLAGS) \
-		      -Wl,--defsym,xrp_dsp_comm_base_magic=0x20161006
-if BUILD_SIM
-bin_PROGRAMS += xrp-dsp-sim
+xrp_dsp_hosted_LDFLAGS = $(AM_LDFLAGS) \
+			 -Wl,--defsym,xrp_dsp_comm_base_magic=0x20161006
+if BUILD_STANDALONE
+bin_PROGRAMS += xrp-dsp-standalone
 endif
-if BUILD_NAT
-bin_PROGRAMS += xrp-dsp-nat
+if BUILD_HOSTED
+bin_PROGRAMS += xrp-dsp-hosted
 endif
 
 else
 AM_CFLAGS += $(THREADS_CFLAGS)
 AM_LDFLAGS = $(THREADS_LDFLAGS)
 
-if BUILD_SIM
+if BUILD_STANDALONE
 BUILT_SOURCES = xrp.dtb
 CLEANFILES = xrp.dtb
-bin_PROGRAMS += xrp-linux-sim
+bin_PROGRAMS += xrp-host-standalone
 endif
-if BUILD_NAT
-bin_PROGRAMS += xrp-linux-nat
+if BUILD_HOSTED
+bin_PROGRAMS += xrp-host-hosted
 endif
 endif
 
-xrp_dsp_nat_SOURCES = dsp_main.c
-xrp_dsp_sim_SOURCES = dsp_main.c
+if HOST_OS_LINUX
+AM_LDFLAGS = -lrt
+endif
 
-xrp_dsp_nat_LDADD = ../xrp-dsp/libxrp-dsp.a ../xrp-dsp/libxrp-dsp-hw-simple.a
-xrp_dsp_sim_LDADD = ../xrp-dsp/libxrp-dsp.a ../xrp-dsp/libxrp-dsp-hw-simple.a
+xrp_dsp_hosted_SOURCES = dsp_main.c
+xrp_dsp_standalone_SOURCES = dsp_main.c
 
-xrp_linux_nat_SOURCES = linux_main.c
-xrp_linux_sim_SOURCES = linux_main.c xrp_dtb.s
+xrp_dsp_hosted_LDADD = ../xrp-dsp/libxrp-dsp.a ../xrp-dsp/libxrp-dsp-hw-simple.a
+xrp_dsp_standalone_LDADD = ../xrp-dsp/libxrp-dsp.a ../xrp-dsp/libxrp-dsp-hw-simple.a
 
-xrp_linux_nat_LDADD = ../xrp-host/libxrp-linux-native.a
-xrp_linux_sim_LDADD = ../xrp-host/libxrp-linux-sim.a -lrt -lfdt
+xrp_host_hosted_SOURCES = host_main.c
+xrp_host_standalone_SOURCES = host_main.c xrp_dtb.s
+
+xrp_host_hosted_LDFLAGS = $(AM_LDFLAGS) $(THREADS_LDFLAGS)
+xrp_host_standalone_LDFLAGS = $(AM_LDFLAGS) $(THREADS_LDFLAGS)
+
+xrp_host_hosted_LDADD = ../xrp-host/libxrp-host-hosted.a
+xrp_host_standalone_LDADD = ../xrp-host/libxrp-host-standalone.a -lfdt
 
 xrp_dtb.$(OBJEXT): xrp.dtb
 xrp.dtb: $(srcdir)/xrp.dts

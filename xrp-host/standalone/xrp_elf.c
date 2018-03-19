@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016 - 2018 Cadence Design Systems Inc.
+ * Copyright (c) 2018 Cadence Design Systems Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -21,16 +21,10 @@
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <fcntl.h>
 #include <libfdt.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <sys/ioctl.h>
-#include <sys/mman.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <unistd.h>
 
 typedef uint8_t __u8;
 typedef uint32_t __u32;
@@ -39,7 +33,7 @@ typedef uint64_t __u64;
 #include "xrp_host_common.h"
 #include "xrp_host_impl.h"
 #include "xrp_private_alloc.h"
-#include "xrp_host_sim.h"
+#include "xrp_host.h"
 
 extern char dt_blob_start[];
 
@@ -47,7 +41,6 @@ struct xrp_shmem {
 	phys_addr_t start;
 	phys_addr_t size;
 	const char *name;
-	int fd;
 	void *ptr;
 };
 
@@ -150,18 +143,8 @@ void xrp_initialize_shmem(void)
 	xrp_shmem = malloc(xrp_shmem_count * sizeof(struct xrp_shmem));
 
 	for (i = 0; i < xrp_shmem_count; ++i) {
-		const char *name_fmt = names + name_offset;
-		char *name = NULL;
-		int sz = strlen(names + name_offset) + sizeof(int) * 3 + 1;
+		const char *name = names + name_offset;
 		int rc;
-
-		for (;;) {
-			name = realloc(name, sz);
-			rc = snprintf(name, sz, name_fmt, (int)getpid());
-			if (rc < sz)
-				break;
-			sz = rc + 1;
-		}
 
 		xrp_shmem[i] = (struct xrp_shmem){
 			.start = getprop_u32(reg, reg_offset),
@@ -170,25 +153,7 @@ void xrp_initialize_shmem(void)
 		};
 		reg_offset += 8;
 		name_offset += strlen(names + name_offset) + 1;
-
-		xrp_shmem[i].fd = shm_open(xrp_shmem[i].name,
-					   O_RDWR | O_CREAT, 0666);
-		if (xrp_shmem[i].fd < 0) {
-			perror("shm_open");
-			break;
-		}
-		rc = ftruncate(xrp_shmem[i].fd, xrp_shmem[i].size);
-		if (rc < 0) {
-			perror("ftruncate");
-			break;
-		}
-		xrp_shmem[i].ptr = mmap(NULL, xrp_shmem[i].size,
-					PROT_READ | PROT_WRITE,
-					MAP_SHARED, xrp_shmem[i].fd, 0);
-		if (xrp_shmem[i].ptr == MAP_FAILED) {
-			perror("mmap");
-			break;
-		}
+		xrp_shmem[i].ptr = (void *)xrp_shmem[i].start;
 	}
 	reg = fdt_getprop(fdt, offset, "exit-loc", &reg_len);
 	if (!reg) {

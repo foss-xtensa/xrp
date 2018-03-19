@@ -44,23 +44,23 @@ AC_ARG_ENABLE(dsp,
 	      [build_dsp=false])
 AM_CONDITIONAL([BUILD_DSP], [test x$build_dsp = xtrue])
 
-AC_ARG_ENABLE(sim,
-	      [AS_HELP_STRING([--enable-sim],
-			      [build fast simulation library/example [no]])],
+AC_ARG_ENABLE(standalone,
+	      [AS_HELP_STRING([--enable-standalone],
+			      [build standalone library/example [no]])],
 	      [AS_IF([test "x${enableval}" = xno],
-		     [build_sim=false],
-		     [build_sim=true])],
-	      [build_sim=false])
-AM_CONDITIONAL([BUILD_SIM], [test x$build_sim = xtrue])
+		     [build_standalone=false],
+		     [build_standalone=true])],
+	      [build_standalone=false])
+AM_CONDITIONAL([BUILD_STANDALONE], [test x$build_standalone = xtrue])
 
-AC_ARG_ENABLE(native,
-	      [AS_HELP_STRING([--enable-native],
-			      [build native library/example [yes]])],
+AC_ARG_ENABLE(hosted,
+	      [AS_HELP_STRING([--enable-hosted],
+			      [build hosted library/example [yes]])],
 	      [AS_IF([test "x${enableval}" = xno],
-		     [build_native=false],
-		     [build_native=true])],
-	      [build_native=true])
-AM_CONDITIONAL([BUILD_NAT], [test x$build_native = xtrue])
+		     [build_hosted=false],
+		     [build_hosted=true])],
+	      [build_hosted=true])
+AM_CONDITIONAL([BUILD_HOSTED], [test x$build_hosted = xtrue])
 
 AC_ARG_ENABLE(example,
 	      [AS_HELP_STRING([--enable-example],
@@ -68,7 +68,7 @@ AC_ARG_ENABLE(example,
 	      [AS_IF([test "x${enableval}" = xno],
 		     [build_example=false],
 		     [build_example=true])],
-	      [build_example=no])
+	      [build_example=false])
 AM_CONDITIONAL([BUILD_EXAMPLE], [test x$build_example = xtrue])
 
 AC_ARG_ENABLE(threads,
@@ -103,7 +103,7 @@ AM_CONDITIONAL([HOST_OS_LINUX], [test x$HOST_OS = xlinux])
 
 AM_CONDITIONAL([USE_THREADS], [test x$use_threads = xtrue])
 
-AS_IF([test x$build_native = xtrue -o x$build_sim = xtrue],
+AS_IF([test x$build_dsp = xfalse],
       [
       AC_MSG_CHECKING([for working _Atomic support])
       AC_COMPILE_IFELSE([
@@ -117,12 +117,12 @@ AS_IF([test x$build_native = xtrue -o x$build_sim = xtrue],
 			[AC_MSG_RESULT([no])])
       ])
 
-AS_IF([test x$build_dsp = xfalse -a x$build_sim = xtrue],
+AS_IF([test x$build_dsp = xfalse -a x$build_standalone = xtrue],
       [
       AC_CHECK_HEADERS([valgrind/memcheck.h])
       ])
 
-AS_IF([test x$build_dsp = xfalse -a x$build_example = xtrue -a x$build_sim = xtrue],
+AS_IF([test x$build_dsp = xfalse -a x$build_example = xtrue -a x$build_standalone = xtrue],
       [
       AC_CHECK_HEADER([libfdt.h],, [AC_MSG_FAILURE([No usable libfdt.h is found])])
       saved_LIBS="$LIBS"

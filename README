@@ -74,18 +74,22 @@ drops to zero.
 XRP implementations.
 ===================
 
-There are two implementations of the XRP interface: native and fast simulation.
+There are two implementations of the XRP interface for the host side: hosted
+(formerly known as native) and standalone (formerly known as fast simulation).
+Hosted implementation requires additional support from the host OS which is
+provided through the OS kernel driver. Standalone implementation talks to the
+DSP directly and is self-sufficient.
+DSP XRP implementation can be configured to work with either host XRP.
 
-Native implementation runs on a system where CPU cores running host linux code
+Hosted implementation runs on a system where CPU cores running host OS code
 and Xtensa DSP cores are connected to shared memory. It may be a hardware or
-a simulated system. It consists of the following three parts: native linux
-implementation of the XRP interface, linux kernel driver and DSP implementation
+a simulated system. It consists of the following three parts: hosted host
+implementation of the XRP interface, OS kernel driver and DSP implementation
 of the XRP interface.
-- native linux XRP implementation is a library code that runs in linux
-  userspace processes on linux CPU cores. It communicates with devices managed
-  by the linux kernel driver through the file-based interface exposed by the
-  driver;
-- linux kernel driver consists of the generic XRP implementation and an
+- hosted host XRP implementation is a library code that runs in a userspace
+  processes. It communicates with devices managed by the OS kernel driver
+  through the file-based interface exposed by the driver;
+- OS kernel driver consists of the generic XRP implementation and an
   optional hardware-specific XRP driver. Generic XRP driver does the
   following:
   - loads firmware into the DSP cores, performs initial synchronization and
@@ -119,7 +123,7 @@ of the XRP interface.
   |  | |             |       ^        | |   | | DSP XRP library | |     |
   |  | |             v       |        | |   | `-----------------' |     |
   |  | | ,--------------------------. | |   |     ^    ^    |     |     |
-  |  | | | Native Linux XRP library | | |   |     |    |    v     |<~.  |
+  |  | | |  Hosted host XRP library | | |   |     |    |    v     |<~.  |
   |  | | `--------------------------' | |   |     | ,-----------. |<~|  |
   |  | `------------ | ----- ^ -------' |   |     | |HW-specific|<~~~|  |
   |  |               |       |          |   |     | |XRP library|<~~~|  |
@@ -127,7 +131,7 @@ of the XRP interface.
   |  | | Kernel |    |       |          |   `---- | ------ | -----'  |  |
   |  | |        `--- v ----- | -------. |         v        |         |  |
   |  | | ,--------------------------. | |   ,-----------.  |         |  |
-  |  | | |  XRP linux kernel driver |<----->|   Shared  |  |         |  |
+  |  | | |   XRP OS kernel driver   |<----->|   Shared  |  |         |  |
   |  | | `--------------------------' | |   |   memory  |  |         |  |
   |  | |             |       ^        | |   `-----------'  |         |  |
   |  | |             v       |        | |                  v         |  |
@@ -143,15 +147,68 @@ of the XRP interface.
   `---------------------------------------------------------------------'
 
 
-Fast simulation runs linux-side code on a linux-based system and communicates
+Hosted implementation may run in a system that is separate from the DSP
+subsystem, i.e. the following configuration is possible: hosted host XRP
+library and generic XRP kernel driver are running in an emulator that
+communicates over shared memory with the DSP subsystem running in XTSC model.
+This way it is possible to simulate heterogeneous setups, like Aarch64-based
+host + Xtensa DSPs.
+
+  ,--------------------------------.        ,-------------------------.
+  | Host system simulation process |        | XTSC simulation process |
+  |                                `-----.  |                         `----.
+  | ,-----------.                        |  |  ,-------.-------.           |
+  | | Host CPUS |                        |  |  | DSP 0 | DSP 1 | ...       |
+  | |           `----------------------. |  |  |       `-------------.     |
+  | | ,--------------.                 | |  |  | ,-----------------. |     |
+  | | | User process | ...             | |  |  | |   DSP payload   | |     |
+  | | |              `---------------. | |  |  | `-----------------' |     |
+  | | | ,--------------------------. | | |  |  |     ^         |     |     |
+  | | | |  User application code   | | | |  |  |     |         v     |     |
+  | | | `--------------------------' | | |  |  | ,-----------------. |     |
+  | | |             |       ^        | | |  |  | | DSP XRP library | |     |
+  | | |             v       |        | | |  |  | `-----------------' |     |
+  | | | ,--------------------------. | | |  |  |     ^    ^    |     |     |
+  | | | |  Hosted host XRP library | | | |  |  |     |    |    v     |<~.  |
+  | | | `--------------------------' | | |  |  |     | ,-----------. |<~|  |
+  | | `------------ | ----- ^ -------' | |  |  |     | |HW-specific|<~~~|  |
+  | |               |       |          | |  |  |     | |XRP library|<~~~|  |
+  | | ,--------.    |       |          | |  |  |     | `-----------' |  |  |
+  | | | Kernel |    |       |          | |  |  `---- | --------------'  |  |
+  | | |        `--- v ----- | -------. | |  |        |                  |  |
+  | | | ,--------------------------. | | |  |        |                  |  |
+  | | | |   XRP OS kernel driver   | | | |  |        |                  |  |
+  | | | `--------------------------' | | |  |        |                  |  |
+  | | `---------------- ^ -----------' | |  |        |                  |  |
+  | `------------------ | -------------' |  |        |                  |  |
+  |                     v                |  |        v                  |  |
+  | ,----------------------------------------------------------------.  |  |
+  | |                        Shared memory                           |  |  |
+  | `----------------------------------------------------------------'  |  |
+  |                                      |  |             |             |  |
+  `--------------------------------------'  |             v             |  |
+                                            |  ,---------------------.  |  |
+                                            |  |  Helper LUA script  |  |  |
+                                            |  `---------------------'  |  |
+                                            |             |             |  |
+                                            |             v             |  |
+                                            |  ,---------------------.  |  |
+                                            |  |     DSP 0 MMIO      |~~|  |
+                                            |  |     DSP 1 MMIO      |~~|  |
+                                            |  |         ...         |~~'  |
+                                            |  `---------------------'     |
+                                            |                              |
+                                            `------------------------------'
+
+
+Standalone implementation can run on a linux-based system that communicates
 with unmodified Xtensa DSP code running in a simulator on the same linux-based
-system. It consists of the following two parts: fast simulation implementation
-of the XRP interface and the DSP implementation of the XRP interface.
-- fast simulation XRP implementation is a library code that runs in linux
-  userspace process and communicates through the shared memory with the Xtensa
-  DSP side XRP code running in simulator;
-- Xtensa DSP side XRP implementation is the same both in native and in fast
-  simulation cases.
+system.
+It consists of the following two parts: standalone host implementation of the
+XRP interface and the DSP implementation of the XRP interface.
+- standalone host XRP implementation is a library code that runs in a process
+  that directly communicates through the shared memory with the Xtensa DSP
+  side XRP code;
 
   ,--------------.                       ,-------------------------.
   | User process |                       | XTSC simulation process |
@@ -165,7 +222,7 @@ of the XRP interface and the DSP implementation of the XRP interface.
   |              |       ^            |  |  |     ^         |     |     |
   |              v       |            |  |  |     |         v     |     |
   |  ,-----------------------------.  |  |  | ,-----------------. |     |
-  |  | Fast simulation XRP library |  |  |  | | DSP XRP library | |     |
+  |  | Standalone host XRP library |  |  |  | | DSP XRP library | |     |
   |  `-----------------------------'  |  |  | `-----------------' |     |
   |                  ^                |  |  |     ^    ^    |     |     |
   |                  |                |  |  |     |    |    v     |<~.  |
@@ -193,57 +250,42 @@ of the XRP interface and the DSP implementation of the XRP interface.
                                          |                              |
                                          `------------------------------'
 
-A mixed variant of native and fast simulation system running linux-side code
-in a separate simulator is possible. It uses native linux XRP library and
-generic XRP kernel driver, but fast simulation DSP payload.
-This way it is possible to simulate heterogeneous setups, like Aarch64-based
-host + Xtensa DSPs.
 
-  ,--------------------------------.        ,-------------------------.
-  | Host system simulation process |        | XTSC simulation process |
-  |                                `-----.  |                         `----.
-  | ,-----------.                        |  |  ,-------.-------.           |
-  | | Host CPUS |                        |  |  | DSP 0 | DSP 1 | ...       |
-  | |           `----------------------. |  |  |       `-------------.     |
-  | | ,--------------.                 | |  |  | ,-----------------. |     |
-  | | | User process | ...             | |  |  | |   DSP payload   | |     |
-  | | |              `---------------. | |  |  | `-----------------' |     |
-  | | | ,--------------------------. | | |  |  |     ^         |     |     |
-  | | | |  User application code   | | | |  |  |     |         v     |     |
-  | | | `--------------------------' | | |  |  | ,-----------------. |     |
-  | | |             |       ^        | | |  |  | | DSP XRP library | |     |
-  | | |             v       |        | | |  |  | `-----------------' |     |
-  | | | ,--------------------------. | | |  |  |     ^    ^    |     |     |
-  | | | | Native Linux XRP library | | | |  |  |     |    |    v     |<~.  |
-  | | | `--------------------------' | | |  |  |     | ,-----------. |<~|  |
-  | | `------------ | ----- ^ -------' | |  |  |     | |HW-specific|<~~~|  |
-  | |               |       |          | |  |  |     | |XRP library|<~~~|  |
-  | | ,--------.    |       |          | |  |  |     | `-----------' |  |  |
-  | | | Kernel |    |       |          | |  |  `---- | --------------'  |  |
-  | | |        `--- v ----- | -------. | |  |        |                  |  |
-  | | | ,--------------------------. | | |  |        |                  |  |
-  | | | |  XRP linux kernel driver | | | |  |        |                  |  |
-  | | | `--------------------------' | | |  |        |                  |  |
-  | | `---------------- ^ -----------' | |  |        |                  |  |
-  | `------------------ | -------------' |  |        |                  |  |
-  |                     v                |  |        v                  |  |
-  | ,----------------------------------------------------------------.  |  |
-  | |                        Shared memory                           |  |  |
-  | `----------------------------------------------------------------'  |  |
-  |                                      |  |             |             |  |
-  `--------------------------------------'  |             v             |  |
-                                            |  ,---------------------.  |  |
-                                            |  |  Helper LUA script  |  |  |
-                                            |  `---------------------'  |  |
-                                            |             |             |  |
-                                            |             v             |  |
-                                            |  ,---------------------.  |  |
-                                            |  |     DSP 0 MMIO      |~~|  |
-                                            |  |     DSP 1 MMIO      |~~|  |
-                                            |  |         ...         |~~'  |
-                                            |  `---------------------'     |
-                                            |                              |
-                                            `------------------------------'
+Standalone implementation can run natively on a device without OS or with RTOS
+that provides direct access to the hardware, such as memory shared with DSP
+and MMIO:
+
+  ,--------.
+  | System |
+  |        `------------------------------------------------------------.
+  |  ,-----------.                          ,-------.-------.           |
+  |  | Host CPUS |                          | DSP 0 | DSP 1 | ...       |
+  |  |           `----------------------.   |       `-------------.     |
+  |  | ,------------------------------. |   | ,-----------------. |     |
+  |  | |    User application code     | |   | |   DSP payload   | |     |
+  |  | `------------------------------' |   | `-----------------' |     |
+  |  |            |       ^             |   |     ^         |     |     |
+  |  |            v       |             |   |     |         v     |     |
+  |  | ,------------------------------. |   | ,-----------------. |     |
+  |  | |  Standalone host XRP library | |   | | DSP XRP library | |     |
+  |  | `------------------------------' |   | `-----------------' |     |
+  |  |        |       |       ^         |   |     ^    ^    |     |     |
+  |  |        |       |       |         |   |     |    |    v     |<~.  |
+  |  |        |       |       |         |   |     | ,-----------. |<~|  |
+  |  |        |       |       |         |   |     | |HW-specific|<~~~|  |
+  |  |        |       |       |         |   |     | |XRP library|<~~~|  |
+  |  |        |       |       |         |   |     | `-----------' |  |  |
+  |  `------- | ----- | ----- | --------'   `---- | --------------'  |  |
+  |           |       v       |                   v                  |  |
+  |           |   ,----------------------------------.               |  |
+  |           |   |           Shared memory          |               |  |
+  |           |   `----------------------------------'               |  |
+  |           |                             ,--------------------.   |  |
+  |           |                             |     DSP 0 MMIO     |~~~|  |
+  |           `---------------------------->|     DSP 1 MMIO     |~~~|  |
+  |                                         |         ...        |~~~'  |
+  |                                         `--------------------'      |
+  `---------------------------------------------------------------------'
 
 
 Kernel driver requirements.
@@ -291,16 +333,16 @@ control them, location and amount of the shared memory all may change. The
 following pieces of the code capture the details of the configuration and need
 to be adjusted whenever it is changed:
 
-Native mode:
+Hosted mode:
 - the device tree. Linux kernel need to have a device tree node for each
   Xtensa DSP managed by the XRP linux kernel driver. Please see
   xrp-kernel/cdns,xrp*.txt for the device tree binding information.
 - DSP firmware bits of the XRP don't have any hardcoded addresses, but the
   firmware image depends on the linker map.
 
-Fast simulation mode:
+Standalone mode:
 - the device tree. Although there's no linux kernel and kernel driver involved,
-  the configuration is maintained in the same format as in native mode. But in
+  the configuration is maintained in the same format as in hosted mode. But in
   addition to a device node for each managed Xtensa DSP there must be a device
   node for all segments of memory shared with Xtensa simulators. Please see
   xrp-host/sim/cdns,sim-shmem.txt for the device tree binding information.
@@ -398,7 +440,7 @@ be unmapped with the xrp_unmap_bufer function. Each mapping of the buffer must
 be unmapped individually. A buffer is only allowed to cross host/DSP boundary
 when it doesn't have any mappings.
 
-In native mode XRP linux kernel driver manages DSP devices. When the driver
+In hosted mode XRP linux kernel driver manages DSP devices. When the driver
 gets loaded or device binding is added through sysfs the driver's probe
 function is called for each matching device node. It halts and resets the DSP,
 loads the firmware image and sets up the communication area address in shared
@@ -409,13 +451,13 @@ of success a new character device is created for that DSP. Linux userspace XRP
 library may then open that device and interact with it by ioctl and mmap system
 calls.
 
-In fast simulation mode XTSC simulator loads firmware images for all simulated
+In standalone mode XTSC simulator loads firmware images for all simulated
 DSP cores. Each firmware image has its communication area address preconfigured
 (see DSP_COMM_BASE in this document). Shared physical memory simulated by the
 XTSC is implemented as shared memory of the host platform. In case of linux it
 is backed by files in /dev/shm. Fast simulation mode XRP user library uses
 device tree blob linked with it to find names of the shared memory files and
-addresses of the DSP communication areas. It synchronizes with all DSP nodes
+addresses of the DSP communication areas. It synchronizes with used DSP nodes
 configured in the device tree, the synchronization protocol is the same as in
 native mode. It is possible to use IRQ for communication from host to the DSP.
 A LUA script running in the XTSC polls hardcoded shared memory locations
@@ -434,10 +476,10 @@ Code structure.
 |                      simulation modes.
 +-xrp-host/         -- host-side implementations of the XRP interface and
 | |                    common code for these implementations.
-| +-native/         -- linux implementation of the XRP interface for the native
+| +-hosted/         -- linux implementation of the XRP interface for the hosted
 | |                    mode.
-| +-sim/            -- linux implementation of the XRP interface for the fast
-| |                    simulation mode.
+| +-standalone/     -- linux and bare-metal implementations of the XRP
+| |                    interface for the standalone mode.
 | +-thread-pthread/ -- multithreading abstraction implementations based on
 | |                    POSIX thread library.
 | `-thread-single/  -- dummy multithreading abstraction implementations.
@@ -484,9 +526,9 @@ One build directory may be configured to build code either for the host or for
 the DSP, but not for both. This behavior is controlled by the configure switch
 '--enable-dsp'.
 
-Switches '--enable-native' (on by default) and '--enable-sim' (off by default)
-enable building of native variand of library/example or fast simulation variant
-respectively.
+Switches '--enable-hosted' (on by default) and '--enable-standalone' (off by
+default) enable building of hosted variand of library/example or standalone
+variant respectively.
 
 - Xtensa DSP code needs an xcc-based toolchain. Provide the following
   environment variable to the configure or to make:
@@ -498,29 +540,37 @@ respectively.
   $ ./configure --host=xtensa-elf --enable-dsp CC=xt-xcc
   $ make
 
-- linux side code needs a toolchain for the target linux. Without additional
-  switches the following will produce linux XRP library for native mode,
-  xrp-host/libxrp-linux-native.a:
+- host side code needs a toolchain for the host. Without additional
+  switches the following will produce linux XRP library for hosted mode,
+  xrp-host/libxrp-host-hosted.a:
 
   $ ./configure
   $ make
 
-  The following will produce linux XRP library for fast simulation mode,
-  xrp-host/libxrp-linux-sim.a:
+  The following will produce linux XRP library for standalone mode,
+  xrp-host/libxrp-host-standalone.a:
 
-  $ ./configure --enable-sim --disable-native
+  $ ./configure --enable-standalone --disable-hosted
   $ make
+
+  The following will produce bare-metal XRP library for standalone mode,
+  xrp-host/libxrp-host-standalone.a:
+
+  $ ./configure --host=xtensa-elf --enable-standalone --disable-hosted \
+    CC=xt-xcc
+  $ make
+
 
 Building XRP examples.
 =====================
 
 An example application may be built in addition to the XRP library. The switch
-'--enable-sim' configures for building fast simulation library or example. Not
-specifying it or specifying '--disable-sim' configures for building native
-library or example.
+'--enable-standalone' configures for building standalone library or example.
+Not specifying it or specifying '--disable-standalone' configures for building
+hosted library or example.
 
 - adding switch '--enable-example' to the DSP build configuration will produce
-  example firmware for native mode. Provide the following environment variable
+  example firmware for hosted mode. Provide the following environment variable
   to the configure or make:
   - DSP_LSP: path to the LSP to be used.
 
@@ -530,39 +580,46 @@ library or example.
     CC=xt-xcc
   $ make
 
-  The result is xrp-example/xrp-dsp-nat. In order to be loaded as a firmware it
-  needs to be put to the linux file system under /lib/modules/firmware and its
-  name need to be specified in the "firmware" parameter inside the xrp device
-  node in the device tree.
+  The result is xrp-example/xrp-dsp-hosted. In order to be loaded as a firmware
+  it needs to be put to the linux file system under /lib/modules/firmware and
+  its name need to be specified in the "firmware" parameter inside the xrp
+  device node in the device tree.
 
-- adding switches '--enable-example' '--enable-sim' to the DSP build
-  configuration will produce example firmware for fast simulation mode. Provide
+- adding switches '--enable-example' '--enable-standalone' to the DSP build
+  configuration will produce example firmware for standalone mode. Provide
   the following environment variable to the configure or make:
   - DSP_COMM_BASE: base address of the DSP communication area.
 
-  $ ./configure --host=xtensa-elf --enable-dsp --enable-example --enable-sim \
+  $ ./configure --host=xtensa-elf --enable-dsp --enable-example \
+    --enable-standalone \
     DSP_CORE=visionp6cnn_ao_exls \
     DSP_LSP=MW-MP/P6_0/xtensa-elf/lib/sim-stacklocal \
     DSP_COMM_BASE=0xf0000000 \
     CC=xt-xcc
   $ make
 
-  The result is xrp-example/xrp-dsp-sim. In order to be loaded as a firmware a
-  path to it needs to be passed to the XTSC.
+  The result is xrp-example/xrp-dsp-standalone. In order to be loaded as a
+  firmware a path to it needs to be passed to the XTSC.
 
-- adding switch '--enable-example' to the linux build configuration will
-  produce example linux application for native mode.
+- adding switch '--enable-example' to the linux host build configuration will
+  produce example linux host application for hosted mode.
 
   $ ./configure --enable-example
   $ make
 
-  The result is xrp-example/xrp-linux-nat.
+  The result is xrp-example/xrp-host-hosted.
 
-- adding switches '--enable-example' '--enable-sim' to the linux build
-  configuration will produce example linux application for fast simulation
-  mode.
+- adding switches '--enable-example' '--enable-standalone' to the linux build
+  configuration will produce example linux application for standalone mode.
 
-  $ ./configure --enable-example --enable-sim
+  $ ./configure --enable-example --enable-standalone
   $ make
 
-  The result is xrp-example/xrp-linux-sim.
+  The result is xrp-example/xrp-host-standalone.
+
+- the following will produce bare-metal example for standalone mode,
+  xrp-example/xrp-host-standalone
+
+  $ ./configure --host=xtensa-elf --enable-example --enable-standalone \
+    --disable-hosted CC=xt-xcc
+  $ make
