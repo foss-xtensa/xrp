@@ -151,15 +151,14 @@ xrp_dsp_standalone_LINK = $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
 	$(xrp_dsp_standalone_LDFLAGS) $(LDFLAGS) -o $@
 am_xrp_host_hosted_OBJECTS = host_main.$(OBJEXT)
 xrp_host_hosted_OBJECTS = $(am_xrp_host_hosted_OBJECTS)
-xrp_host_hosted_DEPENDENCIES = ../xrp-host/libxrp-host-hosted.a
-xrp_host_hosted_LINK = $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
-	$(xrp_host_hosted_LDFLAGS) $(LDFLAGS) -o $@
+am__DEPENDENCIES_1 =
+xrp_host_hosted_DEPENDENCIES = ../xrp-host/libxrp-host-hosted.a \
+	$(am__DEPENDENCIES_1)
 am_xrp_host_standalone_OBJECTS = host_main.$(OBJEXT) xrp_dtb.$(OBJEXT)
 xrp_host_standalone_OBJECTS = $(am_xrp_host_standalone_OBJECTS)
 xrp_host_standalone_DEPENDENCIES =  \
-	../xrp-host/libxrp-host-standalone.a
-xrp_host_standalone_LINK = $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
-	$(xrp_host_standalone_LDFLAGS) $(LDFLAGS) -o $@
+	../xrp-host/libxrp-host-standalone.a $(am__DEPENDENCIES_1) \
+	$(am__DEPENDENCIES_1)
 AM_V_P = $(am__v_P_@AM_V@)
 am__v_P_ = $(am__v_P_@AM_DEFAULT_V@)
 am__v_P_0 = false
@@ -355,10 +354,8 @@ xrp_dsp_hosted_LDADD = ../xrp-dsp/libxrp-dsp.a ../xrp-dsp/libxrp-dsp-hw-simple.a
 xrp_dsp_standalone_LDADD = ../xrp-dsp/libxrp-dsp.a ../xrp-dsp/libxrp-dsp-hw-simple.a
 xrp_host_hosted_SOURCES = host_main.c
 xrp_host_standalone_SOURCES = host_main.c xrp_dtb.s
-xrp_host_hosted_LDFLAGS = $(AM_LDFLAGS) $(THREADS_LDFLAGS)
-xrp_host_standalone_LDFLAGS = $(AM_LDFLAGS) $(THREADS_LDFLAGS) $(LIBFDT_LDFLAGS)
-xrp_host_hosted_LDADD = ../xrp-host/libxrp-host-hosted.a
-xrp_host_standalone_LDADD = ../xrp-host/libxrp-host-standalone.a -lfdt
+xrp_host_hosted_LDADD = ../xrp-host/libxrp-host-hosted.a $(THREADS_LDFLAGS)
+xrp_host_standalone_LDADD = ../xrp-host/libxrp-host-standalone.a $(THREADS_LDFLAGS) $(LIBFDT_LDFLAGS) -lfdt
 all: $(BUILT_SOURCES)
 	$(MAKE) $(AM_MAKEFLAGS) all-am
 
@@ -446,11 +443,11 @@ xrp-dsp-standalone$(EXEEXT): $(xrp_dsp_standalone_OBJECTS) $(xrp_dsp_standalone_
 
 xrp-host-hosted$(EXEEXT): $(xrp_host_hosted_OBJECTS) $(xrp_host_hosted_DEPENDENCIES) $(EXTRA_xrp_host_hosted_DEPENDENCIES) 
 	@rm -f xrp-host-hosted$(EXEEXT)
-	$(AM_V_CCLD)$(xrp_host_hosted_LINK) $(xrp_host_hosted_OBJECTS) $(xrp_host_hosted_LDADD) $(LIBS)
+	$(AM_V_CCLD)$(LINK) $(xrp_host_hosted_OBJECTS) $(xrp_host_hosted_LDADD) $(LIBS)
 
 xrp-host-standalone$(EXEEXT): $(xrp_host_standalone_OBJECTS) $(xrp_host_standalone_DEPENDENCIES) $(EXTRA_xrp_host_standalone_DEPENDENCIES) 
 	@rm -f xrp-host-standalone$(EXEEXT)
-	$(AM_V_CCLD)$(xrp_host_standalone_LINK) $(xrp_host_standalone_OBJECTS) $(xrp_host_standalone_LDADD) $(LIBS)
+	$(AM_V_CCLD)$(LINK) $(xrp_host_standalone_OBJECTS) $(xrp_host_standalone_LDADD) $(LIBS)
 
 mostlyclean-compile:
 	-rm -f *.$(OBJEXT)

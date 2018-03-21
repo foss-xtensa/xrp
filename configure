@@ -628,9 +628,6 @@ DSP_COMM_BASE
 DSP_LSP
 DSP_CORE
 DTC
-EGREP
-GREP
-CPP
 LIBFDT_LDFLAGS
 LIBFDT_CPPFLAGS
 USE_THREADS_FALSE
@@ -641,6 +638,9 @@ THREADS_LDFLAGS
 THREADS_CFLAGS
 THREADS_IMPL
 HOST_OS
+EGREP
+GREP
+CPP
 BUILD_EXAMPLE_FALSE
 BUILD_EXAMPLE_TRUE
 BUILD_HOSTED_FALSE
@@ -4269,88 +4269,6 @@ fi
 	;;
 elf)
 	HOST_OS=elf
-	use_threads=${use_threads:-false}
-	if test "x${use_threads}" = xtrue; then :
-  as_fn_error $? "*** threads are not supported for ELF hosts" "$LINENO" 5
-fi
-	;;
-esac
-
-THREADS_IMPL="${THREADS_IMPL:-single}"
-
-
-
- if test x$HOST_OS = xlinux; then
-  HOST_OS_LINUX_TRUE=
-  HOST_OS_LINUX_FALSE='#'
-else
-  HOST_OS_LINUX_TRUE='#'
-  HOST_OS_LINUX_FALSE=
-fi
-
-
- if test x$use_threads = xtrue; then
-  USE_THREADS_TRUE=
-  USE_THREADS_FALSE='#'
-else
-  USE_THREADS_TRUE='#'
-  USE_THREADS_FALSE=
-fi
-
-
-
-# Check whether --with-libfdt was given.
-if test "${with_libfdt+set}" = set; then :
-  withval=$with_libfdt; case "${withval}" in
-	     (no)
-		as_fn_error $? "*** libfdt is a required dependency" "$LINENO" 5
-		;;
-	     (yes)
-		as_fn_error $? "*** --with-libfdt requires you to specify a path" "$LINENO" 5
-		;;
-	     (*)
-		LIBFDT_CPPFLAGS="-I${withval}/include"
-		LIBFDT_LDFLAGS="-L${withval}/lib"
-		;;
-	     esac
-fi
-
-
-
-
-
-
-if test x$build_dsp = xfalse; then :
-
-      { $as_echo "$as_me:${as_lineno-$LINENO}: checking for working _Atomic support" >&5
-$as_echo_n "checking for working _Atomic support... " >&6; }
-      cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-
-			struct { _Atomic int i; _Atomic enum {A, B} e; } s;
-int
-main ()
-{
-++s.i; s.e = A;
-  ;
-  return 0;
-}
-
-_ACEOF
-if ac_fn_c_try_compile "$LINENO"; then :
-
-			$as_echo "#define HAVE_ATOMIC 1" >>confdefs.h
-
-			{ $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
-$as_echo "yes" >&6; }
-
-else
-  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
-$as_echo "no" >&6; }
-fi
-rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
-
-fi
 
 ac_ext=c
 ac_cpp='$CPP $CPPFLAGS'
@@ -4748,6 +4666,102 @@ fi
 
 done
 
+
+ac_fn_c_check_header_mongrel "$LINENO" "xtensa/xos.h" "ac_cv_header_xtensa_xos_h" "$ac_includes_default"
+if test "x$ac_cv_header_xtensa_xos_h" = xyes; then :
+  have_threads=true
+else
+  have_threads=false
+fi
+
+
+	use_threads=${use_threads:-${have_threads}}
+	if test "x${use_threads}" = xtrue; then :
+  if test "x${have_threads}" != xtrue; then :
+  as_fn_error $? "*** threads are not supported" "$LINENO" 5
+fi
+	       THREADS_IMPL=xos
+	       THREADS_LDFLAGS=-lxos
+	       $as_echo "#define HAVE_THREADS_XOS 1" >>confdefs.h
+
+fi
+	;;
+esac
+
+THREADS_IMPL="${THREADS_IMPL:-single}"
+
+
+
+ if test x$HOST_OS = xlinux; then
+  HOST_OS_LINUX_TRUE=
+  HOST_OS_LINUX_FALSE='#'
+else
+  HOST_OS_LINUX_TRUE='#'
+  HOST_OS_LINUX_FALSE=
+fi
+
+
+ if test x$use_threads = xtrue; then
+  USE_THREADS_TRUE=
+  USE_THREADS_FALSE='#'
+else
+  USE_THREADS_TRUE='#'
+  USE_THREADS_FALSE=
+fi
+
+
+
+# Check whether --with-libfdt was given.
+if test "${with_libfdt+set}" = set; then :
+  withval=$with_libfdt; case "${withval}" in
+	     (no)
+		as_fn_error $? "*** libfdt is a required dependency" "$LINENO" 5
+		;;
+	     (yes)
+		as_fn_error $? "*** --with-libfdt requires you to specify a path" "$LINENO" 5
+		;;
+	     (*)
+		LIBFDT_CPPFLAGS="-I${withval}/include"
+		LIBFDT_LDFLAGS="-L${withval}/lib"
+		;;
+	     esac
+fi
+
+
+
+
+
+if test x$build_dsp = xfalse; then :
+
+      { $as_echo "$as_me:${as_lineno-$LINENO}: checking for working _Atomic support" >&5
+$as_echo_n "checking for working _Atomic support... " >&6; }
+      cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+			struct { _Atomic int i; _Atomic enum {A, B} e; } s;
+int
+main ()
+{
+++s.i; s.e = A;
+  ;
+  return 0;
+}
+
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"; then :
+
+			$as_echo "#define HAVE_ATOMIC 1" >>confdefs.h
+
+			{ $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+$as_echo "yes" >&6; }
+
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+
+fi
 
 if test x$build_dsp = xfalse -a x$build_standalone = xtrue; then :
 
