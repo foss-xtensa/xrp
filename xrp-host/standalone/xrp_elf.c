@@ -144,7 +144,6 @@ void xrp_initialize_shmem(void)
 
 	for (i = 0; i < xrp_shmem_count; ++i) {
 		const char *name = names + name_offset;
-		int rc;
 
 		xrp_shmem[i] = (struct xrp_shmem){
 			.start = getprop_u32(reg, reg_offset),
