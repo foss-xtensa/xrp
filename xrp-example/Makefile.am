@@ -71,11 +71,8 @@ xrp_dsp_standalone_LDADD = ../xrp-dsp/libxrp-dsp.a ../xrp-dsp/libxrp-dsp-hw-simp
 xrp_host_hosted_SOURCES = host_main.c
 xrp_host_standalone_SOURCES = host_main.c xrp_dtb.s
 
-xrp_host_hosted_LDFLAGS = $(AM_LDFLAGS) $(THREADS_LDFLAGS)
-xrp_host_standalone_LDFLAGS = $(AM_LDFLAGS) $(THREADS_LDFLAGS) $(LIBFDT_LDFLAGS)
-
-xrp_host_hosted_LDADD = ../xrp-host/libxrp-host-hosted.a
-xrp_host_standalone_LDADD = ../xrp-host/libxrp-host-standalone.a -lfdt
+xrp_host_hosted_LDADD = ../xrp-host/libxrp-host-hosted.a $(THREADS_LDFLAGS)
+xrp_host_standalone_LDADD = ../xrp-host/libxrp-host-standalone.a $(THREADS_LDFLAGS) $(LIBFDT_LDFLAGS) -lfdt
 
 xrp_dtb.$(OBJEXT): xrp.dtb
 xrp.dtb: $(srcdir)/xrp.dts

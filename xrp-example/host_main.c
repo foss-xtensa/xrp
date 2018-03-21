@@ -28,6 +28,9 @@
 #include <string.h>
 #include "xrp_api.h"
 #include "example_namespace.h"
+#ifdef HAVE_THREADS_XOS
+#include <xtensa/xos.h>
+#endif
 
 /* Test data transfer from and to in/out buffers */
 static void f1(int devid)
@@ -446,6 +449,10 @@ int main(int argc, char **argv)
 {
 	int devid = 0;
 
+#ifdef HAVE_THREADS_XOS
+	xos_set_clock_freq(XOS_CLOCK_FREQ);
+	xos_start_main("main", 0, 0);
+#endif
 	if (argc > 1)
 		sscanf(argv[1], "%i", &devid);
 	f1(devid);

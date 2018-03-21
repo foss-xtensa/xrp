@@ -90,9 +90,16 @@ linux*)
 	;;
 elf)
 	HOST_OS=elf
-	use_threads=${use_threads:-false}
+	AC_CHECK_HEADER([xtensa/xos.h],
+			[have_threads=true],
+			[have_threads=false])
+	use_threads=${use_threads:-${have_threads}}
 	AS_IF([test "x${use_threads}" = xtrue],
-	      [AC_MSG_ERROR([*** threads are not supported for ELF hosts])])
+	      [AS_IF([test "x${have_threads}" != xtrue],
+		     [AC_MSG_ERROR([*** threads are not supported])])
+	       THREADS_IMPL=xos
+	       THREADS_LDFLAGS=-lxos
+	       AC_DEFINE(HAVE_THREADS_XOS)])
 	;;
 esac
 AC_SUBST(HOST_OS)
