@@ -39,19 +39,11 @@
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include "xrp_debug.h"
 
 #define PAGE_SIZE 4096
 #define GFP_KERNEL 0
 #define ALIGN(v, a) (((v) + (a) - 1) & -(a))
-
-#ifdef DEBUG
-#define pr_debug printf
-#else
-static inline void pr_debug(const char *fmt, ...)
-{
-	(void)fmt;
-}
-#endif
 
 static void *kmalloc(size_t sz, int flags)
 {

@@ -29,21 +29,12 @@
 #include <xtensa/xtruntime.h>
 
 #include "xrp_api.h"
+#include "xrp_debug.h"
 #include "xrp_dsp_hw.h"
 
 typedef uint8_t __u8;
 typedef uint32_t __u32;
 #include "xrp_kernel_dsp_interface.h"
-
-#ifdef DEBUG
-#define pr_debug printf
-#else
-static inline int pr_debug(const char *p, ...)
-{
-	(void)p;
-	return 0;
-}
-#endif
 
 extern char xrp_dsp_comm_base_magic[] __attribute__((weak));
 void *xrp_dsp_comm_base = &xrp_dsp_comm_base_magic;

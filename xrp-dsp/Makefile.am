@@ -21,7 +21,7 @@
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 
-AM_CPPFLAGS = -I$(srcdir)/.. -I$(srcdir)/../xrp-kernel
+AM_CPPFLAGS = -I$(srcdir)/.. -I$(srcdir)/../xrp-common -I$(srcdir)/../xrp-kernel
 AM_CFLAGS = -W -Wall --xtensa-core=$(DSP_CORE)
 
 include_HEADERS = ../xrp_api.h xrp_dsp_hw.h

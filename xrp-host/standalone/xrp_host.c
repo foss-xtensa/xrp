@@ -40,22 +40,13 @@ typedef uint8_t __u8;
 typedef uint32_t __u32;
 typedef uint64_t __u64;
 
+#include "xrp_debug.h"
 #include "xrp_host_common.h"
 #include "xrp_host_impl.h"
 #include "xrp_kernel_dsp_interface.h"
 #include "xrp_hw_simple_dsp_interface.h"
 #include "xrp_private_alloc.h"
 #include "xrp_host.h"
-
-#ifdef DEBUG
-#define pr_debug printf
-#else
-static inline int pr_debug(const char *p, ...)
-{
-	(void)p;
-	return 0;
-}
-#endif
 
 enum {
 	XRP_IRQ_NONE,

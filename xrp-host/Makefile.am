@@ -21,7 +21,8 @@
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 
-AM_CPPFLAGS = -I$(srcdir)/.. -I$(srcdir) -I$(srcdir)/thread-@THREADS_IMPL@
+AM_CPPFLAGS = -I$(srcdir)/.. -I$(srcdir) -I$(srcdir)/../xrp-common \
+	      -I$(srcdir)/thread-@THREADS_IMPL@
 AM_CFLAGS = -W -Wall $(THREADS_CFLAGS)
 
 include_HEADERS = ../xrp_api.h
