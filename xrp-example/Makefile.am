@@ -62,8 +62,8 @@ if HOST_OS_LINUX
 AM_LDFLAGS = -lrt
 endif
 
-xrp_dsp_hosted_SOURCES = dsp_main.c
-xrp_dsp_standalone_SOURCES = dsp_main.c
+xrp_dsp_hosted_SOURCES = dsp_main.c dsp_test.c
+xrp_dsp_standalone_SOURCES = dsp_main.c dsp_test.c
 
 xrp_dsp_hosted_LDADD = ../xrp-dsp/libxrp-dsp.a ../xrp-dsp/libxrp-dsp-hw-simple.a
 xrp_dsp_standalone_LDADD = ../xrp-dsp/libxrp-dsp.a ../xrp-dsp/libxrp-dsp-hw-simple.a
