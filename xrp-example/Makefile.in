@@ -112,7 +112,7 @@ POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
 bin_PROGRAMS = $(am__EXEEXT_1) $(am__EXEEXT_2) $(am__EXEEXT_3) \
-	$(am__EXEEXT_4)
+	$(am__EXEEXT_4) $(am__EXEEXT_5)
 @BUILD_DSP_TRUE@am__append_1 = -I$(srcdir)/../xrp-dsp
 @BUILD_DSP_TRUE@am__append_2 = --xtensa-core=$(DSP_CORE)
 @BUILD_DSP_TRUE@@BUILD_STANDALONE_TRUE@am__append_3 = xrp-dsp-standalone
@@ -120,6 +120,7 @@ bin_PROGRAMS = $(am__EXEEXT_1) $(am__EXEEXT_2) $(am__EXEEXT_3) \
 @BUILD_DSP_FALSE@am__append_5 = $(THREADS_CFLAGS)
 @BUILD_DSP_FALSE@@BUILD_STANDALONE_TRUE@am__append_6 = xrp-host-standalone
 @BUILD_DSP_FALSE@@BUILD_HOSTED_TRUE@am__append_7 = xrp-host-hosted
+@BUILD_DSP_FALSE@@BUILD_SINGLE_TRUE@am__append_8 = xrp-host-single
 subdir = xrp-example
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/configure.ac
@@ -135,15 +136,17 @@ CONFIG_CLEAN_VPATH_FILES =
 @BUILD_DSP_FALSE@@BUILD_STANDALONE_TRUE@am__EXEEXT_3 = xrp-host-standalone$(EXEEXT)
 @BUILD_DSP_FALSE@@BUILD_HOSTED_TRUE@am__EXEEXT_4 =  \
 @BUILD_DSP_FALSE@@BUILD_HOSTED_TRUE@	xrp-host-hosted$(EXEEXT)
+@BUILD_DSP_FALSE@@BUILD_SINGLE_TRUE@am__EXEEXT_5 =  \
+@BUILD_DSP_FALSE@@BUILD_SINGLE_TRUE@	xrp-host-single$(EXEEXT)
 am__installdirs = "$(DESTDIR)$(bindir)"
 PROGRAMS = $(bin_PROGRAMS)
-am_xrp_dsp_hosted_OBJECTS = dsp_main.$(OBJEXT)
+am_xrp_dsp_hosted_OBJECTS = dsp_main.$(OBJEXT) dsp_test.$(OBJEXT)
 xrp_dsp_hosted_OBJECTS = $(am_xrp_dsp_hosted_OBJECTS)
 xrp_dsp_hosted_DEPENDENCIES = ../xrp-dsp/libxrp-dsp.a \
 	../xrp-dsp/libxrp-dsp-hw-simple.a
 xrp_dsp_hosted_LINK = $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
 	$(xrp_dsp_hosted_LDFLAGS) $(LDFLAGS) -o $@
-am_xrp_dsp_standalone_OBJECTS = dsp_main.$(OBJEXT)
+am_xrp_dsp_standalone_OBJECTS = dsp_main.$(OBJEXT) dsp_test.$(OBJEXT)
 xrp_dsp_standalone_OBJECTS = $(am_xrp_dsp_standalone_OBJECTS)
 xrp_dsp_standalone_DEPENDENCIES = ../xrp-dsp/libxrp-dsp.a \
 	../xrp-dsp/libxrp-dsp-hw-simple.a
@@ -153,6 +156,10 @@ am_xrp_host_hosted_OBJECTS = host_main.$(OBJEXT)
 xrp_host_hosted_OBJECTS = $(am_xrp_host_hosted_OBJECTS)
 am__DEPENDENCIES_1 =
 xrp_host_hosted_DEPENDENCIES = ../xrp-host/libxrp-host-hosted.a \
+	$(am__DEPENDENCIES_1)
+am_xrp_host_single_OBJECTS = host_main.$(OBJEXT) dsp_test.$(OBJEXT)
+xrp_host_single_OBJECTS = $(am_xrp_host_single_OBJECTS)
+xrp_host_single_DEPENDENCIES = ../xrp-host/libxrp-host-single.a \
 	$(am__DEPENDENCIES_1)
 am_xrp_host_standalone_OBJECTS = host_main.$(OBJEXT) xrp_dtb.$(OBJEXT)
 xrp_host_standalone_OBJECTS = $(am_xrp_host_standalone_OBJECTS)
@@ -193,9 +200,11 @@ am__v_CCAS_ = $(am__v_CCAS_@AM_DEFAULT_V@)
 am__v_CCAS_0 = @echo "  CCAS    " $@;
 am__v_CCAS_1 = 
 SOURCES = $(xrp_dsp_hosted_SOURCES) $(xrp_dsp_standalone_SOURCES) \
-	$(xrp_host_hosted_SOURCES) $(xrp_host_standalone_SOURCES)
+	$(xrp_host_hosted_SOURCES) $(xrp_host_single_SOURCES) \
+	$(xrp_host_standalone_SOURCES)
 DIST_SOURCES = $(xrp_dsp_hosted_SOURCES) $(xrp_dsp_standalone_SOURCES) \
-	$(xrp_host_hosted_SOURCES) $(xrp_host_standalone_SOURCES)
+	$(xrp_host_hosted_SOURCES) $(xrp_host_single_SOURCES) \
+	$(xrp_host_standalone_SOURCES)
 am__can_run_installinfo = \
   case $$AM_UPDATE_INFO_DIR in \
     n|no|NO) false;; \
@@ -348,14 +357,16 @@ AM_CFLAGS = -W -Wall $(am__append_2) $(am__append_5)
 
 @BUILD_DSP_FALSE@@BUILD_STANDALONE_TRUE@BUILT_SOURCES = xrp.dtb
 @BUILD_DSP_FALSE@@BUILD_STANDALONE_TRUE@CLEANFILES = xrp.dtb
-xrp_dsp_hosted_SOURCES = dsp_main.c
-xrp_dsp_standalone_SOURCES = dsp_main.c
+xrp_dsp_hosted_SOURCES = dsp_main.c dsp_test.c
+xrp_dsp_standalone_SOURCES = dsp_main.c dsp_test.c
 xrp_dsp_hosted_LDADD = ../xrp-dsp/libxrp-dsp.a ../xrp-dsp/libxrp-dsp-hw-simple.a
 xrp_dsp_standalone_LDADD = ../xrp-dsp/libxrp-dsp.a ../xrp-dsp/libxrp-dsp-hw-simple.a
 xrp_host_hosted_SOURCES = host_main.c
 xrp_host_standalone_SOURCES = host_main.c xrp_dtb.s
+xrp_host_single_SOURCES = host_main.c dsp_test.c
 xrp_host_hosted_LDADD = ../xrp-host/libxrp-host-hosted.a $(THREADS_LDFLAGS)
 xrp_host_standalone_LDADD = ../xrp-host/libxrp-host-standalone.a $(THREADS_LDFLAGS) $(LIBFDT_LDFLAGS) -lfdt
+xrp_host_single_LDADD = ../xrp-host/libxrp-host-single.a $(THREADS_LDFLAGS)
 all: $(BUILT_SOURCES)
 	$(MAKE) $(AM_MAKEFLAGS) all-am
 
@@ -445,6 +456,10 @@ xrp-host-hosted$(EXEEXT): $(xrp_host_hosted_OBJECTS) $(xrp_host_hosted_DEPENDENC
 	@rm -f xrp-host-hosted$(EXEEXT)
 	$(AM_V_CCLD)$(LINK) $(xrp_host_hosted_OBJECTS) $(xrp_host_hosted_LDADD) $(LIBS)
 
+xrp-host-single$(EXEEXT): $(xrp_host_single_OBJECTS) $(xrp_host_single_DEPENDENCIES) $(EXTRA_xrp_host_single_DEPENDENCIES) 
+	@rm -f xrp-host-single$(EXEEXT)
+	$(AM_V_CCLD)$(LINK) $(xrp_host_single_OBJECTS) $(xrp_host_single_LDADD) $(LIBS)
+
 xrp-host-standalone$(EXEEXT): $(xrp_host_standalone_OBJECTS) $(xrp_host_standalone_DEPENDENCIES) $(EXTRA_xrp_host_standalone_DEPENDENCIES) 
 	@rm -f xrp-host-standalone$(EXEEXT)
 	$(AM_V_CCLD)$(LINK) $(xrp_host_standalone_OBJECTS) $(xrp_host_standalone_LDADD) $(LIBS)
@@ -456,6 +471,7 @@ distclean-compile:
 	-rm -f *.tab.c
 
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/dsp_main.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/dsp_test.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/host_main.Po@am__quote@
 
 .c.o:

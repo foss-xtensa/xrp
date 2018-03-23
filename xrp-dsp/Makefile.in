@@ -163,8 +163,9 @@ am_libxrp_dsp_hw_simple_a_OBJECTS = xrp_dsp_hw_simple.$(OBJEXT)
 libxrp_dsp_hw_simple_a_OBJECTS = $(am_libxrp_dsp_hw_simple_a_OBJECTS)
 libxrp_dsp_a_AR = $(AR) $(ARFLAGS)
 libxrp_dsp_a_LIBADD =
+am__dirstamp = $(am__leading_dot)dirstamp
 am_libxrp_dsp_a_OBJECTS = xrp_dsp.$(OBJEXT) \
-	xrp_dsp_framework.$(OBJEXT)
+	../xrp-common/xrp_ns.$(OBJEXT) xrp_dsp_framework.$(OBJEXT)
 libxrp_dsp_a_OBJECTS = $(am_libxrp_dsp_a_OBJECTS)
 AM_V_P = $(am__v_P_@AM_V@)
 am__v_P_ = $(am__v_P_@AM_DEFAULT_V@)
@@ -335,11 +336,11 @@ target_alias = @target_alias@
 top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
-AM_CPPFLAGS = -I$(srcdir)/.. -I$(srcdir)/../xrp-kernel
+AM_CPPFLAGS = -I$(srcdir)/.. -I$(srcdir)/../xrp-common -I$(srcdir)/../xrp-kernel
 AM_CFLAGS = -W -Wall --xtensa-core=$(DSP_CORE)
 include_HEADERS = ../xrp_api.h xrp_dsp_hw.h
 lib_LIBRARIES = libxrp-dsp.a libxrp-dsp-hw-simple.a
-libxrp_dsp_a_SOURCES = xrp_dsp.c xrp_dsp_framework.c
+libxrp_dsp_a_SOURCES = xrp_dsp.c ../xrp-common/xrp_ns.c xrp_dsp_framework.c
 libxrp_dsp_hw_simple_a_SOURCES = xrp_dsp_hw_simple.c
 all: all-am
 
@@ -410,6 +411,14 @@ libxrp-dsp-hw-simple.a: $(libxrp_dsp_hw_simple_a_OBJECTS) $(libxrp_dsp_hw_simple
 	$(AM_V_at)-rm -f libxrp-dsp-hw-simple.a
 	$(AM_V_AR)$(libxrp_dsp_hw_simple_a_AR) libxrp-dsp-hw-simple.a $(libxrp_dsp_hw_simple_a_OBJECTS) $(libxrp_dsp_hw_simple_a_LIBADD)
 	$(AM_V_at)$(RANLIB) libxrp-dsp-hw-simple.a
+../xrp-common/$(am__dirstamp):
+	@$(MKDIR_P) ../xrp-common
+	@: > ../xrp-common/$(am__dirstamp)
+../xrp-common/$(DEPDIR)/$(am__dirstamp):
+	@$(MKDIR_P) ../xrp-common/$(DEPDIR)
+	@: > ../xrp-common/$(DEPDIR)/$(am__dirstamp)
+../xrp-common/xrp_ns.$(OBJEXT): ../xrp-common/$(am__dirstamp) \
+	../xrp-common/$(DEPDIR)/$(am__dirstamp)
 
 libxrp-dsp.a: $(libxrp_dsp_a_OBJECTS) $(libxrp_dsp_a_DEPENDENCIES) $(EXTRA_libxrp_dsp_a_DEPENDENCIES) 
 	$(AM_V_at)-rm -f libxrp-dsp.a
@@ -418,10 +427,12 @@ libxrp-dsp.a: $(libxrp_dsp_a_OBJECTS) $(libxrp_dsp_a_DEPENDENCIES) $(EXTRA_libxr
 
 mostlyclean-compile:
 	-rm -f *.$(OBJEXT)
+	-rm -f ../xrp-common/*.$(OBJEXT)
 
 distclean-compile:
 	-rm -f *.tab.c
 
+@AMDEP_TRUE@@am__include@ @am__quote@../xrp-common/$(DEPDIR)/xrp_ns.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/xrp_dsp.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/xrp_dsp_framework.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/xrp_dsp_hw_simple.Po@am__quote@
@@ -578,6 +589,8 @@ clean-generic:
 distclean-generic:
 	-test -z "$(CONFIG_CLEAN_FILES)" || rm -f $(CONFIG_CLEAN_FILES)
 	-test . = "$(srcdir)" || test -z "$(CONFIG_CLEAN_VPATH_FILES)" || rm -f $(CONFIG_CLEAN_VPATH_FILES)
+	-rm -f ../xrp-common/$(DEPDIR)/$(am__dirstamp)
+	-rm -f ../xrp-common/$(am__dirstamp)
 
 maintainer-clean-generic:
 	@echo "This command is intended for maintainers to use"
@@ -587,7 +600,7 @@ clean: clean-am
 clean-am: clean-generic clean-libLIBRARIES mostlyclean-am
 
 distclean: distclean-am
-	-rm -rf ./$(DEPDIR)
+	-rm -rf ../xrp-common/$(DEPDIR) ./$(DEPDIR)
 	-rm -f Makefile
 distclean-am: clean-am distclean-compile distclean-generic \
 	distclean-tags
@@ -633,7 +646,7 @@ install-ps-am:
 installcheck-am:
 
 maintainer-clean: maintainer-clean-am
-	-rm -rf ./$(DEPDIR)
+	-rm -rf ../xrp-common/$(DEPDIR) ./$(DEPDIR)
 	-rm -f Makefile
 maintainer-clean-am: distclean-am maintainer-clean-generic
 

@@ -114,6 +114,7 @@ build_triplet = @build@
 host_triplet = @host@
 @BUILD_STANDALONE_TRUE@am__append_1 = libxrp-host-standalone.a
 @BUILD_HOSTED_TRUE@am__append_2 = libxrp-host-hosted.a
+@BUILD_SINGLE_TRUE@am__append_3 = libxrp-host-single.a
 subdir = xrp-host
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/configure.ac
@@ -171,16 +172,29 @@ am_libxrp_host_hosted_a_OBJECTS =  \
 	$(am__objects_1) \
 	hosted/libxrp_host_hosted_a-xrp_@HOST_OS@.$(OBJEXT)
 libxrp_host_hosted_a_OBJECTS = $(am_libxrp_host_hosted_a_OBJECTS)
+libxrp_host_single_a_AR = $(AR) $(ARFLAGS)
+libxrp_host_single_a_LIBADD =
+am__libxrp_host_single_a_SOURCES_DIST = xrp_host_common.c \
+	xrp_sync_queue.c xrp_threaded_queue.c single/xrp_single.c \
+	../xrp-common/xrp_ns.c
+@USE_THREADS_FALSE@am__objects_2 = libxrp_host_single_a-xrp_sync_queue.$(OBJEXT)
+@USE_THREADS_TRUE@am__objects_2 = libxrp_host_single_a-xrp_threaded_queue.$(OBJEXT)
+am_libxrp_host_single_a_OBJECTS =  \
+	libxrp_host_single_a-xrp_host_common.$(OBJEXT) \
+	$(am__objects_2) \
+	single/libxrp_host_single_a-xrp_single.$(OBJEXT) \
+	../xrp-common/libxrp_host_single_a-xrp_ns.$(OBJEXT)
+libxrp_host_single_a_OBJECTS = $(am_libxrp_host_single_a_OBJECTS)
 libxrp_host_standalone_a_AR = $(AR) $(ARFLAGS)
 libxrp_host_standalone_a_LIBADD =
 am__libxrp_host_standalone_a_SOURCES_DIST = xrp_host_common.c \
 	xrp_sync_queue.c xrp_threaded_queue.c standalone/xrp_host.c \
 	standalone/xrp_@HOST_OS@.c standalone/xrp_alloc.c
-@USE_THREADS_FALSE@am__objects_2 = libxrp_host_standalone_a-xrp_sync_queue.$(OBJEXT)
-@USE_THREADS_TRUE@am__objects_2 = libxrp_host_standalone_a-xrp_threaded_queue.$(OBJEXT)
+@USE_THREADS_FALSE@am__objects_3 = libxrp_host_standalone_a-xrp_sync_queue.$(OBJEXT)
+@USE_THREADS_TRUE@am__objects_3 = libxrp_host_standalone_a-xrp_threaded_queue.$(OBJEXT)
 am_libxrp_host_standalone_a_OBJECTS =  \
 	libxrp_host_standalone_a-xrp_host_common.$(OBJEXT) \
-	$(am__objects_2) \
+	$(am__objects_3) \
 	standalone/libxrp_host_standalone_a-xrp_host.$(OBJEXT) \
 	standalone/libxrp_host_standalone_a-xrp_@HOST_OS@.$(OBJEXT) \
 	standalone/libxrp_host_standalone_a-xrp_alloc.$(OBJEXT)
@@ -219,8 +233,10 @@ am__v_CCLD_ = $(am__v_CCLD_@AM_DEFAULT_V@)
 am__v_CCLD_0 = @echo "  CCLD    " $@;
 am__v_CCLD_1 = 
 SOURCES = $(libxrp_host_hosted_a_SOURCES) \
+	$(libxrp_host_single_a_SOURCES) \
 	$(libxrp_host_standalone_a_SOURCES)
 DIST_SOURCES = $(am__libxrp_host_hosted_a_SOURCES_DIST) \
+	$(am__libxrp_host_single_a_SOURCES_DIST) \
 	$(am__libxrp_host_standalone_a_SOURCES_DIST)
 am__can_run_installinfo = \
   case $$AM_UPDATE_INFO_DIR in \
@@ -360,10 +376,12 @@ target_alias = @target_alias@
 top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
-AM_CPPFLAGS = -I$(srcdir)/.. -I$(srcdir) -I$(srcdir)/thread-@THREADS_IMPL@
+AM_CPPFLAGS = -I$(srcdir)/.. -I$(srcdir) -I$(srcdir)/../xrp-common \
+	      -I$(srcdir)/thread-@THREADS_IMPL@
+
 AM_CFLAGS = -W -Wall $(THREADS_CFLAGS)
 include_HEADERS = ../xrp_api.h
-lib_LIBRARIES = $(am__append_1) $(am__append_2)
+lib_LIBRARIES = $(am__append_1) $(am__append_2) $(am__append_3)
 @USE_THREADS_FALSE@queue_sources = xrp_sync_queue.c
 @USE_THREADS_TRUE@queue_sources = xrp_threaded_queue.c
 libxrp_host_standalone_a_CPPFLAGS = $(AM_CPPFLAGS) \
@@ -384,6 +402,14 @@ libxrp_host_hosted_a_CPPFLAGS = $(AM_CPPFLAGS) \
 libxrp_host_hosted_a_SOURCES = xrp_host_common.c \
 			       $(queue_sources) \
 			       hosted/xrp_@HOST_OS@.c
+
+libxrp_host_single_a_CPPFLAGS = $(AM_CPPFLAGS) \
+				-I$(srcdir)/single
+
+libxrp_host_single_a_SOURCES = xrp_host_common.c \
+			       $(queue_sources) \
+			       single/xrp_single.c \
+			       ../xrp-common/xrp_ns.c
 
 all: all-am
 
@@ -462,6 +488,28 @@ libxrp-host-hosted.a: $(libxrp_host_hosted_a_OBJECTS) $(libxrp_host_hosted_a_DEP
 	$(AM_V_at)-rm -f libxrp-host-hosted.a
 	$(AM_V_AR)$(libxrp_host_hosted_a_AR) libxrp-host-hosted.a $(libxrp_host_hosted_a_OBJECTS) $(libxrp_host_hosted_a_LIBADD)
 	$(AM_V_at)$(RANLIB) libxrp-host-hosted.a
+single/$(am__dirstamp):
+	@$(MKDIR_P) single
+	@: > single/$(am__dirstamp)
+single/$(DEPDIR)/$(am__dirstamp):
+	@$(MKDIR_P) single/$(DEPDIR)
+	@: > single/$(DEPDIR)/$(am__dirstamp)
+single/libxrp_host_single_a-xrp_single.$(OBJEXT):  \
+	single/$(am__dirstamp) single/$(DEPDIR)/$(am__dirstamp)
+../xrp-common/$(am__dirstamp):
+	@$(MKDIR_P) ../xrp-common
+	@: > ../xrp-common/$(am__dirstamp)
+../xrp-common/$(DEPDIR)/$(am__dirstamp):
+	@$(MKDIR_P) ../xrp-common/$(DEPDIR)
+	@: > ../xrp-common/$(DEPDIR)/$(am__dirstamp)
+../xrp-common/libxrp_host_single_a-xrp_ns.$(OBJEXT):  \
+	../xrp-common/$(am__dirstamp) \
+	../xrp-common/$(DEPDIR)/$(am__dirstamp)
+
+libxrp-host-single.a: $(libxrp_host_single_a_OBJECTS) $(libxrp_host_single_a_DEPENDENCIES) $(EXTRA_libxrp_host_single_a_DEPENDENCIES) 
+	$(AM_V_at)-rm -f libxrp-host-single.a
+	$(AM_V_AR)$(libxrp_host_single_a_AR) libxrp-host-single.a $(libxrp_host_single_a_OBJECTS) $(libxrp_host_single_a_LIBADD)
+	$(AM_V_at)$(RANLIB) libxrp-host-single.a
 standalone/$(am__dirstamp):
 	@$(MKDIR_P) standalone
 	@: > standalone/$(am__dirstamp)
@@ -485,19 +533,26 @@ libxrp-host-standalone.a: $(libxrp_host_standalone_a_OBJECTS) $(libxrp_host_stan
 
 mostlyclean-compile:
 	-rm -f *.$(OBJEXT)
+	-rm -f ../xrp-common/*.$(OBJEXT)
 	-rm -f hosted/*.$(OBJEXT)
+	-rm -f single/*.$(OBJEXT)
 	-rm -f standalone/*.$(OBJEXT)
 
 distclean-compile:
 	-rm -f *.tab.c
 
+@AMDEP_TRUE@@am__include@ @am__quote@../xrp-common/$(DEPDIR)/libxrp_host_single_a-xrp_ns.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libxrp_host_hosted_a-xrp_host_common.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libxrp_host_hosted_a-xrp_sync_queue.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libxrp_host_hosted_a-xrp_threaded_queue.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libxrp_host_single_a-xrp_host_common.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libxrp_host_single_a-xrp_sync_queue.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libxrp_host_single_a-xrp_threaded_queue.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libxrp_host_standalone_a-xrp_host_common.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libxrp_host_standalone_a-xrp_sync_queue.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libxrp_host_standalone_a-xrp_threaded_queue.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@hosted/$(DEPDIR)/libxrp_host_hosted_a-xrp_@HOST_OS@.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@single/$(DEPDIR)/libxrp_host_single_a-xrp_single.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@standalone/$(DEPDIR)/libxrp_host_standalone_a-xrp_@HOST_OS@.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@standalone/$(DEPDIR)/libxrp_host_standalone_a-xrp_alloc.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@standalone/$(DEPDIR)/libxrp_host_standalone_a-xrp_host.Po@am__quote@
@@ -573,6 +628,76 @@ hosted/libxrp_host_hosted_a-xrp_@HOST_OS@.obj: hosted/xrp_@HOST_OS@.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='hosted/xrp_@HOST_OS@.c' object='hosted/libxrp_host_hosted_a-xrp_@HOST_OS@.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libxrp_host_hosted_a_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o hosted/libxrp_host_hosted_a-xrp_@HOST_OS@.obj `if test -f 'hosted/xrp_@HOST_OS@.c'; then $(CYGPATH_W) 'hosted/xrp_@HOST_OS@.c'; else $(CYGPATH_W) '$(srcdir)/hosted/xrp_@HOST_OS@.c'; fi`
+
+libxrp_host_single_a-xrp_host_common.o: xrp_host_common.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libxrp_host_single_a_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT libxrp_host_single_a-xrp_host_common.o -MD -MP -MF $(DEPDIR)/libxrp_host_single_a-xrp_host_common.Tpo -c -o libxrp_host_single_a-xrp_host_common.o `test -f 'xrp_host_common.c' || echo '$(srcdir)/'`xrp_host_common.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libxrp_host_single_a-xrp_host_common.Tpo $(DEPDIR)/libxrp_host_single_a-xrp_host_common.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='xrp_host_common.c' object='libxrp_host_single_a-xrp_host_common.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libxrp_host_single_a_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o libxrp_host_single_a-xrp_host_common.o `test -f 'xrp_host_common.c' || echo '$(srcdir)/'`xrp_host_common.c
+
+libxrp_host_single_a-xrp_host_common.obj: xrp_host_common.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libxrp_host_single_a_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT libxrp_host_single_a-xrp_host_common.obj -MD -MP -MF $(DEPDIR)/libxrp_host_single_a-xrp_host_common.Tpo -c -o libxrp_host_single_a-xrp_host_common.obj `if test -f 'xrp_host_common.c'; then $(CYGPATH_W) 'xrp_host_common.c'; else $(CYGPATH_W) '$(srcdir)/xrp_host_common.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libxrp_host_single_a-xrp_host_common.Tpo $(DEPDIR)/libxrp_host_single_a-xrp_host_common.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='xrp_host_common.c' object='libxrp_host_single_a-xrp_host_common.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libxrp_host_single_a_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o libxrp_host_single_a-xrp_host_common.obj `if test -f 'xrp_host_common.c'; then $(CYGPATH_W) 'xrp_host_common.c'; else $(CYGPATH_W) '$(srcdir)/xrp_host_common.c'; fi`
+
+libxrp_host_single_a-xrp_sync_queue.o: xrp_sync_queue.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libxrp_host_single_a_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT libxrp_host_single_a-xrp_sync_queue.o -MD -MP -MF $(DEPDIR)/libxrp_host_single_a-xrp_sync_queue.Tpo -c -o libxrp_host_single_a-xrp_sync_queue.o `test -f 'xrp_sync_queue.c' || echo '$(srcdir)/'`xrp_sync_queue.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libxrp_host_single_a-xrp_sync_queue.Tpo $(DEPDIR)/libxrp_host_single_a-xrp_sync_queue.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='xrp_sync_queue.c' object='libxrp_host_single_a-xrp_sync_queue.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libxrp_host_single_a_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o libxrp_host_single_a-xrp_sync_queue.o `test -f 'xrp_sync_queue.c' || echo '$(srcdir)/'`xrp_sync_queue.c
+
+libxrp_host_single_a-xrp_sync_queue.obj: xrp_sync_queue.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libxrp_host_single_a_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT libxrp_host_single_a-xrp_sync_queue.obj -MD -MP -MF $(DEPDIR)/libxrp_host_single_a-xrp_sync_queue.Tpo -c -o libxrp_host_single_a-xrp_sync_queue.obj `if test -f 'xrp_sync_queue.c'; then $(CYGPATH_W) 'xrp_sync_queue.c'; else $(CYGPATH_W) '$(srcdir)/xrp_sync_queue.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libxrp_host_single_a-xrp_sync_queue.Tpo $(DEPDIR)/libxrp_host_single_a-xrp_sync_queue.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='xrp_sync_queue.c' object='libxrp_host_single_a-xrp_sync_queue.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libxrp_host_single_a_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o libxrp_host_single_a-xrp_sync_queue.obj `if test -f 'xrp_sync_queue.c'; then $(CYGPATH_W) 'xrp_sync_queue.c'; else $(CYGPATH_W) '$(srcdir)/xrp_sync_queue.c'; fi`
+
+libxrp_host_single_a-xrp_threaded_queue.o: xrp_threaded_queue.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libxrp_host_single_a_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT libxrp_host_single_a-xrp_threaded_queue.o -MD -MP -MF $(DEPDIR)/libxrp_host_single_a-xrp_threaded_queue.Tpo -c -o libxrp_host_single_a-xrp_threaded_queue.o `test -f 'xrp_threaded_queue.c' || echo '$(srcdir)/'`xrp_threaded_queue.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libxrp_host_single_a-xrp_threaded_queue.Tpo $(DEPDIR)/libxrp_host_single_a-xrp_threaded_queue.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='xrp_threaded_queue.c' object='libxrp_host_single_a-xrp_threaded_queue.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libxrp_host_single_a_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o libxrp_host_single_a-xrp_threaded_queue.o `test -f 'xrp_threaded_queue.c' || echo '$(srcdir)/'`xrp_threaded_queue.c
+
+libxrp_host_single_a-xrp_threaded_queue.obj: xrp_threaded_queue.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libxrp_host_single_a_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT libxrp_host_single_a-xrp_threaded_queue.obj -MD -MP -MF $(DEPDIR)/libxrp_host_single_a-xrp_threaded_queue.Tpo -c -o libxrp_host_single_a-xrp_threaded_queue.obj `if test -f 'xrp_threaded_queue.c'; then $(CYGPATH_W) 'xrp_threaded_queue.c'; else $(CYGPATH_W) '$(srcdir)/xrp_threaded_queue.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libxrp_host_single_a-xrp_threaded_queue.Tpo $(DEPDIR)/libxrp_host_single_a-xrp_threaded_queue.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='xrp_threaded_queue.c' object='libxrp_host_single_a-xrp_threaded_queue.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libxrp_host_single_a_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o libxrp_host_single_a-xrp_threaded_queue.obj `if test -f 'xrp_threaded_queue.c'; then $(CYGPATH_W) 'xrp_threaded_queue.c'; else $(CYGPATH_W) '$(srcdir)/xrp_threaded_queue.c'; fi`
+
+single/libxrp_host_single_a-xrp_single.o: single/xrp_single.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libxrp_host_single_a_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT single/libxrp_host_single_a-xrp_single.o -MD -MP -MF single/$(DEPDIR)/libxrp_host_single_a-xrp_single.Tpo -c -o single/libxrp_host_single_a-xrp_single.o `test -f 'single/xrp_single.c' || echo '$(srcdir)/'`single/xrp_single.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) single/$(DEPDIR)/libxrp_host_single_a-xrp_single.Tpo single/$(DEPDIR)/libxrp_host_single_a-xrp_single.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='single/xrp_single.c' object='single/libxrp_host_single_a-xrp_single.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libxrp_host_single_a_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o single/libxrp_host_single_a-xrp_single.o `test -f 'single/xrp_single.c' || echo '$(srcdir)/'`single/xrp_single.c
+
+single/libxrp_host_single_a-xrp_single.obj: single/xrp_single.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libxrp_host_single_a_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT single/libxrp_host_single_a-xrp_single.obj -MD -MP -MF single/$(DEPDIR)/libxrp_host_single_a-xrp_single.Tpo -c -o single/libxrp_host_single_a-xrp_single.obj `if test -f 'single/xrp_single.c'; then $(CYGPATH_W) 'single/xrp_single.c'; else $(CYGPATH_W) '$(srcdir)/single/xrp_single.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) single/$(DEPDIR)/libxrp_host_single_a-xrp_single.Tpo single/$(DEPDIR)/libxrp_host_single_a-xrp_single.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='single/xrp_single.c' object='single/libxrp_host_single_a-xrp_single.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libxrp_host_single_a_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o single/libxrp_host_single_a-xrp_single.obj `if test -f 'single/xrp_single.c'; then $(CYGPATH_W) 'single/xrp_single.c'; else $(CYGPATH_W) '$(srcdir)/single/xrp_single.c'; fi`
+
+../xrp-common/libxrp_host_single_a-xrp_ns.o: ../xrp-common/xrp_ns.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libxrp_host_single_a_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT ../xrp-common/libxrp_host_single_a-xrp_ns.o -MD -MP -MF ../xrp-common/$(DEPDIR)/libxrp_host_single_a-xrp_ns.Tpo -c -o ../xrp-common/libxrp_host_single_a-xrp_ns.o `test -f '../xrp-common/xrp_ns.c' || echo '$(srcdir)/'`../xrp-common/xrp_ns.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) ../xrp-common/$(DEPDIR)/libxrp_host_single_a-xrp_ns.Tpo ../xrp-common/$(DEPDIR)/libxrp_host_single_a-xrp_ns.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../xrp-common/xrp_ns.c' object='../xrp-common/libxrp_host_single_a-xrp_ns.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libxrp_host_single_a_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o ../xrp-common/libxrp_host_single_a-xrp_ns.o `test -f '../xrp-common/xrp_ns.c' || echo '$(srcdir)/'`../xrp-common/xrp_ns.c
+
+../xrp-common/libxrp_host_single_a-xrp_ns.obj: ../xrp-common/xrp_ns.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libxrp_host_single_a_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT ../xrp-common/libxrp_host_single_a-xrp_ns.obj -MD -MP -MF ../xrp-common/$(DEPDIR)/libxrp_host_single_a-xrp_ns.Tpo -c -o ../xrp-common/libxrp_host_single_a-xrp_ns.obj `if test -f '../xrp-common/xrp_ns.c'; then $(CYGPATH_W) '../xrp-common/xrp_ns.c'; else $(CYGPATH_W) '$(srcdir)/../xrp-common/xrp_ns.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) ../xrp-common/$(DEPDIR)/libxrp_host_single_a-xrp_ns.Tpo ../xrp-common/$(DEPDIR)/libxrp_host_single_a-xrp_ns.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../xrp-common/xrp_ns.c' object='../xrp-common/libxrp_host_single_a-xrp_ns.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libxrp_host_single_a_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o ../xrp-common/libxrp_host_single_a-xrp_ns.obj `if test -f '../xrp-common/xrp_ns.c'; then $(CYGPATH_W) '../xrp-common/xrp_ns.c'; else $(CYGPATH_W) '$(srcdir)/../xrp-common/xrp_ns.c'; fi`
 
 libxrp_host_standalone_a-xrp_host_common.o: xrp_host_common.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libxrp_host_standalone_a_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT libxrp_host_standalone_a-xrp_host_common.o -MD -MP -MF $(DEPDIR)/libxrp_host_standalone_a-xrp_host_common.Tpo -c -o libxrp_host_standalone_a-xrp_host_common.o `test -f 'xrp_host_common.c' || echo '$(srcdir)/'`xrp_host_common.c
@@ -794,8 +919,12 @@ clean-generic:
 distclean-generic:
 	-test -z "$(CONFIG_CLEAN_FILES)" || rm -f $(CONFIG_CLEAN_FILES)
 	-test . = "$(srcdir)" || test -z "$(CONFIG_CLEAN_VPATH_FILES)" || rm -f $(CONFIG_CLEAN_VPATH_FILES)
+	-rm -f ../xrp-common/$(DEPDIR)/$(am__dirstamp)
+	-rm -f ../xrp-common/$(am__dirstamp)
 	-rm -f hosted/$(DEPDIR)/$(am__dirstamp)
 	-rm -f hosted/$(am__dirstamp)
+	-rm -f single/$(DEPDIR)/$(am__dirstamp)
+	-rm -f single/$(am__dirstamp)
 	-rm -f standalone/$(DEPDIR)/$(am__dirstamp)
 	-rm -f standalone/$(am__dirstamp)
 
@@ -807,7 +936,7 @@ clean: clean-am
 clean-am: clean-generic clean-libLIBRARIES mostlyclean-am
 
 distclean: distclean-am
-	-rm -rf ./$(DEPDIR) hosted/$(DEPDIR) standalone/$(DEPDIR)
+	-rm -rf ../xrp-common/$(DEPDIR) ./$(DEPDIR) hosted/$(DEPDIR) single/$(DEPDIR) standalone/$(DEPDIR)
 	-rm -f Makefile
 distclean-am: clean-am distclean-compile distclean-generic \
 	distclean-tags
@@ -853,7 +982,7 @@ install-ps-am:
 installcheck-am:
 
 maintainer-clean: maintainer-clean-am
-	-rm -rf ./$(DEPDIR) hosted/$(DEPDIR) standalone/$(DEPDIR)
+	-rm -rf ../xrp-common/$(DEPDIR) ./$(DEPDIR) hosted/$(DEPDIR) single/$(DEPDIR) standalone/$(DEPDIR)
 	-rm -f Makefile
 maintainer-clean-am: distclean-am maintainer-clean-generic
 
