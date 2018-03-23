@@ -89,6 +89,13 @@ static void dump_cmd_ns_map(const struct xrp_cmd_ns_map *ns_map)
 }
 #endif
 
+static int cmd_ns_present(struct xrp_cmd_ns_map *ns_map,
+			  struct xrp_cmd_ns *cmd_ns)
+{
+	return cmd_ns >= ns_map->cmd_ns &&
+		cmd_ns < ns_map->cmd_ns + ns_map->n_cmd_ns;
+}
+
 struct xrp_cmd_ns *xrp_find_cmd_ns(struct xrp_cmd_ns_map *ns_map,
 				   const void *id)
 {
@@ -113,18 +120,15 @@ struct xrp_cmd_ns *xrp_find_cmd_ns(struct xrp_cmd_ns_map *ns_map,
 	p = ns_map->cmd_ns + a;
 	if (a < b && compare_cmd_ns(id, p) > 0)
 		++p;
-	pr_debug("%s: found: ", __func__);
-	dump_cmd_ns(p);
-	pr_debug("\n");
+	if (cmd_ns_present(ns_map, p)) {
+		pr_debug("%s: found: ", __func__);
+		dump_cmd_ns(p);
+		pr_debug("\n");
+	} else {
+		pr_debug("%s: not found\n", __func__);
+	}
 
 	return p;
-}
-
-static int cmd_ns_present(struct xrp_cmd_ns_map *ns_map,
-			  struct xrp_cmd_ns *cmd_ns)
-{
-	return cmd_ns >= ns_map->cmd_ns &&
-		cmd_ns < ns_map->cmd_ns + ns_map->n_cmd_ns;
 }
 
 static struct xrp_cmd_ns *insert_cmd_ns(struct xrp_cmd_ns_map *ns_map,
