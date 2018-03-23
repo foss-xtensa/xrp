@@ -34,6 +34,9 @@ endif
 if BUILD_HOSTED
 lib_LIBRARIES += libxrp-host-hosted.a
 endif
+if BUILD_SINGLE
+lib_LIBRARIES += libxrp-host-single.a
+endif
 
 if USE_THREADS
 queue_sources = xrp_threaded_queue.c
@@ -57,3 +60,10 @@ libxrp_host_hosted_a_CPPFLAGS = $(AM_CPPFLAGS) \
 libxrp_host_hosted_a_SOURCES = xrp_host_common.c \
 			       $(queue_sources) \
 			       hosted/xrp_@HOST_OS@.c
+
+libxrp_host_single_a_CPPFLAGS = $(AM_CPPFLAGS) \
+				-I$(srcdir)/single
+libxrp_host_single_a_SOURCES = xrp_host_common.c \
+			       $(queue_sources) \
+			       single/xrp_single.c \
+			       ../xrp-common/xrp_ns.c

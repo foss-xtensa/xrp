@@ -62,6 +62,15 @@ AC_ARG_ENABLE(hosted,
 	      [build_hosted=true])
 AM_CONDITIONAL([BUILD_HOSTED], [test x$build_hosted = xtrue])
 
+AC_ARG_ENABLE(single,
+	      [AS_HELP_STRING([--enable-single],
+			      [build single library/example [no]])],
+	      [AS_IF([test "x${enableval}" = xno],
+		     [build_single=false],
+		     [build_single=true])],
+	      [build_single=false])
+AM_CONDITIONAL([BUILD_SINGLE], [test x$build_single = xtrue])
+
 AC_ARG_ENABLE(example,
 	      [AS_HELP_STRING([--enable-example],
 			      [build example application [no]])],

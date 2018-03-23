@@ -56,6 +56,9 @@ endif
 if BUILD_HOSTED
 bin_PROGRAMS += xrp-host-hosted
 endif
+if BUILD_SINGLE
+bin_PROGRAMS += xrp-host-single
+endif
 endif
 
 if HOST_OS_LINUX
@@ -70,9 +73,11 @@ xrp_dsp_standalone_LDADD = ../xrp-dsp/libxrp-dsp.a ../xrp-dsp/libxrp-dsp-hw-simp
 
 xrp_host_hosted_SOURCES = host_main.c
 xrp_host_standalone_SOURCES = host_main.c xrp_dtb.s
+xrp_host_single_SOURCES = host_main.c dsp_test.c
 
 xrp_host_hosted_LDADD = ../xrp-host/libxrp-host-hosted.a $(THREADS_LDFLAGS)
 xrp_host_standalone_LDADD = ../xrp-host/libxrp-host-standalone.a $(THREADS_LDFLAGS) $(LIBFDT_LDFLAGS) -lfdt
+xrp_host_single_LDADD = ../xrp-host/libxrp-host-single.a $(THREADS_LDFLAGS)
 
 xrp_dtb.$(OBJEXT): xrp.dtb
 xrp.dtb: $(srcdir)/xrp.dts
