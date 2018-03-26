@@ -74,12 +74,17 @@ drops to zero.
 XRP implementations.
 ===================
 
-There are two implementations of the XRP interface for the host side: hosted
-(formerly known as native) and standalone (formerly known as fast simulation).
+There are three implementations of the XRP interface for the host side: hosted
+(formerly known as native), standalone (formerly known as fast simulation) and
+single image.
 Hosted implementation requires additional support from the host OS which is
 provided through the OS kernel driver. Standalone implementation talks to the
-DSP directly and is self-sufficient.
-DSP XRP implementation can be configured to work with either host XRP.
+DSP directly and is self-sufficient. Single image implementation runs host and
+DSP code in a single process context, requests are either served synchronously
+or asynchronously in the XRP queue thread context.
+DSP XRP implementation can be configured to work with either hosted or
+standalone host XRP. Single image implementation doesn't use DSP XRP code and
+is not xtensa specific.
 
 Hosted implementation runs on a system where CPU cores running host OS code
 and Xtensa DSP cores are connected to shared memory. It may be a hardware or
@@ -288,6 +293,23 @@ and MMIO:
   `---------------------------------------------------------------------'
 
 
+Single image implementation can run in a userspace process, or natively on a
+device or in simulator, with or without OS:
+
+  ,---------.
+  | Process |
+  |         `-----------------------------------------------.
+  |  ,------------------------------.  ,-----------------.  |
+  |  |    User application code     |  |   DSP payload   |  |
+  |  `------------------------------'  `-----------------'  |
+  |             |       ^                  ^         |      |
+  |             v       |                  |         v      |
+  |  ,---------------------------------------------------.  |
+  |  |               Single image XRP library            |  |
+  |  `---------------------------------------------------'  |
+  `---------------------------------------------------------'
+
+
 Kernel driver requirements.
 ==========================
 
@@ -349,6 +371,12 @@ Standalone mode:
 - DSP firmware bits of the XRP built for fast simulation have the base address
   of the communication area in the shared memory built into it. See how
   DSP_COMM_BASE is used.
+
+Single image mode:
+- XRP does not depend on the target hardware. The only configurable parameter
+  is the thread stack size in case XOS threads are used on Xtensa ELF host.
+  It is captured in a symbol xrp_xos_thread_stack_size and may be adjusted
+  with -Wl,-defsym,xrp_xos_thread_stack_size=... option in LDFLAGS.
 
 Operation.
 =========
@@ -478,11 +506,14 @@ Code structure.
 | |                    common code for these implementations.
 | +-hosted/         -- linux implementation of the XRP interface for the hosted
 | |                    mode.
+| +-single/         -- single-image implementation of the XRP interface.
 | +-standalone/     -- linux and bare-metal implementations of the XRP
 | |                    interface for the standalone mode.
 | +-thread-pthread/ -- multithreading abstraction implementations based on
 | |                    POSIX thread library.
-| `-thread-single/  -- dummy multithreading abstraction implementations.
+| +-thread-single/  -- dummy multithreading abstraction implementations.
+| `-thread-xos/     -- multithreading abstraction implementations based on XOS
+|                      RTOS.
 +-xrp-kernel/       -- linux kernel driver for the native XRP implementation.
 | `-test/           -- standalone tests for the driver.
 `-xrp_api.h         -- XRP API definition.
@@ -526,9 +557,14 @@ One build directory may be configured to build code either for the host or for
 the DSP, but not for both. This behavior is controlled by the configure switch
 '--enable-dsp'.
 
-Switches '--enable-hosted' (on by default) and '--enable-standalone' (off by
-default) enable building of hosted variand of library/example or standalone
-variant respectively.
+Switches '--enable-hosted' (on by default), '--enable-standalone' (off by
+default) and '--enable-single' (off by default) enable building of hosted
+variant of library/example, standalone variant or single image variant
+respectively.
+
+Switch '--enable-threads' (detect by default) enables or disables use of
+thread library for asynchronous processing. When omitted the configure script
+checks for POSIX or XOS threads availability.
 
 - Xtensa DSP code needs an xcc-based toolchain. Provide the following
   environment variable to the configure or to make:
@@ -557,6 +593,19 @@ variant respectively.
   xrp-host/libxrp-host-standalone.a:
 
   $ ./configure --host=xtensa-elf --enable-standalone --disable-hosted \
+    CC=xt-xcc
+  $ make
+
+  The following will produce linux XRP library for single image mode,
+  xrp-host/libxrp-host-single.a:
+
+  $ ./configure --host=xtensa-elf --enable-single --disable-hosted
+  $ make
+
+  The following will produce bare-metal XRP library for single image mode,
+  xrp-host/libxrp-host-single.a:
+
+  $ ./configure --host=xtensa-elf --enable-single --disable-hosted \
     CC=xt-xcc
   $ make
 
@@ -623,3 +672,10 @@ hosted library or example.
   $ ./configure --host=xtensa-elf --enable-example --enable-standalone \
     --disable-hosted CC=xt-xcc
   $ make
+
+- the following will produce bare-metal example for single-image mode,
+  xrp-example/xrp-host-single
+
+  $ ./configure --host=xtensa-elf --enable-example --enable-single \
+    --disable-hosted CC=xt-xcc
+  $ make LDFLAGS="-Wl,--defsym,xrp_xos_thread_stack_size=0x2000"
