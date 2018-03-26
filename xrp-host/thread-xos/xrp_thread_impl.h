@@ -106,13 +106,20 @@ static inline int32_t xrp_xos_thread_func(void *arg, int32_t wake_value)
 	return 0;
 }
 
+extern char xrp_xos_thread_stack_size[] __attribute__((weak));
+
 static inline int xrp_thread_create(xrp_thread *thread,
 				    void *(*thread_func)(void *),
 				    void *p)
 {
-	void *stack = malloc(XOS_STACK_MIN_SIZE);
+	uint32_t thread_stack_size = (uint32_t)xrp_xos_thread_stack_size;
+	void *stack;
 	int32_t rc;
 
+	if (!thread_stack_size)
+		thread_stack_size = XOS_STACK_MIN_SIZE;
+
+	stack = malloc(thread_stack_size);
 	if (stack == NULL)
 		return 0;
 	thread->stack = stack;
@@ -120,7 +127,7 @@ static inline int xrp_thread_create(xrp_thread *thread,
 	rc = xos_thread_create(&thread->thread, NULL,
 			       xrp_xos_thread_func, p,
 			       "xrp_xos_thread_func",
-			       stack, XOS_STACK_MIN_SIZE,
+			       stack, thread_stack_size,
 			       0, NULL, 0);
 	return rc == XOS_OK;
 }
