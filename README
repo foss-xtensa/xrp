@@ -376,7 +376,8 @@ Single image mode:
 - XRP does not depend on the target hardware. The only configurable parameter
   is the thread stack size in case XOS threads are used on Xtensa ELF host.
   It is captured in a symbol xrp_xos_thread_stack_size and may be adjusted
-  with -Wl,-defsym,xrp_xos_thread_stack_size=... option in LDFLAGS.
+  with -Wl,-defsym,xrp_xos_thread_stack_size=... option in LDFLAGS at
+  configure or build time.
 
 Operation.
 =========
@@ -599,7 +600,7 @@ checks for POSIX or XOS threads availability.
   The following will produce linux XRP library for single image mode,
   xrp-host/libxrp-host-single.a:
 
-  $ ./configure --host=xtensa-elf --enable-single --disable-hosted
+  $ ./configure --enable-single --disable-hosted
   $ make
 
   The following will produce bare-metal XRP library for single image mode,
