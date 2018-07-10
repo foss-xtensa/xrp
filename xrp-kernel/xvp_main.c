@@ -1810,6 +1810,11 @@ err:
 	return ret;
 }
 
+typedef long xrp_init_function(struct platform_device *pdev,
+			       enum xrp_init_flags flags,
+			       const struct xrp_hw_ops *hw_ops, void *hw_arg);
+
+xrp_init_function xrp_init;
 long xrp_init(struct platform_device *pdev, enum xrp_init_flags flags,
 	      const struct xrp_hw_ops *hw_ops, void *hw_arg)
 {
@@ -1817,6 +1822,7 @@ long xrp_init(struct platform_device *pdev, enum xrp_init_flags flags,
 }
 EXPORT_SYMBOL(xrp_init);
 
+xrp_init_function xrp_init_v1;
 long xrp_init_v1(struct platform_device *pdev, enum xrp_init_flags flags,
 		 const struct xrp_hw_ops *hw_ops, void *hw_arg)
 {
@@ -1824,6 +1830,7 @@ long xrp_init_v1(struct platform_device *pdev, enum xrp_init_flags flags,
 }
 EXPORT_SYMBOL(xrp_init_v1);
 
+xrp_init_function xrp_init_cma;
 long xrp_init_cma(struct platform_device *pdev, enum xrp_init_flags flags,
 		  const struct xrp_hw_ops *hw_ops, void *hw_arg)
 {
@@ -1900,27 +1907,26 @@ MODULE_DEVICE_TABLE(acpi, xrp_acpi_match);
 
 static int xrp_probe(struct platform_device *pdev)
 {
-	int ret = -EINVAL;
-	struct xvp *xvp = devm_kzalloc(&pdev->dev, sizeof(*xvp), GFP_KERNEL);
-	if (!xvp)
-		return -ENOMEM;
+	long ret = -EINVAL;
 
 #ifdef CONFIG_OF
 	{
 		const struct of_device_id *match;
-		int (*init)(struct platform_device *pdev, struct xvp *xvp,
-			    const struct xrp_hw_ops *hw_ops, void *hw_arg);
+		xrp_init_function *init;
 
 	        match = of_match_device(xrp_of_match, &pdev->dev);
 		init = match->data;
-		return init(pdev, xvp, &hw_ops, NULL);
+		ret = init(pdev, 0, &hw_ops, NULL);
+		return IS_ERR_VALUE(ret) ? ret : 0;
 	}
 #endif
 #ifdef CONFIG_ACPI
-	ret = xrp_init_v1(pdev, xvp, &hw_ops, NULL);
-	if (ret == 0) {
+	ret = xrp_init_v1(pdev, 0, &hw_ops, NULL);
+	if (!IS_ERR_VALUE(ret)) {
 		struct xrp_address_map_entry *entry;
+		struct xvp *xvp = ERR_PTR(ret);
 
+		ret = 0;
 		/*
 		 * On ACPI system DSP can currently only access
 		 * its own shared memory.
