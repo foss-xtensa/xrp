@@ -206,6 +206,14 @@ static inline void xrp_send_device_irq(struct xvp *xvp)
 		xvp->hw_ops->send_irq(xvp->hw_arg);
 }
 
+static inline bool xrp_panic_check(struct xvp *xvp)
+{
+	if (xvp->hw_ops->panic_check)
+		return xvp->hw_ops->panic_check(xvp->hw_arg);
+	else
+		return false;
+}
+
 static void xrp_add_known_file(struct file *filp)
 {
 	struct xrp_known_file *p = kmalloc(sizeof(*p), GFP_KERNEL);
@@ -274,6 +282,8 @@ static int xrp_synchronize(struct xvp *xvp)
 		v = xrp_comm_read32(&shared_sync->sync);
 		if (v == XRP_DSP_SYNC_DSP_READY)
 			break;
+		if (xrp_panic_check(xvp))
+			goto err;
 		schedule();
 	} while (time_before(jiffies, deadline));
 
@@ -291,6 +301,8 @@ static int xrp_synchronize(struct xvp *xvp)
 		v = xrp_comm_read32(&shared_sync->sync);
 		if (v == XRP_DSP_SYNC_DSP_TO_HOST)
 			break;
+		if (xrp_panic_check(xvp))
+			goto err;
 		schedule();
 	} while (time_before(jiffies, deadline));
 
@@ -305,6 +317,8 @@ static int xrp_synchronize(struct xvp *xvp)
 	if (xvp->host_irq_mode) {
 		int res = wait_for_completion_timeout(&xvp->completion,
 						      firmware_command_timeout * HZ);
+		if (xrp_panic_check(xvp))
+			goto err;
 		if (res == 0) {
 			dev_err(xvp->dev,
 				"host IRQ mode is requested, but DSP couldn't deliver IRQ during synchronization\n");
@@ -1039,11 +1053,17 @@ static long xvp_complete_cmd_irq(struct xvp *xvp,
 {
 	long timeout = firmware_command_timeout * HZ;
 
+	if (cmd_complete(xvp))
+		return 0;
+	if (xrp_panic_check(xvp))
+		return -EBUSY;
 	do {
 		timeout = wait_for_completion_interruptible_timeout(completion,
 								    timeout);
 		if (cmd_complete(xvp))
 			return 0;
+		if (xrp_panic_check(xvp))
+			return -EBUSY;
 	} while (timeout > 0);
 
 	if (timeout == 0)
@@ -1059,6 +1079,8 @@ static long xvp_complete_cmd_poll(struct xvp *xvp,
 	do {
 		if (cmd_complete(xvp))
 			return 0;
+		if (xrp_panic_check(xvp))
+			return -EBUSY;
 		schedule();
 	} while (time_before(jiffies, deadline));
 
@@ -1385,6 +1407,9 @@ static long xrp_ioctl_submit_sync(struct file *filp,
 				ret = xvp_complete_cmd_poll(xvp,
 							    xrp_cmd_complete);
 			}
+#ifdef DEBUG
+			xrp_panic_check(xvp);
+#endif
 
 			/* copy back inline data */
 			if (ret == 0) {
