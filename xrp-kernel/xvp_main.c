@@ -318,9 +318,8 @@ err:
 	return ret;
 }
 
-static bool xrp_cmd_complete(void *p)
+static bool xrp_cmd_complete(struct xvp *xvp)
 {
-	struct xvp *xvp = p;
 	struct xrp_dsp_cmd __iomem *cmd = xvp->comm;
 	u32 flags = xrp_comm_read32(&cmd->flags);
 
@@ -1034,16 +1033,16 @@ static long xrp_ioctl_free(struct file *filp,
 	return -EINVAL;
 }
 
-static long xvp_complete_cmd_irq(struct completion *completion,
-				 bool (*cmd_complete)(void *p),
-				 void *p)
+static long xvp_complete_cmd_irq(struct xvp *xvp,
+				 struct completion *completion,
+				 bool (*cmd_complete)(struct xvp *p))
 {
 	long timeout = firmware_command_timeout * HZ;
 
 	do {
 		timeout = wait_for_completion_interruptible_timeout(completion,
 								    timeout);
-		if (cmd_complete(p))
+		if (cmd_complete(xvp))
 			return 0;
 	} while (timeout > 0);
 
@@ -1052,13 +1051,13 @@ static long xvp_complete_cmd_irq(struct completion *completion,
 	return timeout;
 }
 
-static long xvp_complete_cmd_poll(bool (*cmd_complete)(void *p),
-				  void *p)
+static long xvp_complete_cmd_poll(struct xvp *xvp,
+				  bool (*cmd_complete)(struct xvp *p))
 {
 	unsigned long deadline = jiffies + firmware_command_timeout * HZ;
 
 	do {
-		if (cmd_complete(p))
+		if (cmd_complete(xvp))
 			return 0;
 		schedule();
 	} while (time_before(jiffies, deadline));
@@ -1379,12 +1378,12 @@ static long xrp_ioctl_submit_sync(struct file *filp,
 			xrp_send_device_irq(xvp);
 
 			if (xvp->host_irq_mode) {
-				ret = xvp_complete_cmd_irq(&xvp->completion,
-							   xrp_cmd_complete,
-							   xvp);
+				ret = xvp_complete_cmd_irq(xvp,
+							   &xvp->completion,
+							   xrp_cmd_complete);
 			} else {
-				ret = xvp_complete_cmd_poll(xrp_cmd_complete,
-							    xvp);
+				ret = xvp_complete_cmd_poll(xvp,
+							    xrp_cmd_complete);
 			}
 
 			/* copy back inline data */
