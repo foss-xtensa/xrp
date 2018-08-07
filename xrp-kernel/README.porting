@@ -89,16 +89,28 @@ notification. The hardware-specific XRP driver must install IRQ handler and
 call xrp_irq_handler function from it. The xrp_hw_ops::send_irq callback is
 used to send IRQ to the DSP.
 
-xrp_hw_ops::clean_cache and xrp_hw_ops::flush_cache are used to clean (write
-back) and flush (write back and invalidate) an area of user memory shared with
-the DSP. Standard linux cache management functions (from the DMA API) may be
-used only when the DSP shared memory is allocated from the system memory and
-covered by struct page's. If that's not the case the hardware-specific XRP
-driver may use architecture-specific methods of cache management. These
-functions are optional. If they are not provided then memory allocated from
-the driver is mapped into the userspace without caching and other userspace
-memory is shared directly with the DSP only when it's not cached, otherwise
-a kernel bounce buffer is used.
+xrp_hw_ops::cacheable determines if dma_sync_for_device and dma_sync_for_cpu
+are able to deal with a range of pages. It is called to determine whether the
+memory allocated from the XRP should be mapped cached or uncached to the
+userspace.
+It is also called for the ordinary userspace memory as well as for the 3rd
+party device memory userspace mappings to determine if the mapping may be
+shared with DSP directly or a bounce buffer is needed.
+
+xrp_hw_ops::dma_sync_for_device is used to clean (write back), flush (write
+back and invalidate) or invalidate an area of user memory shared with the DSP
+to transition ownership of that memory to the DSP. xrp_hw_ops::dma_sync_for_cpu
+is used to transition ownership of the memory back to host CPU.
+Standard linux cache management functions (from the DMA API) may be used only
+when the DSP shared memory is allocated from the system memory, covered by
+struct page's and there's no cache aliasing. If that's not the case then the
+hardware-specific XRP driver may use architecture-specific methods of cache
+management or forbid direct use of cached memory entirely.
+
+Cache-related functions are optional, if one of them is not provided then the
+default implementation is used: memory allocated from the driver is mapped into
+the userspace as cached only when it's a system memory and cached system memory
+is shared directly with the DSP.
 
 xrp_hw_ops::memcpy_toio and xrp_hw_ops::memset_io are optional functions used
 for copying data/code to the hardware-specific memory. memcpy_toio and

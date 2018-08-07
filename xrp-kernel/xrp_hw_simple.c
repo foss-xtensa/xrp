@@ -158,36 +158,81 @@ static irqreturn_t irq_handler(int irq, void *dev_id)
 }
 
 #if defined(__XTENSA__)
-static void clean_cache(void *vaddr, phys_addr_t paddr, unsigned long sz)
+static bool cacheable(void *hw_arg, unsigned long pfn, unsigned long n_pages)
 {
-	__flush_dcache_range((unsigned long)vaddr, sz);
+	return true;
 }
 
-static void flush_cache(void *vaddr, phys_addr_t paddr, unsigned long sz)
+static void dma_sync_for_device(void *hw_arg,
+				void *vaddr, phys_addr_t paddr,
+				unsigned long sz, unsigned flags)
 {
-	__flush_dcache_range((unsigned long)vaddr, sz);
-	__invalidate_dcache_range((unsigned long)vaddr, sz);
+	switch (flags) {
+	case XRP_FLAG_READ:
+		__flush_dcache_range((unsigned long)vaddr, sz);
+		break;
+
+	case XRP_FLAG_READ_WRITE:
+		__flush_invalidate_dcache_range((unsigned long)vaddr, sz);
+		break;
+
+	case XRP_FLAG_WRITE:
+		__invalidate_dcache_range((unsigned long)vaddr, sz);
+		break;
+	}
 }
+
+static void dma_sync_for_cpu(void *hw_arg,
+			     void *vaddr, phys_addr_t paddr,
+			     unsigned long sz, unsigned flags)
+{
+	switch (flags) {
+	case XRP_FLAG_READ_WRITE:
+	case XRP_FLAG_WRITE:
+		__invalidate_dcache_range((unsigned long)vaddr, sz);
+		break;
+	}
+}
+
 #elif defined(__arm__)
-static void clean_cache(void *vaddr, phys_addr_t paddr, unsigned long sz)
+static bool cacheable(void *hw_arg, unsigned long pfn, unsigned long n_pages)
 {
-	__cpuc_flush_dcache_area(vaddr, sz);
-	outer_clean_range(paddr, paddr + sz);
+	return true;
 }
 
-static void flush_cache(void *vaddr, phys_addr_t paddr, unsigned long sz)
+static void dma_sync_for_device(void *hw_arg,
+				void *vaddr, phys_addr_t paddr,
+				unsigned long sz, unsigned flags)
 {
-	__cpuc_flush_dcache_area(vaddr, sz);
-	outer_flush_range(paddr, paddr + sz);
-}
-#else
-#warning "cache operations are not implemented for this architecture"
-static void clean_cache(void *vaddr, phys_addr_t paddr, unsigned long sz)
-{
+	switch (flags) {
+	case XRP_FLAG_READ:
+		__cpuc_flush_dcache_area(vaddr, sz);
+		outer_clean_range(paddr, paddr + sz);
+		break;
+
+	case XRP_FLAG_WRITE:
+		__cpuc_flush_dcache_area(vaddr, sz);
+		outer_inv_range(paddr, paddr + sz);
+		break;
+
+	case XRP_FLAG_READ_WRITE:
+		__cpuc_flush_dcache_area(vaddr, sz);
+		outer_flush_range(paddr, paddr + sz);
+		break;
+	}
 }
 
-static void flush_cache(void *vaddr, phys_addr_t paddr, unsigned long sz)
+static void dma_sync_for_cpu(void *hw_arg,
+			     void *vaddr, phys_addr_t paddr,
+			     unsigned long sz, unsigned flags)
 {
+	switch (flags) {
+	case XRP_FLAG_WRITE:
+	case XRP_FLAG_READ_WRITE:
+		__cpuc_flush_dcache_area(vaddr, sz);
+		outer_inv_range(paddr, paddr + sz);
+		break;
+	}
 }
 #endif
 
@@ -200,8 +245,11 @@ static const struct xrp_hw_ops hw_ops = {
 
 	.send_irq = send_irq,
 
-	.clean_cache = clean_cache,
-	.flush_cache = flush_cache,
+#if defined(__XTENSA__) || defined(__arm__)
+	.cacheable = cacheable,
+	.dma_sync_for_device = dma_sync_for_device,
+	.dma_sync_for_cpu = dma_sync_for_cpu,
+#endif
 };
 
 static long init_hw(struct platform_device *pdev, struct xrp_hw_simple *hw,
