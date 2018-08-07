@@ -660,7 +660,7 @@ static long xvp_copy_virt_to_phys(struct xvp_file *xvp_file,
 				  struct xrp_alien_mapping *mapping)
 {
 	phys_addr_t phys;
-	unsigned long align = clamp(vaddr & -vaddr, PAGE_SIZE, 16ul);
+	unsigned long align = clamp(vaddr & -vaddr, 16ul, PAGE_SIZE);
 	unsigned long offset = vaddr & (align - 1);
 	struct xrp_allocation *allocation;
 	long rc;
