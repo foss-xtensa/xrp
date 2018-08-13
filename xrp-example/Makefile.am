@@ -62,7 +62,7 @@ endif
 endif
 
 if HOST_OS_LINUX
-AM_LDFLAGS = -lrt
+xrp_host_standalone_LDFLAGS = -lrt
 endif
 
 xrp_dsp_hosted_SOURCES = dsp_main.c dsp_test.c
