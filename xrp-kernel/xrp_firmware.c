@@ -65,12 +65,13 @@ static int xrp_load_segment_to_sysmem(struct xvp *xvp, Elf32_Phdr *phdr)
 
 	for (offs = 0; offs < phdr->p_memsz; ++page) {
 		void *p = kmap(page);
-		size_t sz = PAGE_SIZE - page_offs;
+		size_t sz;
 
 		if (!p)
 			return -ENOMEM;
 
 		page_offs &= ~PAGE_MASK;
+		sz = PAGE_SIZE - page_offs;
 
 		if (offs < phdr->p_filesz) {
 			size_t copy_sz = sz;
