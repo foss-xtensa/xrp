@@ -50,6 +50,7 @@ static void f1(int devid)
 	status = -1;
 
 	for (i = 0; i <= 32; ++i) {
+		int mismatch = 0;
 		memset(in_buf, i, sizeof(in_buf));
 		memset(out_buf, 0, sizeof(out_buf));
 		xrp_run_command_sync(queue,
@@ -59,9 +60,21 @@ static void f1(int devid)
 		assert(status == XRP_STATUS_SUCCESS);
 		status = -1;
 
+		for (j = 0; j < 32; ++j)
+			mismatch += (out_buf[j] != (j < i ? i + j : 0));
+
+		if (!mismatch)
+			continue;
+
 		for (j = 0; j < 32; ++j) {
-			assert(out_buf[j] == (j < i ? i + j : 0));
+			int ne = (out_buf[j] != (j < i ? i + j : 0));
+			fprintf(stderr,
+				"out_buf[%d] (%p) == 0x%02x %c= expected: 0x%02x\n",
+				j, out_buf + j, (uint8_t)out_buf[j],
+				ne ? '!' : '=',
+				(j < i ? i + j : 0));
 		}
+		assert(mismatch == 0);
 	}
 
 	xrp_release_queue(queue, &status);
@@ -155,7 +168,7 @@ static void f3(int devid)
 	struct xrp_device *device;
 	struct xrp_queue *queue;
 	uint32_t sz;
-	int i;
+	unsigned i;
 
 
 	device = xrp_open_device(devid, &status);
@@ -218,7 +231,19 @@ static void f3(int devid)
 			assert(data1);
 			assert(data2);
 			fprintf(stderr, "comparing %p vs %p\n", data1, data2);
-			assert(memcmp(data1, data2, sz) == 0);
+			if (memcmp(data1, data2, sz)) {
+				for (i = 0; i < sz; ++i) {
+					uint8_t v1 = ((uint8_t *)data1)[i];
+					uint8_t v2 = ((uint8_t *)data2)[i];
+					if (v1 != v2) {
+						fprintf(stderr,
+							"data1[%d] (%p) (== 0x%02x) != data2[%d] (%p) (== 0x%02x)\n",
+							i, data1 + i, v1, i, data2 + i, v2);
+
+					}
+				}
+				assert(0);
+			}
 			xrp_unmap_buffer(buf1, data1, &status);
 			assert(status == XRP_STATUS_SUCCESS);
 			status = -1;
