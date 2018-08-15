@@ -21,7 +21,7 @@
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 
-AM_CPPFLAGS = -I$(srcdir)/..
+AM_CPPFLAGS = -I$(srcdir)/.. -I$(srcdir)/../xrp-common
 AM_CFLAGS = -W -Wall
 
 bin_PROGRAMS =
