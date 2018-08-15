@@ -540,9 +540,38 @@ static void do_dump(int devid, unsigned long addr, unsigned long sz)
 	assert(status == XRP_STATUS_SUCCESS);
 }
 
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <unistd.h>
+static void do_memdump(int devid, unsigned long addr)
+{
+	char buf[256];
+	int fd = open("/dev/mem", O_RDONLY | O_SYNC);
+
+	(void)devid;
+	if (fd < 0) {
+		perror("open");
+		return;
+	}
+	if ((off_t)-1 == lseek(fd, addr, SEEK_SET)) {
+		perror("lseek");
+		close(fd);
+		return;
+	}
+	if (read(fd, buf, sizeof(buf)) < 0) {
+		perror("read");
+		close(fd);
+		return;
+	}
+	dump(buf, sizeof(buf));
+	close(fd);
+}
+
 enum {
 	CMD_TEST,
 	CMD_DUMP,
+	CMD_MEMDUMP,
 
 	CMD_N,
 };
@@ -553,6 +582,7 @@ int main(int argc, char **argv)
 	static const char * const cmd[CMD_N] = {
 		[CMD_TEST] = "test",
 		[CMD_DUMP] = "dump",
+		[CMD_MEMDUMP] = "memdump",
 	};
 	int i = 0;
 
@@ -619,6 +649,16 @@ int main(int argc, char **argv)
 			if (argc > 4)
 				sscanf(argv[4], "%li", &sz);
 			do_dump(devid, addr, sz);
+		}
+		break;
+
+	case CMD_MEMDUMP:
+		{
+			unsigned long addr = 0;
+
+			if (argc > 3)
+				sscanf(argv[3], "%li", &addr);
+			do_memdump(devid, addr);
 		}
 		break;
 	}
