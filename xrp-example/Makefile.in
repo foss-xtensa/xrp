@@ -344,7 +344,7 @@ target_alias = @target_alias@
 top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
-AM_CPPFLAGS = -I$(srcdir)/.. $(am__append_1)
+AM_CPPFLAGS = -I$(srcdir)/.. -I$(srcdir)/../xrp-common $(am__append_1)
 AM_CFLAGS = -W -Wall $(am__append_2) $(am__append_5)
 @BUILD_DSP_FALSE@AM_LDFLAGS = $(THREADS_LDFLAGS)
 @BUILD_DSP_TRUE@AM_LDFLAGS = --xtensa-core=$(DSP_CORE) -mlsp=$(DSP_LSP) \
