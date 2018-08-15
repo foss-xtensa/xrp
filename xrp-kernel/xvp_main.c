@@ -137,7 +137,7 @@ static inline void xrp_dma_sync_for_device(struct xvp *xvp, phys_addr_t phys,
 					   unsigned long size,
 					   unsigned long flags)
 {
-	dma_sync_single_for_device(xvp->dev, phys, size,
+	dma_sync_single_for_device(xvp->dev, phys_to_dma(xvp->dev, phys), size,
 				   xrp_dma_direction[flags & XRP_FLAG_READ_WRITE]);
 }
 
@@ -145,7 +145,7 @@ static inline void xrp_dma_sync_for_cpu(struct xvp *xvp, phys_addr_t phys,
 					unsigned long size,
 					unsigned long flags)
 {
-	dma_sync_single_for_cpu(xvp->dev, phys, size,
+	dma_sync_single_for_cpu(xvp->dev, phys_to_dma(xvp->dev, phys), size,
 				xrp_dma_direction[flags & XRP_FLAG_READ_WRITE]);
 }
 
