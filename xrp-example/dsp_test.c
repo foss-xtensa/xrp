@@ -98,6 +98,19 @@ static enum xrp_status example_v1_handler(void *handler_context,
 	return bg_sz == i ? XRP_STATUS_SUCCESS : XRP_STATUS_FAILURE;
 }
 
+static void example_v2_memcpy(uint32_t paddr, struct xrp_buffer *buf)
+{
+	size_t sz;
+	void *p;
+	if (!buf)
+		return;
+	xrp_buffer_get_info(buf, XRP_BUFFER_SIZE_SIZE_T, &sz, sizeof(sz), NULL);
+	p = xrp_map_buffer(buf, 0, sz, XRP_WRITE, NULL);
+	memcpy(p, (void *)paddr, sz);
+	xrp_unmap_buffer(buf, p, NULL);
+	xrp_release_buffer(buf, NULL);
+}
+
 static enum xrp_status example_v2_handler(void *handler_context,
 					  const void *in_data, size_t in_data_size,
 					  void *out_data, size_t out_data_size,
@@ -118,6 +131,10 @@ static enum xrp_status example_v2_handler(void *handler_context,
 		return XRP_STATUS_SUCCESS;
 	case EXAMPLE_V2_CMD_FAIL:
 		return XRP_STATUS_FAILURE;
+	case EXAMPLE_V2_CMD_MEMCPY:
+		example_v2_memcpy(cmd->memcpy.paddr,
+				  xrp_get_buffer_from_group(buffer_group, 0, NULL));
+		return XRP_STATUS_SUCCESS;
 	default:
 		return XRP_STATUS_FAILURE;
 	}

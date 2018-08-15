@@ -37,10 +37,16 @@
 enum {
 	EXAMPLE_V2_CMD_OK,
 	EXAMPLE_V2_CMD_FAIL,
+	EXAMPLE_V2_CMD_MEMCPY,
 };
 
 struct example_v2_cmd {
 	uint32_t cmd;
+	union {
+		struct {
+			uint32_t paddr;
+		} memcpy;
+	};
 };
 
 struct example_v2_rsp {
