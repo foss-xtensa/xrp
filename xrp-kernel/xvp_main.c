@@ -1529,8 +1529,8 @@ static int xvp_close(struct inode *inode, struct file *filp)
 	pr_debug("%s\n", __func__);
 
 	xrp_remove_known_file(filp);
-	devm_kfree(xvp_file->xvp->dev, xvp_file);
 	pm_runtime_put_sync(xvp_file->xvp->dev);
+	devm_kfree(xvp_file->xvp->dev, xvp_file);
 	return 0;
 }
 
