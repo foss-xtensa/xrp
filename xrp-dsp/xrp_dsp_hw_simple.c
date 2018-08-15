@@ -28,19 +28,10 @@
 #include <xtensa/xtruntime.h>
 
 #include "xrp_dsp_hw.h"
+#include "xrp_debug.h"
 
 typedef uint32_t __u32;
 #include "xrp_hw_simple_dsp_interface.h"
-
-#ifdef DEBUG
-#define pr_debug printf
-#else
-static inline int pr_debug(const char *p, ...)
-{
-	(void)p;
-	return 0;
-}
-#endif
 
 static uint32_t mmio_base;
 
