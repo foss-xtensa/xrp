@@ -470,9 +470,19 @@ static void f7(int devid)
 	assert(status == XRP_STATUS_SUCCESS);
 }
 
+enum {
+	CMD_TEST,
+
+	CMD_N,
+};
+
 int main(int argc, char **argv)
 {
 	int devid = 0;
+	static const char * const cmd[CMD_N] = {
+		[CMD_TEST] = "test",
+	};
+	int i = 0;
 
 #ifdef HAVE_THREADS_XOS
 	xos_set_clock_freq(XOS_CLOCK_FREQ);
@@ -480,18 +490,52 @@ int main(int argc, char **argv)
 #endif
 	if (argc > 1)
 		sscanf(argv[1], "%i", &devid);
-	f1(devid);
-	printf("=======================================================\n");
-	f2(devid);
-	printf("=======================================================\n");
-	f3(devid);
-	printf("=======================================================\n");
-	f4(devid);
-	printf("=======================================================\n");
-	f5(devid);
-	printf("=======================================================\n");
-	f6(devid);
-	printf("=======================================================\n");
-	f7(devid);
+	if (argc > 2) {
+		for (i = 0; i < CMD_N; ++i)
+			if (strcmp(argv[2], cmd[i]) == 0)
+				break;
+		if (i == CMD_N) {
+			fprintf(stderr, "%s: unrecognized command: %s\n", argv[0], argv[2]);
+			return 1;
+		}
+	}
+	switch(i) {
+	case CMD_TEST:
+		{
+			unsigned long tests = -1;
+
+			if (argc > 3)
+				sscanf(argv[3], "%li", &tests);
+
+			if (tests & 1) {
+				f1(devid);
+				printf("=======================================================\n");
+			}
+			if (tests & 2) {
+				f2(devid);
+				printf("=======================================================\n");
+			}
+			if (tests & 4) {
+				f3(devid);
+				printf("=======================================================\n");
+			}
+			if (tests & 8) {
+				f4(devid);
+				printf("=======================================================\n");
+			}
+			if (tests & 0x10) {
+				f5(devid);
+				printf("=======================================================\n");
+			}
+			if (tests & 0x20) {
+				f6(devid);
+				printf("=======================================================\n");
+			}
+			if (tests & 0x40) {
+				f7(devid);
+			}
+		}
+		break;
+	}
 	return 0;
 }
