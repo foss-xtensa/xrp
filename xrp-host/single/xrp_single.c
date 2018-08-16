@@ -276,9 +276,8 @@ void xrp_enqueue_command(struct xrp_queue *queue,
 		rq->event = NULL;
 	}
 
-	xrp_queue_push(&queue->device->impl.description->queue, &rq->q);
-
 	set_status(status, XRP_STATUS_SUCCESS);
+	xrp_queue_push(&queue->device->impl.description->queue, &rq->q);
 }
 
 /* Namespace DSP side API. */

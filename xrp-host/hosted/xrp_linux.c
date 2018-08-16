@@ -268,7 +268,6 @@ void xrp_enqueue_command(struct xrp_queue *queue,
 		xrp_retain_buffer_group(buffer_group, NULL);
 	rq->buffer_group = buffer_group;
 
-	xrp_queue_push(&queue->impl.queue, &rq->q);
-
 	set_status(status, XRP_STATUS_SUCCESS);
+	xrp_queue_push(&queue->impl.queue, &rq->q);
 }

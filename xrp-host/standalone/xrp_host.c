@@ -680,6 +680,6 @@ void xrp_enqueue_command(struct xrp_queue *queue,
 	if (queue->use_nsid) {
 		memcpy(dsp_cmd->nsid, queue->nsid, sizeof(dsp_cmd->nsid));
 	}
-	xrp_queue_push(&device->impl.queue, &rq->q);
 	set_status(status, XRP_STATUS_SUCCESS);
+	xrp_queue_push(&device->impl.queue, &rq->q);
 }
