@@ -140,38 +140,6 @@ static enum xrp_status example_v2_handler(void *handler_context,
 	}
 }
 
-static enum xrp_status test_ns(struct xrp_device *device)
-{
-	enum xrp_status status;
-	char test_nsid[16][XRP_NAMESPACE_ID_SIZE];
-	size_t i;
-
-	for (i = 0; i < sizeof(test_nsid) / sizeof(test_nsid[0]); ++i) {
-		size_t j;
-
-		for (j = 0; j < XRP_NAMESPACE_ID_SIZE; ++j) {
-			test_nsid[i][j] = rand();
-		}
-	}
-	for (i = 0; i < sizeof(test_nsid) / sizeof(test_nsid[0]); ++i) {
-		xrp_device_register_namespace(device, test_nsid[i],
-					      NULL, NULL, &status);
-		if (status != XRP_STATUS_SUCCESS) {
-			pr_debug("xrp_register_namespace failed\n");
-			return XRP_STATUS_FAILURE;
-		}
-	}
-	for (i = 0; i < sizeof(test_nsid) / sizeof(test_nsid[0]); ++i) {
-		xrp_device_unregister_namespace(device, test_nsid[i],
-						&status);
-		if (status != XRP_STATUS_SUCCESS) {
-			pr_debug("xrp_unregister_namespace failed\n");
-			return XRP_STATUS_FAILURE;
-		}
-	}
-	return XRP_STATUS_SUCCESS;
-}
-
 void __attribute__((constructor)) dsp_test_register(void)
 {
 	enum xrp_status status;
@@ -181,11 +149,6 @@ void __attribute__((constructor)) dsp_test_register(void)
 	if (status != XRP_STATUS_SUCCESS) {
 		pr_debug("xrp_open_device failed\n");
 		abort();
-	}
-	status = test_ns(device);
-	if (status != XRP_STATUS_SUCCESS) {
-		pr_debug("test_ns failed\n");
-		goto err_release;
 	}
 	xrp_device_register_namespace(device, XRP_EXAMPLE_V1_NSID,
 				      example_v1_handler, NULL, &status);
