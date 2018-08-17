@@ -521,9 +521,7 @@ static long xvp_pfn_virt_to_phys(struct xvp_file *xvp_file,
 {
 	int i;
 	int ret;
-	int nr_pages =
-		((vaddr + size + PAGE_SIZE - 1) >> PAGE_SHIFT) -
-		(vaddr >> PAGE_SHIFT);
+	int nr_pages = PFN_UP(vaddr + size) - PFN_DOWN(vaddr);
 	unsigned long pfn;
 	const struct xrp_address_map_entry *address_map;
 
@@ -576,9 +574,7 @@ static long xvp_gup_virt_to_phys(struct xvp_file *xvp_file,
 {
 	int ret;
 	int i;
-	int nr_pages =
-		((vaddr + size + PAGE_SIZE - 1) >> PAGE_SHIFT) -
-		(vaddr >> PAGE_SHIFT);
+	int nr_pages = PFN_UP(vaddr + size) - PFN_DOWN(vaddr);
 	struct page **page = kmalloc(nr_pages * sizeof(void *), GFP_KERNEL);
 	const struct xrp_address_map_entry *address_map;
 
@@ -1020,10 +1016,8 @@ static long xrp_writeback_alien_mapping(struct xvp_file *xvp_file,
 			 __func__, (void __user *)alien_mapping->vaddr,
 			 &alien_mapping->paddr);
 		page = pfn_to_page(__phys_to_pfn(alien_mapping->paddr));
-		nr_pages =
-			((alien_mapping->vaddr + alien_mapping->size +
-			  PAGE_SIZE - 1) >> PAGE_SHIFT) -
-			(alien_mapping->vaddr >> PAGE_SHIFT);
+		nr_pages = PFN_UP(alien_mapping->vaddr + alien_mapping->size) -
+			PFN_DOWN(alien_mapping->vaddr);
 		for (i = 0; i < nr_pages; ++i)
 			SetPageDirty(page + i);
 		break;
@@ -1579,7 +1573,7 @@ static int xvp_mmap(struct file *filp, struct vm_area_struct *vma)
 {
 	int err;
 	struct xvp_file *xvp_file = filp->private_data;
-	unsigned long pfn = vma->vm_pgoff + (xvp_file->xvp->pmem >> PAGE_SHIFT);
+	unsigned long pfn = vma->vm_pgoff + PFN_DOWN(xvp_file->xvp->pmem);
 	struct xrp_allocation *xrp_allocation;
 
 	pr_debug("%s\n", __func__);
