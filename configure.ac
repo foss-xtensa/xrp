@@ -187,7 +187,16 @@ AC_ARG_ENABLE(port,
 	      [])
 AC_SUBST(HW_PORT)
 
+case "${HW_PORT}" in
+	hikey960)
+		CC=${CC:-xt-xcc --xtensa-core=hifi3_hikey960}
+		DSP_LSP=${DSP_LSP:-\$(srcdir)/hikey960}
+		DSP_CACHEATTR=${DSP_CACHEATTR:-0x24222222}
+		;;
+esac
+
 AC_CONFIG_FILES([xrp-dsp/simple/Makefile])
+AC_CONFIG_FILES([xrp-dsp/hikey960/Makefile])
 
 AC_SUBST(DSP_LSP, ["${DSP_LSP:-\$(srcdir)/MW-MP/P6_0/xtensa-elf/lib/sim-stacklocal}"])
 AC_ARG_VAR(DSP_LSP, [use specific Xtensa LSP for example firmware])
