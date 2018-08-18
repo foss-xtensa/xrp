@@ -68,8 +68,8 @@ endif
 xrp_dsp_hosted_SOURCES = dsp_main.c dsp_test.c
 xrp_dsp_standalone_SOURCES = dsp_main.c dsp_test.c
 
-xrp_dsp_hosted_LDADD = ../xrp-dsp/libxrp-dsp.a ../xrp-dsp/libxrp-dsp-hw-simple.a
-xrp_dsp_standalone_LDADD = ../xrp-dsp/libxrp-dsp.a ../xrp-dsp/libxrp-dsp-hw-simple.a
+xrp_dsp_hosted_LDADD = ../xrp-dsp/libxrp-dsp.a ../xrp-dsp/$(HW_PORT)/libxrp-dsp-hw-$(HW_PORT).a
+xrp_dsp_standalone_LDADD = ../xrp-dsp/libxrp-dsp.a ../xrp-dsp/$(HW_PORT)/libxrp-dsp-hw-$(HW_PORT).a
 
 xrp_host_hosted_SOURCES = host_main.c
 xrp_host_standalone_SOURCES = host_main.c xrp_dtb.s

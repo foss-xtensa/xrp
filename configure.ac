@@ -176,6 +176,16 @@ AS_IF([test x$build_dsp = xfalse -a x$build_example = xtrue -a x$build_standalon
 	    [AC_MSG_FAILURE([No usable dtc is found])])
       ])
 
+HW_PORT=simple
+AC_ARG_ENABLE(port,
+	      [AS_HELP_STRING([--enable-port[[=ARG]]],
+			      [enable port ARG [simple]])],
+	      [HW_PORT="${enableval}"],
+	      [])
+AC_SUBST(HW_PORT)
+
+AC_CONFIG_FILES([xrp-dsp/simple/Makefile])
+
 AC_SUBST(DSP_CORE, ["${DSP_CORE:-visionp6cnn_ao_exls}"])
 AC_ARG_VAR(DSP_CORE, [compile DSP code for the specific Xtensa core])
 
