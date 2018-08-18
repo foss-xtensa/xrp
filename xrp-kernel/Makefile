@@ -28,15 +28,21 @@ xrp-y += xvp_main.o xrp_address_map.o xrp_alloc.o
 xrp-$(CONFIG_OF) += xrp_firmware.o
 xrp-$(CONFIG_CMA) += xrp_cma_alloc.o
 
-obj-m += xrp.o
+obj-$(CONFIG_XRP) += xrp.o
 obj-$(CONFIG_XRP_HW_SIMPLE) += xrp_hw_simple.o
 
 ccflags-$(CONFIG_XRP_DEBUG) += -DDEBUG
 
+# Remove this comment and all lines below it when integrating this Makefile
+# into the linux kernel make system.
+#
+# sed -i % '/Remove this comment and all lines below it/,$d'
+#
+
 KSRC ?= /lib/modules/$(shell uname -r)/build
 
 modules:
-	$(MAKE) -C $(KSRC) M=`pwd` modules
+	$(MAKE) -C $(KSRC) M=`pwd` CONFIG_XRP=m modules
 
 %:
-	$(MAKE) -C $(KSRC) M=`pwd` $@
+	$(MAKE) -C $(KSRC) M=`pwd` CONFIG_XRP=m $@
