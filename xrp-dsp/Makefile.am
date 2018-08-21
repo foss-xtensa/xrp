@@ -23,13 +23,13 @@
 
 SUBDIRS = $(HW_PORT)
 
-AM_CPPFLAGS = -I$(srcdir)/.. -I$(srcdir)/../xrp-common -I$(srcdir)/../xrp-kernel
+AM_CPPFLAGS = -I$(srcdir)/.. \
+	      -I$(srcdir)/../xrp-common \
+	      -I$(srcdir)/../xrp-kernel
 AM_CFLAGS = -W -Wall
 
 include_HEADERS = ../xrp_api.h xrp_dsp_hw.h
 lib_LIBRARIES = libxrp-dsp.a
 
 libxrp_dsp_a_SOURCES = xrp_dsp.c \
-		       xrp_dsp_framework.c \
-		       ../xrp-common/xrp_ns.c \
-		       ../xrp-common/xrp_rb_file.c
+		       xrp_dsp_framework.c

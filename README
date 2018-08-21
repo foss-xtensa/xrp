@@ -500,6 +500,7 @@ Code structure.
 +-dts/              -- device tree compiler/flat device tree library. May be
 |                      used with xrp-host/sim when the host version of libfdt
 |                      is missing or too old.
++-xrp-common/       -- common helper functions.
 +-xrp-dsp/          -- Xtensa DSP side XRP implementation.
 +-xrp-example/      -- linux and DSP side example code for both native and fast
 |                      simulation modes.

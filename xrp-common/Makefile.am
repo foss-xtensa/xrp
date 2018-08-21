@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2017 Cadence Design Systems Inc.
+# Copyright (c) 2018 Cadence Design Systems Inc.
 #
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
@@ -21,14 +21,11 @@
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 
-SUBDIRS = xrp-common
+AM_CPPFLAGS = -I$(srcdir)/.. \
+	      -I$(srcdir)/../xrp-kernel
+AM_CFLAGS = -W -Wall
 
-if BUILD_DSP
-SUBDIRS += xrp-dsp
-else
-SUBDIRS += xrp-host
-endif
+lib_LIBRARIES = libxrp-common.a
 
-if BUILD_EXAMPLE
-SUBDIRS += xrp-example
-endif
+libxrp_common_a_SOURCES = xrp_rb_file.c \
+			  xrp_ns.c

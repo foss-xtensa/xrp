@@ -31,9 +31,10 @@ AM_PROG_AS
 AC_PROG_RANLIB
 AC_CANONICAL_HOST
 AC_CONFIG_FILES([Makefile
-		xrp-dsp/Makefile
-		xrp-example/Makefile
-		xrp-host/Makefile])
+		 xrp-common/Makefile
+		 xrp-dsp/Makefile
+		 xrp-example/Makefile
+		 xrp-host/Makefile])
 
 AC_ARG_ENABLE(dsp,
 	      [AS_HELP_STRING([--enable-dsp],
