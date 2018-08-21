@@ -93,6 +93,7 @@ long xrp_init_cma(struct platform_device *pdev, enum xrp_init_flags flags,
 		  const struct xrp_hw_ops *hw, void *hw_arg);
 
 int xrp_deinit(struct platform_device *pdev);
+int xrp_deinit_hw(struct platform_device *pdev, void **hw_arg);
 irqreturn_t xrp_irq_handler(int irq, struct xvp *xvp);
 int xrp_runtime_resume(struct device *dev);
 int xrp_runtime_suspend(struct device *dev);

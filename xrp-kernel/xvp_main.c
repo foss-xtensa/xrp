@@ -1965,6 +1965,16 @@ int xrp_deinit(struct platform_device *pdev)
 }
 EXPORT_SYMBOL(xrp_deinit);
 
+int xrp_deinit_hw(struct platform_device *pdev, void **hw_arg)
+{
+	if (hw_arg) {
+		struct xvp *xvp = platform_get_drvdata(pdev);
+		*hw_arg = xvp->hw_arg;
+	}
+	return xrp_deinit(pdev);
+}
+EXPORT_SYMBOL(xrp_deinit_hw);
+
 static void *get_hw_sync_data(void *hw_arg, size_t *sz)
 {
 	void *p = kzalloc(64, GFP_KERNEL);
