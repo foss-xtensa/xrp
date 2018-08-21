@@ -1,0 +1,52 @@
+Bindings for the Cadence Xtensa Remote Processing HW-specific driver for
+HiKey960.
+
+This binding is an extension of the cdns,xrp,cma binding. All properties of
+that binding are in effect.
+
+Required properties:
+- compatible: shall be "cdns,xrp-hw-hikey960,cma".
+
+Optional properties:
+- reg: panic/log buffer location.
+- device-irq: 1 32-bit cell: DSP IRQ number (normal core IRQ number, not
+  external IRQ number) assigned to the egress mailbox.
+- host-irq: 1 32-bit cell, when present enables IRQ usage in DSP->host
+  direction.
+
+Example:
+
+	reserved-memory {
+		#address-cells = <1>;
+		#size-cells = <1>;
+		ranges;
+
+		xrp_reserved: xrp@60000000 {
+			compatible = "shared-dma-pool";
+			reg = <0x0 0x60000000 0x0 0x10000000>;
+			reusable;
+		};
+	};
+
+	xrp@0 {
+		#address-cells = <1>;
+		#size-cells = <1>;
+		compatible = "cdns,xrp-hw-simple,cma";
+		memory-region = <&xrp_reserved>;
+		reg = <
+		       0x0 0x8b300000 0x0 0x00001000 /* Panic/log page */
+		      >;
+		device-irq = <3>;
+		host-irq = <0>;
+		firmware-name = "xrp0.elf";
+		ranges = <
+			  0x00000000  0x0 0x00000000  0x89200000
+			  0x89cc0000  0x0 0x89cc0000  0x06340000
+			  0x90000000  0x0 0x90000000  0x30000000
+			  0xc0000000  0x0 0x89200000  0x00600000
+			  0xe8000000  0x0 0x89800000  0x00030000
+			  0xe8058000  0x0 0x89830000  0x00031000
+			 >;
+		dsp@0 {
+		};
+	};
