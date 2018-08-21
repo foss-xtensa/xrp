@@ -34,3 +34,16 @@ config XRP_HW_SIMPLE
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called xrp_hw_simple.
+
+config XRP_HW_HIKEY960
+	tristate "XRP for HiKey960"
+	depends on XRP
+	help
+	  This is hardware-specific XRP kernel driver for the HiKey960
+	  hardware. It should be enabled to support XRP on HiKey960
+	  platform.
+
+	  If unsure, say N.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called xrp_hw_hikey960.
