@@ -569,8 +569,7 @@ checks for POSIX or XOS threads availability.
 
 - Xtensa DSP code needs an xcc-based toolchain. Provide the following
   environment variable to the configure or to make:
-  - DSP_CORE: name of the Xtensa DSP core to build for. It must be the name of
-    the build installed for the used xcc-based toolchain.
+  - CC: name of the compiler together with the DSP xtensa core specification.
   Without any other options this will produce DSP XRP library
   xrp-dsp/libxrp-dsp.a
 
@@ -625,9 +624,8 @@ hosted library or example.
   - DSP_LSP: path to the LSP to be used.
 
   $ ./configure --host=xtensa-elf --enable-dsp --enable-example \
-    DSP_CORE=visionp6cnn_ao_exls \
     DSP_LSP=MW-MP/P6_0/xtensa-elf/lib/sim-stacklocal \
-    CC=xt-xcc
+    CC='xt-xcc --xtensa-core=visionp6cnn_ao_exls'
   $ make
 
   The result is xrp-example/xrp-dsp-hosted. In order to be loaded as a firmware
@@ -642,10 +640,9 @@ hosted library or example.
 
   $ ./configure --host=xtensa-elf --enable-dsp --enable-example \
     --enable-standalone \
-    DSP_CORE=visionp6cnn_ao_exls \
     DSP_LSP=MW-MP/P6_0/xtensa-elf/lib/sim-stacklocal \
     DSP_COMM_BASE=0xf0000000 \
-    CC=xt-xcc
+    CC='xt-xcc --xtensa-core=visionp6cnn_ao_exls'
   $ make
 
   The result is xrp-example/xrp-dsp-standalone. In order to be loaded as a

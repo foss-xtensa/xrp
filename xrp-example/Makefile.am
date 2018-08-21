@@ -28,8 +28,7 @@ bin_PROGRAMS =
 
 if BUILD_DSP
 AM_CPPFLAGS += -I$(srcdir)/../xrp-dsp
-AM_CFLAGS += --xtensa-core=$(DSP_CORE)
-AM_LDFLAGS = --xtensa-core=$(DSP_CORE) -mlsp=$(DSP_LSP) \
+AM_LDFLAGS = -mlsp=$(DSP_LSP) \
 	     -Wl,--defsym,_memmap_cacheattr_reset=$(DSP_CACHEATTR)
 
 xrp_dsp_standalone_LDFLAGS = $(AM_LDFLAGS) \

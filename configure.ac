@@ -186,9 +186,6 @@ AC_SUBST(HW_PORT)
 
 AC_CONFIG_FILES([xrp-dsp/simple/Makefile])
 
-AC_SUBST(DSP_CORE, ["${DSP_CORE:-visionp6cnn_ao_exls}"])
-AC_ARG_VAR(DSP_CORE, [compile DSP code for the specific Xtensa core])
-
 AC_SUBST(DSP_LSP, ["${DSP_LSP:-\$(srcdir)/MW-MP/P6_0/xtensa-elf/lib/sim-stacklocal}"])
 AC_ARG_VAR(DSP_LSP, [use specific Xtensa LSP for example firmware])
 

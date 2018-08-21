@@ -24,7 +24,7 @@
 SUBDIRS = $(HW_PORT)
 
 AM_CPPFLAGS = -I$(srcdir)/.. -I$(srcdir)/../xrp-common -I$(srcdir)/../xrp-kernel
-AM_CFLAGS = -W -Wall --xtensa-core=$(DSP_CORE)
+AM_CFLAGS = -W -Wall
 
 include_HEADERS = ../xrp_api.h xrp_dsp_hw.h
 lib_LIBRARIES = libxrp-dsp.a

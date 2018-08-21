@@ -25,7 +25,7 @@ AM_CPPFLAGS = -I$(srcdir)/.. \
 	      -I$(srcdir)/../.. \
 	      -I$(srcdir)/../../xrp-common \
 	      -I$(srcdir)/../../xrp-kernel
-AM_CFLAGS = -W -Wall --xtensa-core=$(DSP_CORE)
+AM_CFLAGS = -W -Wall
 
 lib_LIBRARIES = libxrp-dsp-hw-simple.a
 
