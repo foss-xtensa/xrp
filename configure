@@ -4954,7 +4954,17 @@ fi
 
 
 
+case "${HW_PORT}" in
+	hikey960)
+		CC=${CC:-xt-xcc --xtensa-core=hifi3_hikey960}
+		DSP_LSP=${DSP_LSP:-\$(srcdir)/hikey960}
+		DSP_CACHEATTR=${DSP_CACHEATTR:-0x24222222}
+		;;
+esac
+
 ac_config_files="$ac_config_files xrp-dsp/simple/Makefile"
+
+ac_config_files="$ac_config_files xrp-dsp/hikey960/Makefile"
 
 
 DSP_LSP="${DSP_LSP:-\$(srcdir)/MW-MP/P6_0/xtensa-elf/lib/sim-stacklocal}"
@@ -5751,6 +5761,7 @@ do
     "xrp-example/Makefile") CONFIG_FILES="$CONFIG_FILES xrp-example/Makefile" ;;
     "xrp-host/Makefile") CONFIG_FILES="$CONFIG_FILES xrp-host/Makefile" ;;
     "xrp-dsp/simple/Makefile") CONFIG_FILES="$CONFIG_FILES xrp-dsp/simple/Makefile" ;;
+    "xrp-dsp/hikey960/Makefile") CONFIG_FILES="$CONFIG_FILES xrp-dsp/hikey960/Makefile" ;;
 
   *) as_fn_error $? "invalid argument: \`$ac_config_target'" "$LINENO" 5;;
   esac
