@@ -129,3 +129,11 @@ void xrp_hw_set_sync_data(void *p)
 		_xtos_set_interrupt_handler(device_irq, xrp_irq_handler);
 	}
 }
+
+void xrp_hw_panic(void)
+{
+}
+
+void xrp_hw_init(void)
+{
+}

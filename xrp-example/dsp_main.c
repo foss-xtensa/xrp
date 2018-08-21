@@ -33,7 +33,8 @@
 static void hang(void) __attribute__((noreturn));
 static void hang(void)
 {
-	for (;;);
+	for (;;)
+		xrp_hw_panic();
 }
 
 void abort(void)
@@ -94,10 +95,11 @@ int main(void)
 	struct xrp_device *device;
 
 	register_exception_handlers();
+	xrp_hw_init();
 	device = xrp_open_device(0, &status);
 	if (status != XRP_STATUS_SUCCESS) {
-		printf("xrp_open_device failed\n");
-		return 1;
+		fprintf(stderr, "xrp_open_device failed\n");
+		abort();
 	}
 
 	for (;;) {

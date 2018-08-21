@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017 Cadence Design Systems Inc.
+ * Copyright (c) 2017 - 2018 Cadence Design Systems Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -24,8 +24,10 @@
 #ifndef XRP_DSP_HW_H
 #define XRP_DSP_HW_H
 
+void xrp_hw_init(void);
 void xrp_hw_send_host_irq(void);
 void xrp_hw_wait_device_irq(void);
 void xrp_hw_set_sync_data(void *p);
+void xrp_hw_panic(void);
 
 #endif

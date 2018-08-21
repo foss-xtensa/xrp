@@ -4,6 +4,7 @@ Porting XRP to new hardware.
 The following tasks that XRP firmware performs during the device lifecycle
 need detailed knowledge about the hardware:
 
+- initialization of the hardware-specific code.
 - DSP operation parameters initialization: need to be synchronized with the
   hardware-specific XRP kernel driver on the host side.
 - sending IRQ to the host: need to know the location and layout of the
@@ -12,6 +13,7 @@ need detailed knowledge about the hardware:
   and location of a register to clear IRQ on the DSP side.
 - going to the low-power state when there's nothing to do: need to be aware of
   other IRQs used on the DSP side.
+- signaling panic to the host.
 
 The XRP DSP library implements generic XRP functionality and expects that the
 above functions are implemented externally.
@@ -19,6 +21,7 @@ above functions are implemented externally.
 Typical DSP life cycle looks like this on the DSP side:
 
   main
+    xrp_hw_init
     xrp_open_device
     for (all static namespaces) {
       xrp_device_register_namespace
@@ -41,6 +44,8 @@ The main function, namespace handlers registration and message processing loop
 are all parts of the DSP payload external to the XRP library. The interface
 between them is defined in xrp_dsp_hw.h
 
+xrp_hw_init should be called before any other xrp_hw_* function may be called.
+
 xrp_hw_set_sync_data is called from the message dispatcher when a
 synchronization message is received. It gets a pointer to the configuration
 information provided by the host side hardware-specific XRP driver, it must
@@ -59,6 +64,11 @@ global IRQ mask state.
 
 xrp_hw_send_host_irq is called from the message dispatcher to indicate message
 handling completion to the host.
+
+xrp_hw_panic may be called by the user code when it detects a fatal condition
+from which it cannot recover: an unhandled exception, failed assertion or a
+call to the abort() function. xrp_hw_panic may notify the host of this
+condition.
 
 Porting XRP DSP to new hardware is done by providing hardware-specific
 functions xrp_hw_set_sync_data, xrp_hw_wait_device_irq and
