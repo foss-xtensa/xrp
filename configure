@@ -4168,7 +4168,7 @@ IFS=$ac_save_IFS
 case $host_os in *\ *) host_os=`echo "$host_os" | sed 's/ /-/g'`;; esac
 
 
-ac_config_files="$ac_config_files Makefile xrp-dsp/Makefile xrp-example/Makefile xrp-host/Makefile"
+ac_config_files="$ac_config_files Makefile xrp-common/Makefile xrp-dsp/Makefile xrp-example/Makefile xrp-host/Makefile"
 
 
 # Check whether --enable-dsp was given.
@@ -4938,6 +4938,13 @@ See \`config.log' for more details" "$LINENO" 5; }
 fi
 
 fi
+
+ac_fn_c_check_func "$LINENO" "fopencookie" "ac_cv_func_fopencookie"
+if test "x$ac_cv_func_fopencookie" = xyes; then :
+  $as_echo "#define HAVE_OPENCOOKIE 1" >>confdefs.h
+
+fi
+
 
 HW_PORT=simple
 # Check whether --enable-port was given.
@@ -5739,6 +5746,7 @@ do
   case $ac_config_target in
     "depfiles") CONFIG_COMMANDS="$CONFIG_COMMANDS depfiles" ;;
     "Makefile") CONFIG_FILES="$CONFIG_FILES Makefile" ;;
+    "xrp-common/Makefile") CONFIG_FILES="$CONFIG_FILES xrp-common/Makefile" ;;
     "xrp-dsp/Makefile") CONFIG_FILES="$CONFIG_FILES xrp-dsp/Makefile" ;;
     "xrp-example/Makefile") CONFIG_FILES="$CONFIG_FILES xrp-example/Makefile" ;;
     "xrp-host/Makefile") CONFIG_FILES="$CONFIG_FILES xrp-host/Makefile" ;;

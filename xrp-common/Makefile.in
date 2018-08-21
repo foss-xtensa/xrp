@@ -15,7 +15,7 @@
 @SET_MAKE@
 
 #
-# Copyright (c) 2017 Cadence Design Systems Inc.
+# Copyright (c) 2018 Cadence Design Systems Inc.
 #
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
@@ -111,16 +111,7 @@ PRE_UNINSTALL = :
 POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
-bin_PROGRAMS = $(am__EXEEXT_1) $(am__EXEEXT_2) $(am__EXEEXT_3) \
-	$(am__EXEEXT_4) $(am__EXEEXT_5)
-@BUILD_DSP_TRUE@am__append_1 = -I$(srcdir)/../xrp-dsp
-@BUILD_DSP_TRUE@@BUILD_STANDALONE_TRUE@am__append_2 = xrp-dsp-standalone
-@BUILD_DSP_TRUE@@BUILD_HOSTED_TRUE@am__append_3 = xrp-dsp-hosted
-@BUILD_DSP_FALSE@am__append_4 = $(THREADS_CFLAGS)
-@BUILD_DSP_FALSE@@BUILD_STANDALONE_TRUE@am__append_5 = xrp-host-standalone
-@BUILD_DSP_FALSE@@BUILD_HOSTED_TRUE@am__append_6 = xrp-host-hosted
-@BUILD_DSP_FALSE@@BUILD_SINGLE_TRUE@am__append_7 = xrp-host-single
-subdir = xrp-example
+subdir = xrp-common
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/configure.ac
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
@@ -129,46 +120,45 @@ DIST_COMMON = $(srcdir)/Makefile.am $(am__DIST_COMMON)
 mkinstalldirs = $(install_sh) -d
 CONFIG_CLEAN_FILES =
 CONFIG_CLEAN_VPATH_FILES =
-@BUILD_DSP_TRUE@@BUILD_STANDALONE_TRUE@am__EXEEXT_1 = xrp-dsp-standalone$(EXEEXT)
-@BUILD_DSP_TRUE@@BUILD_HOSTED_TRUE@am__EXEEXT_2 =  \
-@BUILD_DSP_TRUE@@BUILD_HOSTED_TRUE@	xrp-dsp-hosted$(EXEEXT)
-@BUILD_DSP_FALSE@@BUILD_STANDALONE_TRUE@am__EXEEXT_3 = xrp-host-standalone$(EXEEXT)
-@BUILD_DSP_FALSE@@BUILD_HOSTED_TRUE@am__EXEEXT_4 =  \
-@BUILD_DSP_FALSE@@BUILD_HOSTED_TRUE@	xrp-host-hosted$(EXEEXT)
-@BUILD_DSP_FALSE@@BUILD_SINGLE_TRUE@am__EXEEXT_5 =  \
-@BUILD_DSP_FALSE@@BUILD_SINGLE_TRUE@	xrp-host-single$(EXEEXT)
-am__installdirs = "$(DESTDIR)$(bindir)"
-PROGRAMS = $(bin_PROGRAMS)
-am_xrp_dsp_hosted_OBJECTS = dsp_main.$(OBJEXT) dsp_test.$(OBJEXT)
-xrp_dsp_hosted_OBJECTS = $(am_xrp_dsp_hosted_OBJECTS)
-xrp_dsp_hosted_DEPENDENCIES = ../xrp-dsp/libxrp-dsp.a \
-	../xrp-dsp/$(HW_PORT)/libxrp-dsp-hw-$(HW_PORT).a \
-	../xrp-common/libxrp-common.a
-xrp_dsp_hosted_LINK = $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
-	$(xrp_dsp_hosted_LDFLAGS) $(LDFLAGS) -o $@
-am_xrp_dsp_standalone_OBJECTS = dsp_main.$(OBJEXT) dsp_test.$(OBJEXT)
-xrp_dsp_standalone_OBJECTS = $(am_xrp_dsp_standalone_OBJECTS)
-xrp_dsp_standalone_DEPENDENCIES = ../xrp-dsp/libxrp-dsp.a \
-	../xrp-dsp/$(HW_PORT)/libxrp-dsp-hw-$(HW_PORT).a \
-	../xrp-common/libxrp-common.a
-xrp_dsp_standalone_LINK = $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
-	$(xrp_dsp_standalone_LDFLAGS) $(LDFLAGS) -o $@
-am_xrp_host_hosted_OBJECTS = host_main.$(OBJEXT)
-xrp_host_hosted_OBJECTS = $(am_xrp_host_hosted_OBJECTS)
-am__DEPENDENCIES_1 =
-xrp_host_hosted_DEPENDENCIES = ../xrp-host/libxrp-host-hosted.a \
-	$(am__DEPENDENCIES_1)
-am_xrp_host_single_OBJECTS = host_main.$(OBJEXT) dsp_test.$(OBJEXT)
-xrp_host_single_OBJECTS = $(am_xrp_host_single_OBJECTS)
-xrp_host_single_DEPENDENCIES = ../xrp-host/libxrp-host-single.a \
-	$(am__DEPENDENCIES_1)
-am_xrp_host_standalone_OBJECTS = host_main.$(OBJEXT) xrp_dtb.$(OBJEXT)
-xrp_host_standalone_OBJECTS = $(am_xrp_host_standalone_OBJECTS)
-xrp_host_standalone_DEPENDENCIES =  \
-	../xrp-host/libxrp-host-standalone.a $(am__DEPENDENCIES_1) \
-	$(am__DEPENDENCIES_1)
-xrp_host_standalone_LINK = $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
-	$(xrp_host_standalone_LDFLAGS) $(LDFLAGS) -o $@
+am__vpath_adj_setup = srcdirstrip=`echo "$(srcdir)" | sed 's|.|.|g'`;
+am__vpath_adj = case $$p in \
+    $(srcdir)/*) f=`echo "$$p" | sed "s|^$$srcdirstrip/||"`;; \
+    *) f=$$p;; \
+  esac;
+am__strip_dir = f=`echo $$p | sed -e 's|^.*/||'`;
+am__install_max = 40
+am__nobase_strip_setup = \
+  srcdirstrip=`echo "$(srcdir)" | sed 's/[].[^$$\\*|]/\\\\&/g'`
+am__nobase_strip = \
+  for p in $$list; do echo "$$p"; done | sed -e "s|$$srcdirstrip/||"
+am__nobase_list = $(am__nobase_strip_setup); \
+  for p in $$list; do echo "$$p $$p"; done | \
+  sed "s| $$srcdirstrip/| |;"' / .*\//!s/ .*/ ./; s,\( .*\)/[^/]*$$,\1,' | \
+  $(AWK) 'BEGIN { files["."] = "" } { files[$$2] = files[$$2] " " $$1; \
+    if (++n[$$2] == $(am__install_max)) \
+      { print $$2, files[$$2]; n[$$2] = 0; files[$$2] = "" } } \
+    END { for (dir in files) print dir, files[dir] }'
+am__base_list = \
+  sed '$$!N;$$!N;$$!N;$$!N;$$!N;$$!N;$$!N;s/\n/ /g' | \
+  sed '$$!N;$$!N;$$!N;$$!N;s/\n/ /g'
+am__uninstall_files_from_dir = { \
+  test -z "$$files" \
+    || { test ! -d "$$dir" && test ! -f "$$dir" && test ! -r "$$dir"; } \
+    || { echo " ( cd '$$dir' && rm -f" $$files ")"; \
+         $(am__cd) "$$dir" && rm -f $$files; }; \
+  }
+am__installdirs = "$(DESTDIR)$(libdir)"
+LIBRARIES = $(lib_LIBRARIES)
+AR = ar
+ARFLAGS = cru
+AM_V_AR = $(am__v_AR_@AM_V@)
+am__v_AR_ = $(am__v_AR_@AM_DEFAULT_V@)
+am__v_AR_0 = @echo "  AR      " $@;
+am__v_AR_1 = 
+libxrp_common_a_AR = $(AR) $(ARFLAGS)
+libxrp_common_a_LIBADD =
+am_libxrp_common_a_OBJECTS = xrp_rb_file.$(OBJEXT) xrp_ns.$(OBJEXT)
+libxrp_common_a_OBJECTS = $(am_libxrp_common_a_OBJECTS)
 AM_V_P = $(am__v_P_@AM_V@)
 am__v_P_ = $(am__v_P_@AM_DEFAULT_V@)
 am__v_P_0 = false
@@ -197,17 +187,8 @@ AM_V_CCLD = $(am__v_CCLD_@AM_V@)
 am__v_CCLD_ = $(am__v_CCLD_@AM_DEFAULT_V@)
 am__v_CCLD_0 = @echo "  CCLD    " $@;
 am__v_CCLD_1 = 
-CCASCOMPILE = $(CCAS) $(AM_CCASFLAGS) $(CCASFLAGS)
-AM_V_CCAS = $(am__v_CCAS_@AM_V@)
-am__v_CCAS_ = $(am__v_CCAS_@AM_DEFAULT_V@)
-am__v_CCAS_0 = @echo "  CCAS    " $@;
-am__v_CCAS_1 = 
-SOURCES = $(xrp_dsp_hosted_SOURCES) $(xrp_dsp_standalone_SOURCES) \
-	$(xrp_host_hosted_SOURCES) $(xrp_host_single_SOURCES) \
-	$(xrp_host_standalone_SOURCES)
-DIST_SOURCES = $(xrp_dsp_hosted_SOURCES) $(xrp_dsp_standalone_SOURCES) \
-	$(xrp_host_hosted_SOURCES) $(xrp_host_single_SOURCES) \
-	$(xrp_host_standalone_SOURCES)
+SOURCES = $(libxrp_common_a_SOURCES)
+DIST_SOURCES = $(libxrp_common_a_SOURCES)
 am__can_run_installinfo = \
   case $$AM_UPDATE_INFO_DIR in \
     n|no|NO) false;; \
@@ -345,42 +326,18 @@ target_alias = @target_alias@
 top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
-AM_CPPFLAGS = -I$(srcdir)/.. -I$(srcdir)/../xrp-common $(am__append_1)
-AM_CFLAGS = -W -Wall $(am__append_4)
-@BUILD_DSP_FALSE@AM_LDFLAGS = $(THREADS_LDFLAGS)
-@BUILD_DSP_TRUE@AM_LDFLAGS = -mlsp=$(DSP_LSP) \
-@BUILD_DSP_TRUE@	     -Wl,--defsym,_memmap_cacheattr_reset=$(DSP_CACHEATTR)
+AM_CPPFLAGS = -I$(srcdir)/.. \
+	      -I$(srcdir)/../xrp-kernel
 
-@BUILD_DSP_TRUE@xrp_dsp_standalone_LDFLAGS = $(AM_LDFLAGS) \
-@BUILD_DSP_TRUE@			     -Wl,--defsym,xrp_dsp_comm_base_magic=$(DSP_COMM_BASE)
+AM_CFLAGS = -W -Wall
+lib_LIBRARIES = libxrp-common.a
+libxrp_common_a_SOURCES = xrp_rb_file.c \
+			  xrp_ns.c
 
-@BUILD_DSP_TRUE@xrp_dsp_hosted_LDFLAGS = $(AM_LDFLAGS) \
-@BUILD_DSP_TRUE@			 -Wl,--defsym,xrp_dsp_comm_base_magic=0x20161006
-
-@BUILD_DSP_FALSE@@BUILD_STANDALONE_TRUE@BUILT_SOURCES = xrp.dtb
-@BUILD_DSP_FALSE@@BUILD_STANDALONE_TRUE@CLEANFILES = xrp.dtb
-@HOST_OS_LINUX_TRUE@xrp_host_standalone_LDFLAGS = -lrt
-xrp_dsp_hosted_SOURCES = dsp_main.c dsp_test.c
-xrp_dsp_standalone_SOURCES = dsp_main.c dsp_test.c
-xrp_dsp_hosted_LDADD = ../xrp-dsp/libxrp-dsp.a \
-		       ../xrp-dsp/$(HW_PORT)/libxrp-dsp-hw-$(HW_PORT).a \
-		       ../xrp-common/libxrp-common.a
-
-xrp_dsp_standalone_LDADD = ../xrp-dsp/libxrp-dsp.a \
-			   ../xrp-dsp/$(HW_PORT)/libxrp-dsp-hw-$(HW_PORT).a \
-			   ../xrp-common/libxrp-common.a
-
-xrp_host_hosted_SOURCES = host_main.c
-xrp_host_standalone_SOURCES = host_main.c xrp_dtb.s
-xrp_host_single_SOURCES = host_main.c dsp_test.c
-xrp_host_hosted_LDADD = ../xrp-host/libxrp-host-hosted.a $(THREADS_LDFLAGS)
-xrp_host_standalone_LDADD = ../xrp-host/libxrp-host-standalone.a $(THREADS_LDFLAGS) $(LIBFDT_LDFLAGS) -lfdt
-xrp_host_single_LDADD = ../xrp-host/libxrp-host-single.a $(THREADS_LDFLAGS)
-all: $(BUILT_SOURCES)
-	$(MAKE) $(AM_MAKEFLAGS) all-am
+all: all-am
 
 .SUFFIXES:
-.SUFFIXES: .c .o .obj .s
+.SUFFIXES: .c .o .obj
 $(srcdir)/Makefile.in:  $(srcdir)/Makefile.am  $(am__configure_deps)
 	@for dep in $?; do \
 	  case '$(am__configure_deps)' in \
@@ -390,9 +347,9 @@ $(srcdir)/Makefile.in:  $(srcdir)/Makefile.am  $(am__configure_deps)
 	      exit 1;; \
 	  esac; \
 	done; \
-	echo ' cd $(top_srcdir) && $(AUTOMAKE) --foreign xrp-example/Makefile'; \
+	echo ' cd $(top_srcdir) && $(AUTOMAKE) --foreign xrp-common/Makefile'; \
 	$(am__cd) $(top_srcdir) && \
-	  $(AUTOMAKE) --foreign xrp-example/Makefile
+	  $(AUTOMAKE) --foreign xrp-common/Makefile
 Makefile: $(srcdir)/Makefile.in $(top_builddir)/config.status
 	@case '$?' in \
 	  *config.status*) \
@@ -410,68 +367,42 @@ $(top_srcdir)/configure:  $(am__configure_deps)
 $(ACLOCAL_M4):  $(am__aclocal_m4_deps)
 	cd $(top_builddir) && $(MAKE) $(AM_MAKEFLAGS) am--refresh
 $(am__aclocal_m4_deps):
-install-binPROGRAMS: $(bin_PROGRAMS)
+install-libLIBRARIES: $(lib_LIBRARIES)
 	@$(NORMAL_INSTALL)
-	@list='$(bin_PROGRAMS)'; test -n "$(bindir)" || list=; \
-	if test -n "$$list"; then \
-	  echo " $(MKDIR_P) '$(DESTDIR)$(bindir)'"; \
-	  $(MKDIR_P) "$(DESTDIR)$(bindir)" || exit 1; \
-	fi; \
-	for p in $$list; do echo "$$p $$p"; done | \
-	sed 's/$(EXEEXT)$$//' | \
-	while read p p1; do if test -f $$p \
-	  ; then echo "$$p"; echo "$$p"; else :; fi; \
-	done | \
-	sed -e 'p;s,.*/,,;n;h' \
-	    -e 's|.*|.|' \
-	    -e 'p;x;s,.*/,,;s/$(EXEEXT)$$//;$(transform);s/$$/$(EXEEXT)/' | \
-	sed 'N;N;N;s,\n, ,g' | \
-	$(AWK) 'BEGIN { files["."] = ""; dirs["."] = 1 } \
-	  { d=$$3; if (dirs[d] != 1) { print "d", d; dirs[d] = 1 } \
-	    if ($$2 == $$4) files[d] = files[d] " " $$1; \
-	    else { print "f", $$3 "/" $$4, $$1; } } \
-	  END { for (d in files) print "f", d, files[d] }' | \
-	while read type dir files; do \
-	    if test "$$dir" = .; then dir=; else dir=/$$dir; fi; \
-	    test -z "$$files" || { \
-	      echo " $(INSTALL_PROGRAM_ENV) $(INSTALL_PROGRAM) $$files '$(DESTDIR)$(bindir)$$dir'"; \
-	      $(INSTALL_PROGRAM_ENV) $(INSTALL_PROGRAM) $$files "$(DESTDIR)$(bindir)$$dir" || exit $$?; \
-	    } \
-	; done
+	@list='$(lib_LIBRARIES)'; test -n "$(libdir)" || list=; \
+	list2=; for p in $$list; do \
+	  if test -f $$p; then \
+	    list2="$$list2 $$p"; \
+	  else :; fi; \
+	done; \
+	test -z "$$list2" || { \
+	  echo " $(MKDIR_P) '$(DESTDIR)$(libdir)'"; \
+	  $(MKDIR_P) "$(DESTDIR)$(libdir)" || exit 1; \
+	  echo " $(INSTALL_DATA) $$list2 '$(DESTDIR)$(libdir)'"; \
+	  $(INSTALL_DATA) $$list2 "$(DESTDIR)$(libdir)" || exit $$?; }
+	@$(POST_INSTALL)
+	@list='$(lib_LIBRARIES)'; test -n "$(libdir)" || list=; \
+	for p in $$list; do \
+	  if test -f $$p; then \
+	    $(am__strip_dir) \
+	    echo " ( cd '$(DESTDIR)$(libdir)' && $(RANLIB) $$f )"; \
+	    ( cd "$(DESTDIR)$(libdir)" && $(RANLIB) $$f ) || exit $$?; \
+	  else :; fi; \
+	done
 
-uninstall-binPROGRAMS:
+uninstall-libLIBRARIES:
 	@$(NORMAL_UNINSTALL)
-	@list='$(bin_PROGRAMS)'; test -n "$(bindir)" || list=; \
-	files=`for p in $$list; do echo "$$p"; done | \
-	  sed -e 'h;s,^.*/,,;s/$(EXEEXT)$$//;$(transform)' \
-	      -e 's/$$/$(EXEEXT)/' \
-	`; \
-	test -n "$$list" || exit 0; \
-	echo " ( cd '$(DESTDIR)$(bindir)' && rm -f" $$files ")"; \
-	cd "$(DESTDIR)$(bindir)" && rm -f $$files
+	@list='$(lib_LIBRARIES)'; test -n "$(libdir)" || list=; \
+	files=`for p in $$list; do echo $$p; done | sed -e 's|^.*/||'`; \
+	dir='$(DESTDIR)$(libdir)'; $(am__uninstall_files_from_dir)
 
-clean-binPROGRAMS:
-	-test -z "$(bin_PROGRAMS)" || rm -f $(bin_PROGRAMS)
+clean-libLIBRARIES:
+	-test -z "$(lib_LIBRARIES)" || rm -f $(lib_LIBRARIES)
 
-xrp-dsp-hosted$(EXEEXT): $(xrp_dsp_hosted_OBJECTS) $(xrp_dsp_hosted_DEPENDENCIES) $(EXTRA_xrp_dsp_hosted_DEPENDENCIES) 
-	@rm -f xrp-dsp-hosted$(EXEEXT)
-	$(AM_V_CCLD)$(xrp_dsp_hosted_LINK) $(xrp_dsp_hosted_OBJECTS) $(xrp_dsp_hosted_LDADD) $(LIBS)
-
-xrp-dsp-standalone$(EXEEXT): $(xrp_dsp_standalone_OBJECTS) $(xrp_dsp_standalone_DEPENDENCIES) $(EXTRA_xrp_dsp_standalone_DEPENDENCIES) 
-	@rm -f xrp-dsp-standalone$(EXEEXT)
-	$(AM_V_CCLD)$(xrp_dsp_standalone_LINK) $(xrp_dsp_standalone_OBJECTS) $(xrp_dsp_standalone_LDADD) $(LIBS)
-
-xrp-host-hosted$(EXEEXT): $(xrp_host_hosted_OBJECTS) $(xrp_host_hosted_DEPENDENCIES) $(EXTRA_xrp_host_hosted_DEPENDENCIES) 
-	@rm -f xrp-host-hosted$(EXEEXT)
-	$(AM_V_CCLD)$(LINK) $(xrp_host_hosted_OBJECTS) $(xrp_host_hosted_LDADD) $(LIBS)
-
-xrp-host-single$(EXEEXT): $(xrp_host_single_OBJECTS) $(xrp_host_single_DEPENDENCIES) $(EXTRA_xrp_host_single_DEPENDENCIES) 
-	@rm -f xrp-host-single$(EXEEXT)
-	$(AM_V_CCLD)$(LINK) $(xrp_host_single_OBJECTS) $(xrp_host_single_LDADD) $(LIBS)
-
-xrp-host-standalone$(EXEEXT): $(xrp_host_standalone_OBJECTS) $(xrp_host_standalone_DEPENDENCIES) $(EXTRA_xrp_host_standalone_DEPENDENCIES) 
-	@rm -f xrp-host-standalone$(EXEEXT)
-	$(AM_V_CCLD)$(xrp_host_standalone_LINK) $(xrp_host_standalone_OBJECTS) $(xrp_host_standalone_LDADD) $(LIBS)
+libxrp-common.a: $(libxrp_common_a_OBJECTS) $(libxrp_common_a_DEPENDENCIES) $(EXTRA_libxrp_common_a_DEPENDENCIES) 
+	$(AM_V_at)-rm -f libxrp-common.a
+	$(AM_V_AR)$(libxrp_common_a_AR) libxrp-common.a $(libxrp_common_a_OBJECTS) $(libxrp_common_a_LIBADD)
+	$(AM_V_at)$(RANLIB) libxrp-common.a
 
 mostlyclean-compile:
 	-rm -f *.$(OBJEXT)
@@ -479,9 +410,8 @@ mostlyclean-compile:
 distclean-compile:
 	-rm -f *.tab.c
 
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/dsp_main.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/dsp_test.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/host_main.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/xrp_ns.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/xrp_rb_file.Po@am__quote@
 
 .c.o:
 @am__fastdepCC_TRUE@	$(AM_V_CC)depbase=`echo $@ | sed 's|[^/]*$$|$(DEPDIR)/&|;s|\.o$$||'`;\
@@ -498,12 +428,6 @@ distclean-compile:
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='$<' object='$@' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(COMPILE) -c -o $@ `$(CYGPATH_W) '$<'`
-
-.s.o:
-	$(AM_V_CCAS)$(CCASCOMPILE) -c -o $@ $<
-
-.s.obj:
-	$(AM_V_CCAS)$(CCASCOMPILE) -c -o $@ `$(CYGPATH_W) '$<'`
 
 ID: $(am__tagged_files)
 	$(am__define_uniq_tagged_files); mkid -fID $$unique
@@ -588,15 +512,13 @@ distdir: $(DISTFILES)
 	  fi; \
 	done
 check-am: all-am
-check: $(BUILT_SOURCES)
-	$(MAKE) $(AM_MAKEFLAGS) check-am
-all-am: Makefile $(PROGRAMS)
+check: check-am
+all-am: Makefile $(LIBRARIES)
 installdirs:
-	for dir in "$(DESTDIR)$(bindir)"; do \
+	for dir in "$(DESTDIR)$(libdir)"; do \
 	  test -z "$$dir" || $(MKDIR_P) "$$dir"; \
 	done
-install: $(BUILT_SOURCES)
-	$(MAKE) $(AM_MAKEFLAGS) install-am
+install: install-am
 install-exec: install-exec-am
 install-data: install-data-am
 uninstall: uninstall-am
@@ -618,7 +540,6 @@ install-strip:
 mostlyclean-generic:
 
 clean-generic:
-	-test -z "$(CLEANFILES)" || rm -f $(CLEANFILES)
 
 distclean-generic:
 	-test -z "$(CONFIG_CLEAN_FILES)" || rm -f $(CONFIG_CLEAN_FILES)
@@ -627,10 +548,9 @@ distclean-generic:
 maintainer-clean-generic:
 	@echo "This command is intended for maintainers to use"
 	@echo "it deletes files that may require special tools to rebuild."
-	-test -z "$(BUILT_SOURCES)" || rm -f $(BUILT_SOURCES)
 clean: clean-am
 
-clean-am: clean-binPROGRAMS clean-generic mostlyclean-am
+clean-am: clean-generic clean-libLIBRARIES mostlyclean-am
 
 distclean: distclean-am
 	-rm -rf ./$(DEPDIR)
@@ -656,7 +576,7 @@ install-dvi: install-dvi-am
 
 install-dvi-am:
 
-install-exec-am: install-binPROGRAMS
+install-exec-am: install-libLIBRARIES
 
 install-html: install-html-am
 
@@ -695,30 +615,25 @@ ps: ps-am
 
 ps-am:
 
-uninstall-am: uninstall-binPROGRAMS
+uninstall-am: uninstall-libLIBRARIES
 
-.MAKE: all check install install-am install-strip
+.MAKE: install-am install-strip
 
-.PHONY: CTAGS GTAGS TAGS all all-am check check-am clean \
-	clean-binPROGRAMS clean-generic cscopelist-am ctags ctags-am \
-	distclean distclean-compile distclean-generic distclean-tags \
-	distdir dvi dvi-am html html-am info info-am install \
-	install-am install-binPROGRAMS install-data install-data-am \
-	install-dvi install-dvi-am install-exec install-exec-am \
-	install-html install-html-am install-info install-info-am \
-	install-man install-pdf install-pdf-am install-ps \
-	install-ps-am install-strip installcheck installcheck-am \
-	installdirs maintainer-clean maintainer-clean-generic \
-	mostlyclean mostlyclean-compile mostlyclean-generic pdf pdf-am \
-	ps ps-am tags tags-am uninstall uninstall-am \
-	uninstall-binPROGRAMS
+.PHONY: CTAGS GTAGS TAGS all all-am check check-am clean clean-generic \
+	clean-libLIBRARIES cscopelist-am ctags ctags-am distclean \
+	distclean-compile distclean-generic distclean-tags distdir dvi \
+	dvi-am html html-am info info-am install install-am \
+	install-data install-data-am install-dvi install-dvi-am \
+	install-exec install-exec-am install-html install-html-am \
+	install-info install-info-am install-libLIBRARIES install-man \
+	install-pdf install-pdf-am install-ps install-ps-am \
+	install-strip installcheck installcheck-am installdirs \
+	maintainer-clean maintainer-clean-generic mostlyclean \
+	mostlyclean-compile mostlyclean-generic pdf pdf-am ps ps-am \
+	tags tags-am uninstall uninstall-am uninstall-libLIBRARIES
 
 .PRECIOUS: Makefile
 
-
-xrp_dtb.$(OBJEXT): xrp.dtb
-xrp.dtb: $(srcdir)/xrp.dts
-	$(AM_V_GEN)$(DTC) -o $@ -O dtb $<
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.
