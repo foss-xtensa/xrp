@@ -29,8 +29,7 @@
 
 #include "xrp_dsp_hw.h"
 #include "xrp_debug.h"
-
-typedef uint32_t __u32;
+#include "xrp_types.h"
 #include "xrp_hw_simple_dsp_interface.h"
 
 static uint32_t mmio_base;

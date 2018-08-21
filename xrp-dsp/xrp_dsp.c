@@ -32,9 +32,7 @@
 #include "xrp_debug.h"
 #include "xrp_dsp_hw.h"
 #include "xrp_ns.h"
-
-typedef uint8_t __u8;
-typedef uint32_t __u32;
+#include "xrp_types.h"
 #include "xrp_kernel_dsp_interface.h"
 
 extern char xrp_dsp_comm_base_magic[] __attribute__((weak));
