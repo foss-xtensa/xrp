@@ -176,6 +176,8 @@ AS_IF([test x$build_dsp = xfalse -a x$build_example = xtrue -a x$build_standalon
 	    [AC_MSG_FAILURE([No usable dtc is found])])
       ])
 
+AC_CHECK_FUNC([fopencookie],[AC_DEFINE([HAVE_OPENCOOKIE])])
+
 HW_PORT=simple
 AC_ARG_ENABLE(port,
 	      [AS_HELP_STRING([--enable-port[[=ARG]]],
