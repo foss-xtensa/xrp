@@ -35,6 +35,7 @@
 #include <linux/platform_device.h>
 #include <linux/slab.h>
 #include <asm/cacheflush.h>
+#include "xrp_kernel_defs.h"
 #include "xrp_hw.h"
 #include "xrp_hw_simple_dsp_interface.h"
 
@@ -173,7 +174,8 @@ static void dma_sync_for_device(void *hw_arg,
 		break;
 
 	case XRP_FLAG_READ_WRITE:
-		__flush_invalidate_dcache_range((unsigned long)vaddr, sz);
+		__flush_dcache_range((unsigned long)vaddr, sz);
+		__invalidate_dcache_range((unsigned long)vaddr, sz);
 		break;
 
 	case XRP_FLAG_WRITE:
