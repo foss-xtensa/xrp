@@ -24,6 +24,7 @@
 #define _GNU_SOURCE
 #include <stdio.h>
 #include <string.h>
+#include <unistd.h>
 #include "xrp_rb_file.h"
 
 #ifdef HAVE_OPENCOOKIE
