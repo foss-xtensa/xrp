@@ -26,10 +26,15 @@
  * the GNU General Public License version 2 or later.
  */
 
+#include <linux/version.h>
 #include <linux/acpi.h>
 #include <linux/completion.h>
 #include <linux/delay.h>
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 16, 0)
 #include <linux/dma-mapping.h>
+#else
+#include <linux/dma-direct.h>
+#endif
 #include <linux/firmware.h>
 #include <linux/fs.h>
 #include <linux/hashtable.h>

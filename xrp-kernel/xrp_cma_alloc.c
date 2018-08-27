@@ -24,10 +24,14 @@
  * the GNU General Public License version 2 or later.
  */
 
+#include <linux/version.h>
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 16, 0)
 #include <linux/dma-mapping.h>
+#else
+#include <linux/dma-direct.h>
+#endif
 #include <linux/kernel.h>
 #include <linux/slab.h>
-#include <linux/version.h>
 #include "xrp_cma_alloc.h"
 
 struct xrp_cma_allocation {
