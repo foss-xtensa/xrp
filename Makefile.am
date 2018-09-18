@@ -25,10 +25,10 @@ SUBDIRS = xrp-common
 
 if BUILD_DSP
 SUBDIRS += xrp-dsp
-else
+endif
+if BUILD_HOST
 SUBDIRS += xrp-host
 endif
-
 if BUILD_EXAMPLE
 SUBDIRS += xrp-example
 endif

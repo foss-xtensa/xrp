@@ -26,36 +26,28 @@ AM_CFLAGS = -W -Wall
 
 bin_PROGRAMS =
 
-if BUILD_DSP
-AM_CPPFLAGS += -I$(srcdir)/../xrp-dsp
-AM_LDFLAGS = -mlsp=$(DSP_LSP) \
-	     -Wl,--defsym,_memmap_cacheattr_reset=$(DSP_CACHEATTR)
-
-xrp_dsp_standalone_LDFLAGS = $(AM_LDFLAGS) \
-			     -Wl,--defsym,xrp_dsp_comm_base_magic=$(DSP_COMM_BASE)
-
-xrp_dsp_hosted_LDFLAGS = $(AM_LDFLAGS) \
-			 -Wl,--defsym,xrp_dsp_comm_base_magic=0x20161006
 if BUILD_STANDALONE
-bin_PROGRAMS += xrp-dsp-standalone
-endif
-if BUILD_HOSTED
-bin_PROGRAMS += xrp-dsp-hosted
-endif
-
-else
-AM_CFLAGS += $(THREADS_CFLAGS)
-AM_LDFLAGS = $(THREADS_LDFLAGS)
-
-if BUILD_STANDALONE
+if BUILD_HOST
+bin_PROGRAMS += xrp-host-standalone
 BUILT_SOURCES = xrp.dtb
 CLEANFILES = xrp.dtb
-bin_PROGRAMS += xrp-host-standalone
 endif
+if BUILD_DSP
+bin_PROGRAMS += xrp-dsp-standalone
+endif
+endif
+
 if BUILD_HOSTED
+if BUILD_HOST
 bin_PROGRAMS += xrp-host-hosted
 endif
+if BUILD_DSP
+bin_PROGRAMS += xrp-dsp-hosted
+endif
+endif
+
 if BUILD_SINGLE
+if BUILD_HOST
 bin_PROGRAMS += xrp-host-single
 endif
 endif
@@ -64,22 +56,36 @@ if HOST_OS_LINUX
 xrp_host_standalone_LDFLAGS = -lrt
 endif
 
-xrp_dsp_hosted_SOURCES = dsp_main.c dsp_test.c
-xrp_dsp_standalone_SOURCES = dsp_main.c dsp_test.c
+dsp_cppflags = $(AM_CPPFLAGS) -I$(srcdir)/../xrp-dsp
+dsp_ldflags = $(AM_LDFLAGS) \
+	      -mlsp=$(DSP_LSP) \
+	      -Wl,--defsym,_memmap_cacheattr_reset=$(DSP_CACHEATTR)
 
-xrp_dsp_hosted_LDADD = ../xrp-dsp/libxrp-dsp.a \
-		       ../xrp-dsp/$(HW_PORT)/libxrp-dsp-hw-$(HW_PORT).a \
-		       ../xrp-common/libxrp-common.a
+xrp_dsp_standalone_SOURCES = dsp_main.c dsp_test.c
+xrp_dsp_standalone_CPPFLAGS = $(dsp_cppflags)
+xrp_dsp_standalone_LDFLAGS = $(dsp_ldflags) \
+			     -Wl,--defsym,xrp_dsp_comm_base_magic=$(DSP_COMM_BASE)
 xrp_dsp_standalone_LDADD = ../xrp-dsp/libxrp-dsp.a \
 			   ../xrp-dsp/$(HW_PORT)/libxrp-dsp-hw-$(HW_PORT).a \
 			   ../xrp-common/libxrp-common.a
 
-xrp_host_hosted_SOURCES = host_main.c
-xrp_host_standalone_SOURCES = host_main.c xrp_dtb.s
-xrp_host_single_SOURCES = host_main.c dsp_test.c
+xrp_dsp_hosted_SOURCES = dsp_main.c dsp_test.c
+xrp_dsp_hosted_CPPFLAGS = $(dsp_cppflags)
+xrp_dsp_hosted_LDFLAGS = $(dsp_ldflags) \
+			 -Wl,--defsym,xrp_dsp_comm_base_magic=0x20161006
+xrp_dsp_hosted_LDADD = ../xrp-dsp/libxrp-dsp.a \
+		       ../xrp-dsp/$(HW_PORT)/libxrp-dsp-hw-$(HW_PORT).a \
+		       ../xrp-common/libxrp-common.a
 
-xrp_host_hosted_LDADD = ../xrp-host/libxrp-host-hosted.a $(THREADS_LDFLAGS)
+xrp_host_standalone_SOURCES = host_main.c xrp_dtb.s
+xrp_host_standalone_CFLAGS = $(AM_CFLAGS) $(THREAD_CFLAGS)
 xrp_host_standalone_LDADD = ../xrp-host/libxrp-host-standalone.a $(THREADS_LDFLAGS) $(LIBFDT_LDFLAGS) -lfdt
+
+xrp_host_hosted_SOURCES = host_main.c
+xrp_host_hosted_CFLAGS = $(AM_CFLAGS) $(THREAD_CFLAGS)
+xrp_host_hosted_LDADD = ../xrp-host/libxrp-host-hosted.a $(THREADS_LDFLAGS)
+
+xrp_host_single_SOURCES = host_main.c dsp_test.c
 xrp_host_single_LDADD = ../xrp-host/libxrp-host-single.a $(THREADS_LDFLAGS)
 
 xrp_dtb.$(OBJEXT): xrp.dtb
