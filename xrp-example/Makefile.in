@@ -113,13 +113,11 @@ build_triplet = @build@
 host_triplet = @host@
 bin_PROGRAMS = $(am__EXEEXT_1) $(am__EXEEXT_2) $(am__EXEEXT_3) \
 	$(am__EXEEXT_4) $(am__EXEEXT_5)
-@BUILD_DSP_TRUE@am__append_1 = -I$(srcdir)/../xrp-dsp
+@BUILD_HOST_TRUE@@BUILD_STANDALONE_TRUE@am__append_1 = xrp-host-standalone
 @BUILD_DSP_TRUE@@BUILD_STANDALONE_TRUE@am__append_2 = xrp-dsp-standalone
-@BUILD_DSP_TRUE@@BUILD_HOSTED_TRUE@am__append_3 = xrp-dsp-hosted
-@BUILD_DSP_FALSE@am__append_4 = $(THREADS_CFLAGS)
-@BUILD_DSP_FALSE@@BUILD_STANDALONE_TRUE@am__append_5 = xrp-host-standalone
-@BUILD_DSP_FALSE@@BUILD_HOSTED_TRUE@am__append_6 = xrp-host-hosted
-@BUILD_DSP_FALSE@@BUILD_SINGLE_TRUE@am__append_7 = xrp-host-single
+@BUILD_HOSTED_TRUE@@BUILD_HOST_TRUE@am__append_3 = xrp-host-hosted
+@BUILD_DSP_TRUE@@BUILD_HOSTED_TRUE@am__append_4 = xrp-dsp-hosted
+@BUILD_HOST_TRUE@@BUILD_SINGLE_TRUE@am__append_5 = xrp-host-single
 subdir = xrp-example
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/configure.ac
@@ -129,46 +127,51 @@ DIST_COMMON = $(srcdir)/Makefile.am $(am__DIST_COMMON)
 mkinstalldirs = $(install_sh) -d
 CONFIG_CLEAN_FILES =
 CONFIG_CLEAN_VPATH_FILES =
-@BUILD_DSP_TRUE@@BUILD_STANDALONE_TRUE@am__EXEEXT_1 = xrp-dsp-standalone$(EXEEXT)
-@BUILD_DSP_TRUE@@BUILD_HOSTED_TRUE@am__EXEEXT_2 =  \
+@BUILD_HOST_TRUE@@BUILD_STANDALONE_TRUE@am__EXEEXT_1 = xrp-host-standalone$(EXEEXT)
+@BUILD_DSP_TRUE@@BUILD_STANDALONE_TRUE@am__EXEEXT_2 = xrp-dsp-standalone$(EXEEXT)
+@BUILD_HOSTED_TRUE@@BUILD_HOST_TRUE@am__EXEEXT_3 =  \
+@BUILD_HOSTED_TRUE@@BUILD_HOST_TRUE@	xrp-host-hosted$(EXEEXT)
+@BUILD_DSP_TRUE@@BUILD_HOSTED_TRUE@am__EXEEXT_4 =  \
 @BUILD_DSP_TRUE@@BUILD_HOSTED_TRUE@	xrp-dsp-hosted$(EXEEXT)
-@BUILD_DSP_FALSE@@BUILD_STANDALONE_TRUE@am__EXEEXT_3 = xrp-host-standalone$(EXEEXT)
-@BUILD_DSP_FALSE@@BUILD_HOSTED_TRUE@am__EXEEXT_4 =  \
-@BUILD_DSP_FALSE@@BUILD_HOSTED_TRUE@	xrp-host-hosted$(EXEEXT)
-@BUILD_DSP_FALSE@@BUILD_SINGLE_TRUE@am__EXEEXT_5 =  \
-@BUILD_DSP_FALSE@@BUILD_SINGLE_TRUE@	xrp-host-single$(EXEEXT)
+@BUILD_HOST_TRUE@@BUILD_SINGLE_TRUE@am__EXEEXT_5 =  \
+@BUILD_HOST_TRUE@@BUILD_SINGLE_TRUE@	xrp-host-single$(EXEEXT)
 am__installdirs = "$(DESTDIR)$(bindir)"
 PROGRAMS = $(bin_PROGRAMS)
-am_xrp_dsp_hosted_OBJECTS = dsp_main.$(OBJEXT) dsp_test.$(OBJEXT)
+am_xrp_dsp_hosted_OBJECTS = xrp_dsp_hosted-dsp_main.$(OBJEXT) \
+	xrp_dsp_hosted-dsp_test.$(OBJEXT)
 xrp_dsp_hosted_OBJECTS = $(am_xrp_dsp_hosted_OBJECTS)
 xrp_dsp_hosted_DEPENDENCIES = ../xrp-dsp/libxrp-dsp.a \
 	../xrp-dsp/$(HW_PORT)/libxrp-dsp-hw-$(HW_PORT).a \
 	../xrp-common/libxrp-common.a
 xrp_dsp_hosted_LINK = $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
 	$(xrp_dsp_hosted_LDFLAGS) $(LDFLAGS) -o $@
-am_xrp_dsp_standalone_OBJECTS = dsp_main.$(OBJEXT) dsp_test.$(OBJEXT)
+am_xrp_dsp_standalone_OBJECTS = xrp_dsp_standalone-dsp_main.$(OBJEXT) \
+	xrp_dsp_standalone-dsp_test.$(OBJEXT)
 xrp_dsp_standalone_OBJECTS = $(am_xrp_dsp_standalone_OBJECTS)
 xrp_dsp_standalone_DEPENDENCIES = ../xrp-dsp/libxrp-dsp.a \
 	../xrp-dsp/$(HW_PORT)/libxrp-dsp-hw-$(HW_PORT).a \
 	../xrp-common/libxrp-common.a
 xrp_dsp_standalone_LINK = $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
 	$(xrp_dsp_standalone_LDFLAGS) $(LDFLAGS) -o $@
-am_xrp_host_hosted_OBJECTS = host_main.$(OBJEXT)
+am_xrp_host_hosted_OBJECTS = xrp_host_hosted-host_main.$(OBJEXT)
 xrp_host_hosted_OBJECTS = $(am_xrp_host_hosted_OBJECTS)
 am__DEPENDENCIES_1 =
 xrp_host_hosted_DEPENDENCIES = ../xrp-host/libxrp-host-hosted.a \
 	$(am__DEPENDENCIES_1)
+xrp_host_hosted_LINK = $(CCLD) $(xrp_host_hosted_CFLAGS) $(CFLAGS) \
+	$(AM_LDFLAGS) $(LDFLAGS) -o $@
 am_xrp_host_single_OBJECTS = host_main.$(OBJEXT) dsp_test.$(OBJEXT)
 xrp_host_single_OBJECTS = $(am_xrp_host_single_OBJECTS)
 xrp_host_single_DEPENDENCIES = ../xrp-host/libxrp-host-single.a \
 	$(am__DEPENDENCIES_1)
-am_xrp_host_standalone_OBJECTS = host_main.$(OBJEXT) xrp_dtb.$(OBJEXT)
+am_xrp_host_standalone_OBJECTS =  \
+	xrp_host_standalone-host_main.$(OBJEXT) xrp_dtb.$(OBJEXT)
 xrp_host_standalone_OBJECTS = $(am_xrp_host_standalone_OBJECTS)
 xrp_host_standalone_DEPENDENCIES =  \
 	../xrp-host/libxrp-host-standalone.a $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1)
-xrp_host_standalone_LINK = $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
-	$(xrp_host_standalone_LDFLAGS) $(LDFLAGS) -o $@
+xrp_host_standalone_LINK = $(CCLD) $(xrp_host_standalone_CFLAGS) \
+	$(CFLAGS) $(xrp_host_standalone_LDFLAGS) $(LDFLAGS) -o $@
 AM_V_P = $(am__v_P_@AM_V@)
 am__v_P_ = $(am__v_P_@AM_DEFAULT_V@)
 am__v_P_0 = false
@@ -185,6 +188,10 @@ DEFAULT_INCLUDES = -I.@am__isrc@
 depcomp = $(SHELL) $(top_srcdir)/autoconf/depcomp
 am__depfiles_maybe = depfiles
 am__mv = mv -f
+AM_V_lt = $(am__v_lt_@AM_V@)
+am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
+am__v_lt_0 = --silent
+am__v_lt_1 = 
 COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
 	$(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
 AM_V_CC = $(am__v_CC_@AM_V@)
@@ -345,36 +352,41 @@ target_alias = @target_alias@
 top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
-AM_CPPFLAGS = -I$(srcdir)/.. -I$(srcdir)/../xrp-common $(am__append_1)
-AM_CFLAGS = -W -Wall $(am__append_4)
-@BUILD_DSP_FALSE@AM_LDFLAGS = $(THREADS_LDFLAGS)
-@BUILD_DSP_TRUE@AM_LDFLAGS = -mlsp=$(DSP_LSP) \
-@BUILD_DSP_TRUE@	     -Wl,--defsym,_memmap_cacheattr_reset=$(DSP_CACHEATTR)
-
-@BUILD_DSP_TRUE@xrp_dsp_standalone_LDFLAGS = $(AM_LDFLAGS) \
-@BUILD_DSP_TRUE@			     -Wl,--defsym,xrp_dsp_comm_base_magic=$(DSP_COMM_BASE)
-
-@BUILD_DSP_TRUE@xrp_dsp_hosted_LDFLAGS = $(AM_LDFLAGS) \
-@BUILD_DSP_TRUE@			 -Wl,--defsym,xrp_dsp_comm_base_magic=0x20161006
-
-@BUILD_DSP_FALSE@@BUILD_STANDALONE_TRUE@BUILT_SOURCES = xrp.dtb
-@BUILD_DSP_FALSE@@BUILD_STANDALONE_TRUE@CLEANFILES = xrp.dtb
+AM_CPPFLAGS = -I$(srcdir)/.. -I$(srcdir)/../xrp-common
+AM_CFLAGS = -W -Wall
+@BUILD_HOST_TRUE@@BUILD_STANDALONE_TRUE@BUILT_SOURCES = xrp.dtb
+@BUILD_HOST_TRUE@@BUILD_STANDALONE_TRUE@CLEANFILES = xrp.dtb
 @HOST_OS_LINUX_TRUE@xrp_host_standalone_LDFLAGS = -lrt
-xrp_dsp_hosted_SOURCES = dsp_main.c dsp_test.c
+dsp_cppflags = $(AM_CPPFLAGS) -I$(srcdir)/../xrp-dsp
+dsp_ldflags = $(AM_LDFLAGS) \
+	      -mlsp=$(DSP_LSP) \
+	      -Wl,--defsym,_memmap_cacheattr_reset=$(DSP_CACHEATTR)
+
 xrp_dsp_standalone_SOURCES = dsp_main.c dsp_test.c
-xrp_dsp_hosted_LDADD = ../xrp-dsp/libxrp-dsp.a \
-		       ../xrp-dsp/$(HW_PORT)/libxrp-dsp-hw-$(HW_PORT).a \
-		       ../xrp-common/libxrp-common.a
+xrp_dsp_standalone_CPPFLAGS = $(dsp_cppflags)
+xrp_dsp_standalone_LDFLAGS = $(dsp_ldflags) \
+			     -Wl,--defsym,xrp_dsp_comm_base_magic=$(DSP_COMM_BASE)
 
 xrp_dsp_standalone_LDADD = ../xrp-dsp/libxrp-dsp.a \
 			   ../xrp-dsp/$(HW_PORT)/libxrp-dsp-hw-$(HW_PORT).a \
 			   ../xrp-common/libxrp-common.a
 
-xrp_host_hosted_SOURCES = host_main.c
+xrp_dsp_hosted_SOURCES = dsp_main.c dsp_test.c
+xrp_dsp_hosted_CPPFLAGS = $(dsp_cppflags)
+xrp_dsp_hosted_LDFLAGS = $(dsp_ldflags) \
+			 -Wl,--defsym,xrp_dsp_comm_base_magic=0x20161006
+
+xrp_dsp_hosted_LDADD = ../xrp-dsp/libxrp-dsp.a \
+		       ../xrp-dsp/$(HW_PORT)/libxrp-dsp-hw-$(HW_PORT).a \
+		       ../xrp-common/libxrp-common.a
+
 xrp_host_standalone_SOURCES = host_main.c xrp_dtb.s
-xrp_host_single_SOURCES = host_main.c dsp_test.c
-xrp_host_hosted_LDADD = ../xrp-host/libxrp-host-hosted.a $(THREADS_LDFLAGS)
+xrp_host_standalone_CFLAGS = $(AM_CFLAGS) $(THREAD_CFLAGS)
 xrp_host_standalone_LDADD = ../xrp-host/libxrp-host-standalone.a $(THREADS_LDFLAGS) $(LIBFDT_LDFLAGS) -lfdt
+xrp_host_hosted_SOURCES = host_main.c
+xrp_host_hosted_CFLAGS = $(AM_CFLAGS) $(THREAD_CFLAGS)
+xrp_host_hosted_LDADD = ../xrp-host/libxrp-host-hosted.a $(THREADS_LDFLAGS)
+xrp_host_single_SOURCES = host_main.c dsp_test.c
 xrp_host_single_LDADD = ../xrp-host/libxrp-host-single.a $(THREADS_LDFLAGS)
 all: $(BUILT_SOURCES)
 	$(MAKE) $(AM_MAKEFLAGS) all-am
@@ -463,7 +475,7 @@ xrp-dsp-standalone$(EXEEXT): $(xrp_dsp_standalone_OBJECTS) $(xrp_dsp_standalone_
 
 xrp-host-hosted$(EXEEXT): $(xrp_host_hosted_OBJECTS) $(xrp_host_hosted_DEPENDENCIES) $(EXTRA_xrp_host_hosted_DEPENDENCIES) 
 	@rm -f xrp-host-hosted$(EXEEXT)
-	$(AM_V_CCLD)$(LINK) $(xrp_host_hosted_OBJECTS) $(xrp_host_hosted_LDADD) $(LIBS)
+	$(AM_V_CCLD)$(xrp_host_hosted_LINK) $(xrp_host_hosted_OBJECTS) $(xrp_host_hosted_LDADD) $(LIBS)
 
 xrp-host-single$(EXEEXT): $(xrp_host_single_OBJECTS) $(xrp_host_single_DEPENDENCIES) $(EXTRA_xrp_host_single_DEPENDENCIES) 
 	@rm -f xrp-host-single$(EXEEXT)
@@ -479,9 +491,14 @@ mostlyclean-compile:
 distclean-compile:
 	-rm -f *.tab.c
 
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/dsp_main.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/dsp_test.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/host_main.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/xrp_dsp_hosted-dsp_main.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/xrp_dsp_hosted-dsp_test.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/xrp_dsp_standalone-dsp_main.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/xrp_dsp_standalone-dsp_test.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/xrp_host_hosted-host_main.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/xrp_host_standalone-host_main.Po@am__quote@
 
 .c.o:
 @am__fastdepCC_TRUE@	$(AM_V_CC)depbase=`echo $@ | sed 's|[^/]*$$|$(DEPDIR)/&|;s|\.o$$||'`;\
@@ -498,6 +515,90 @@ distclean-compile:
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='$<' object='$@' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(COMPILE) -c -o $@ `$(CYGPATH_W) '$<'`
+
+xrp_dsp_hosted-dsp_main.o: dsp_main.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(xrp_dsp_hosted_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT xrp_dsp_hosted-dsp_main.o -MD -MP -MF $(DEPDIR)/xrp_dsp_hosted-dsp_main.Tpo -c -o xrp_dsp_hosted-dsp_main.o `test -f 'dsp_main.c' || echo '$(srcdir)/'`dsp_main.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/xrp_dsp_hosted-dsp_main.Tpo $(DEPDIR)/xrp_dsp_hosted-dsp_main.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='dsp_main.c' object='xrp_dsp_hosted-dsp_main.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(xrp_dsp_hosted_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o xrp_dsp_hosted-dsp_main.o `test -f 'dsp_main.c' || echo '$(srcdir)/'`dsp_main.c
+
+xrp_dsp_hosted-dsp_main.obj: dsp_main.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(xrp_dsp_hosted_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT xrp_dsp_hosted-dsp_main.obj -MD -MP -MF $(DEPDIR)/xrp_dsp_hosted-dsp_main.Tpo -c -o xrp_dsp_hosted-dsp_main.obj `if test -f 'dsp_main.c'; then $(CYGPATH_W) 'dsp_main.c'; else $(CYGPATH_W) '$(srcdir)/dsp_main.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/xrp_dsp_hosted-dsp_main.Tpo $(DEPDIR)/xrp_dsp_hosted-dsp_main.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='dsp_main.c' object='xrp_dsp_hosted-dsp_main.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(xrp_dsp_hosted_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o xrp_dsp_hosted-dsp_main.obj `if test -f 'dsp_main.c'; then $(CYGPATH_W) 'dsp_main.c'; else $(CYGPATH_W) '$(srcdir)/dsp_main.c'; fi`
+
+xrp_dsp_hosted-dsp_test.o: dsp_test.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(xrp_dsp_hosted_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT xrp_dsp_hosted-dsp_test.o -MD -MP -MF $(DEPDIR)/xrp_dsp_hosted-dsp_test.Tpo -c -o xrp_dsp_hosted-dsp_test.o `test -f 'dsp_test.c' || echo '$(srcdir)/'`dsp_test.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/xrp_dsp_hosted-dsp_test.Tpo $(DEPDIR)/xrp_dsp_hosted-dsp_test.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='dsp_test.c' object='xrp_dsp_hosted-dsp_test.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(xrp_dsp_hosted_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o xrp_dsp_hosted-dsp_test.o `test -f 'dsp_test.c' || echo '$(srcdir)/'`dsp_test.c
+
+xrp_dsp_hosted-dsp_test.obj: dsp_test.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(xrp_dsp_hosted_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT xrp_dsp_hosted-dsp_test.obj -MD -MP -MF $(DEPDIR)/xrp_dsp_hosted-dsp_test.Tpo -c -o xrp_dsp_hosted-dsp_test.obj `if test -f 'dsp_test.c'; then $(CYGPATH_W) 'dsp_test.c'; else $(CYGPATH_W) '$(srcdir)/dsp_test.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/xrp_dsp_hosted-dsp_test.Tpo $(DEPDIR)/xrp_dsp_hosted-dsp_test.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='dsp_test.c' object='xrp_dsp_hosted-dsp_test.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(xrp_dsp_hosted_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o xrp_dsp_hosted-dsp_test.obj `if test -f 'dsp_test.c'; then $(CYGPATH_W) 'dsp_test.c'; else $(CYGPATH_W) '$(srcdir)/dsp_test.c'; fi`
+
+xrp_dsp_standalone-dsp_main.o: dsp_main.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(xrp_dsp_standalone_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT xrp_dsp_standalone-dsp_main.o -MD -MP -MF $(DEPDIR)/xrp_dsp_standalone-dsp_main.Tpo -c -o xrp_dsp_standalone-dsp_main.o `test -f 'dsp_main.c' || echo '$(srcdir)/'`dsp_main.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/xrp_dsp_standalone-dsp_main.Tpo $(DEPDIR)/xrp_dsp_standalone-dsp_main.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='dsp_main.c' object='xrp_dsp_standalone-dsp_main.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(xrp_dsp_standalone_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o xrp_dsp_standalone-dsp_main.o `test -f 'dsp_main.c' || echo '$(srcdir)/'`dsp_main.c
+
+xrp_dsp_standalone-dsp_main.obj: dsp_main.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(xrp_dsp_standalone_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT xrp_dsp_standalone-dsp_main.obj -MD -MP -MF $(DEPDIR)/xrp_dsp_standalone-dsp_main.Tpo -c -o xrp_dsp_standalone-dsp_main.obj `if test -f 'dsp_main.c'; then $(CYGPATH_W) 'dsp_main.c'; else $(CYGPATH_W) '$(srcdir)/dsp_main.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/xrp_dsp_standalone-dsp_main.Tpo $(DEPDIR)/xrp_dsp_standalone-dsp_main.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='dsp_main.c' object='xrp_dsp_standalone-dsp_main.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(xrp_dsp_standalone_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o xrp_dsp_standalone-dsp_main.obj `if test -f 'dsp_main.c'; then $(CYGPATH_W) 'dsp_main.c'; else $(CYGPATH_W) '$(srcdir)/dsp_main.c'; fi`
+
+xrp_dsp_standalone-dsp_test.o: dsp_test.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(xrp_dsp_standalone_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT xrp_dsp_standalone-dsp_test.o -MD -MP -MF $(DEPDIR)/xrp_dsp_standalone-dsp_test.Tpo -c -o xrp_dsp_standalone-dsp_test.o `test -f 'dsp_test.c' || echo '$(srcdir)/'`dsp_test.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/xrp_dsp_standalone-dsp_test.Tpo $(DEPDIR)/xrp_dsp_standalone-dsp_test.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='dsp_test.c' object='xrp_dsp_standalone-dsp_test.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(xrp_dsp_standalone_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o xrp_dsp_standalone-dsp_test.o `test -f 'dsp_test.c' || echo '$(srcdir)/'`dsp_test.c
+
+xrp_dsp_standalone-dsp_test.obj: dsp_test.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(xrp_dsp_standalone_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT xrp_dsp_standalone-dsp_test.obj -MD -MP -MF $(DEPDIR)/xrp_dsp_standalone-dsp_test.Tpo -c -o xrp_dsp_standalone-dsp_test.obj `if test -f 'dsp_test.c'; then $(CYGPATH_W) 'dsp_test.c'; else $(CYGPATH_W) '$(srcdir)/dsp_test.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/xrp_dsp_standalone-dsp_test.Tpo $(DEPDIR)/xrp_dsp_standalone-dsp_test.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='dsp_test.c' object='xrp_dsp_standalone-dsp_test.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(xrp_dsp_standalone_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o xrp_dsp_standalone-dsp_test.obj `if test -f 'dsp_test.c'; then $(CYGPATH_W) 'dsp_test.c'; else $(CYGPATH_W) '$(srcdir)/dsp_test.c'; fi`
+
+xrp_host_hosted-host_main.o: host_main.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(xrp_host_hosted_CFLAGS) $(CFLAGS) -MT xrp_host_hosted-host_main.o -MD -MP -MF $(DEPDIR)/xrp_host_hosted-host_main.Tpo -c -o xrp_host_hosted-host_main.o `test -f 'host_main.c' || echo '$(srcdir)/'`host_main.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/xrp_host_hosted-host_main.Tpo $(DEPDIR)/xrp_host_hosted-host_main.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='host_main.c' object='xrp_host_hosted-host_main.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(xrp_host_hosted_CFLAGS) $(CFLAGS) -c -o xrp_host_hosted-host_main.o `test -f 'host_main.c' || echo '$(srcdir)/'`host_main.c
+
+xrp_host_hosted-host_main.obj: host_main.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(xrp_host_hosted_CFLAGS) $(CFLAGS) -MT xrp_host_hosted-host_main.obj -MD -MP -MF $(DEPDIR)/xrp_host_hosted-host_main.Tpo -c -o xrp_host_hosted-host_main.obj `if test -f 'host_main.c'; then $(CYGPATH_W) 'host_main.c'; else $(CYGPATH_W) '$(srcdir)/host_main.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/xrp_host_hosted-host_main.Tpo $(DEPDIR)/xrp_host_hosted-host_main.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='host_main.c' object='xrp_host_hosted-host_main.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(xrp_host_hosted_CFLAGS) $(CFLAGS) -c -o xrp_host_hosted-host_main.obj `if test -f 'host_main.c'; then $(CYGPATH_W) 'host_main.c'; else $(CYGPATH_W) '$(srcdir)/host_main.c'; fi`
+
+xrp_host_standalone-host_main.o: host_main.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(xrp_host_standalone_CFLAGS) $(CFLAGS) -MT xrp_host_standalone-host_main.o -MD -MP -MF $(DEPDIR)/xrp_host_standalone-host_main.Tpo -c -o xrp_host_standalone-host_main.o `test -f 'host_main.c' || echo '$(srcdir)/'`host_main.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/xrp_host_standalone-host_main.Tpo $(DEPDIR)/xrp_host_standalone-host_main.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='host_main.c' object='xrp_host_standalone-host_main.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(xrp_host_standalone_CFLAGS) $(CFLAGS) -c -o xrp_host_standalone-host_main.o `test -f 'host_main.c' || echo '$(srcdir)/'`host_main.c
+
+xrp_host_standalone-host_main.obj: host_main.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(xrp_host_standalone_CFLAGS) $(CFLAGS) -MT xrp_host_standalone-host_main.obj -MD -MP -MF $(DEPDIR)/xrp_host_standalone-host_main.Tpo -c -o xrp_host_standalone-host_main.obj `if test -f 'host_main.c'; then $(CYGPATH_W) 'host_main.c'; else $(CYGPATH_W) '$(srcdir)/host_main.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/xrp_host_standalone-host_main.Tpo $(DEPDIR)/xrp_host_standalone-host_main.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='host_main.c' object='xrp_host_standalone-host_main.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(xrp_host_standalone_CFLAGS) $(CFLAGS) -c -o xrp_host_standalone-host_main.obj `if test -f 'host_main.c'; then $(CYGPATH_W) 'host_main.c'; else $(CYGPATH_W) '$(srcdir)/host_main.c'; fi`
 
 .s.o:
 	$(AM_V_CCAS)$(CCASCOMPILE) -c -o $@ $<

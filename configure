@@ -630,6 +630,18 @@ HW_PORT
 DTC
 LIBFDT_LDFLAGS
 LIBFDT_CPPFLAGS
+BUILD_EXAMPLE_FALSE
+BUILD_EXAMPLE_TRUE
+BUILD_SINGLE_FALSE
+BUILD_SINGLE_TRUE
+BUILD_HOSTED_FALSE
+BUILD_HOSTED_TRUE
+BUILD_STANDALONE_FALSE
+BUILD_STANDALONE_TRUE
+BUILD_DSP_FALSE
+BUILD_DSP_TRUE
+BUILD_HOST_FALSE
+BUILD_HOST_TRUE
 USE_THREADS_FALSE
 USE_THREADS_TRUE
 HOST_OS_LINUX_FALSE
@@ -641,16 +653,6 @@ HOST_OS
 EGREP
 GREP
 CPP
-BUILD_EXAMPLE_FALSE
-BUILD_EXAMPLE_TRUE
-BUILD_SINGLE_FALSE
-BUILD_SINGLE_TRUE
-BUILD_HOSTED_FALSE
-BUILD_HOSTED_TRUE
-BUILD_STANDALONE_FALSE
-BUILD_STANDALONE_TRUE
-BUILD_DSP_FALSE
-BUILD_DSP_TRUE
 host_os
 host_vendor
 host_cpu
@@ -753,12 +755,13 @@ ac_user_opts='
 enable_option_checking
 enable_silent_rules
 enable_dependency_tracking
+enable_threads
+enable_host
 enable_dsp
 enable_standalone
 enable_hosted
 enable_single
 enable_example
-enable_threads
 with_libfdt
 enable_port
 '
@@ -1412,12 +1415,13 @@ Optional Features:
                           do not reject slow dependency extractors
   --disable-dependency-tracking
                           speeds up one-time build
-  --enable-dsp            build DSP XRP library [no]
-  --enable-standalone     build standalone library/example [no]
-  --enable-hosted         build hosted library/example [yes]
-  --enable-single         build single library/example [no]
-  --enable-example        build example application [no]
   --enable-threads        enable thread support [detect]
+  --enable-host           build host XRP library [yes]
+  --enable-dsp            build DSP XRP library [detect]
+  --enable-standalone     build standalone library/example [yes]
+  --enable-hosted         build hosted library/example [detect]
+  --enable-single         build single library/example [yes]
+  --enable-example        build example application [no]
   --enable-port[=ARG]     enable port ARG [simple]
 
 Optional Packages:
@@ -1438,8 +1442,7 @@ Some influential environment variables:
   CPP         C preprocessor
   DSP_LSP     use specific Xtensa LSP for example firmware
   DSP_COMM_BASE
-              DSP communication base address for fast simulation example
-              firmware
+              DSP communication base address for standalone example firmware
   DSP_CACHEATTR
               default DSP memmap cacheattr for example firmware
   DTC         Device Tree Compiler to use
@@ -4171,106 +4174,6 @@ case $host_os in *\ *) host_os=`echo "$host_os" | sed 's/ /-/g'`;; esac
 ac_config_files="$ac_config_files Makefile xrp-common/Makefile xrp-dsp/Makefile xrp-example/Makefile xrp-host/Makefile"
 
 
-# Check whether --enable-dsp was given.
-if test "${enable_dsp+set}" = set; then :
-  enableval=$enable_dsp; if test "x${enableval}" = xno; then :
-  build_dsp=false
-else
-  build_dsp=true
-fi
-else
-  build_dsp=false
-fi
-
- if test x$build_dsp = xtrue; then
-  BUILD_DSP_TRUE=
-  BUILD_DSP_FALSE='#'
-else
-  BUILD_DSP_TRUE='#'
-  BUILD_DSP_FALSE=
-fi
-
-
-# Check whether --enable-standalone was given.
-if test "${enable_standalone+set}" = set; then :
-  enableval=$enable_standalone; if test "x${enableval}" = xno; then :
-  build_standalone=false
-else
-  build_standalone=true
-fi
-else
-  build_standalone=false
-fi
-
- if test x$build_standalone = xtrue; then
-  BUILD_STANDALONE_TRUE=
-  BUILD_STANDALONE_FALSE='#'
-else
-  BUILD_STANDALONE_TRUE='#'
-  BUILD_STANDALONE_FALSE=
-fi
-
-
-# Check whether --enable-hosted was given.
-if test "${enable_hosted+set}" = set; then :
-  enableval=$enable_hosted; if test "x${enableval}" = xno; then :
-  build_hosted=false
-else
-  build_hosted=true
-fi
-else
-  build_hosted=true
-fi
-
- if test x$build_hosted = xtrue; then
-  BUILD_HOSTED_TRUE=
-  BUILD_HOSTED_FALSE='#'
-else
-  BUILD_HOSTED_TRUE='#'
-  BUILD_HOSTED_FALSE=
-fi
-
-
-# Check whether --enable-single was given.
-if test "${enable_single+set}" = set; then :
-  enableval=$enable_single; if test "x${enableval}" = xno; then :
-  build_single=false
-else
-  build_single=true
-fi
-else
-  build_single=false
-fi
-
- if test x$build_single = xtrue; then
-  BUILD_SINGLE_TRUE=
-  BUILD_SINGLE_FALSE='#'
-else
-  BUILD_SINGLE_TRUE='#'
-  BUILD_SINGLE_FALSE=
-fi
-
-
-# Check whether --enable-example was given.
-if test "${enable_example+set}" = set; then :
-  enableval=$enable_example; if test "x${enableval}" = xno; then :
-  build_example=false
-else
-  build_example=true
-fi
-else
-  build_example=false
-fi
-
- if test x$build_example = xtrue; then
-  BUILD_EXAMPLE_TRUE=
-  BUILD_EXAMPLE_FALSE='#'
-else
-  BUILD_EXAMPLE_TRUE='#'
-  BUILD_EXAMPLE_FALSE=
-fi
-
-
 # Check whether --enable-threads was given.
 if test "${enable_threads+set}" = set; then :
   enableval=$enable_threads; if test "x${enableval}" = xno; then :
@@ -4734,6 +4637,137 @@ else
 fi
 
 
+# Check whether --enable-host was given.
+if test "${enable_host+set}" = set; then :
+  enableval=$enable_host; if test "x${enableval}" = xno; then :
+  build_host=false
+else
+  build_host=true
+fi
+else
+  build_host=true
+fi
+
+ if test x$build_host = xtrue; then
+  BUILD_HOST_TRUE=
+  BUILD_HOST_FALSE='#'
+else
+  BUILD_HOST_TRUE='#'
+  BUILD_HOST_FALSE=
+fi
+
+
+# Check whether --enable-dsp was given.
+if test "${enable_dsp+set}" = set; then :
+  enableval=$enable_dsp; if test "x${enableval}" = xno; then :
+  build_dsp=false
+else
+  build_dsp=true
+fi
+else
+  case "$host_cpu" in
+	       xtensa*)
+			build_dsp=true
+			;;
+	       *)
+			build_dsp=false
+			;;
+	       esac
+fi
+
+ if test x$build_dsp = xtrue; then
+  BUILD_DSP_TRUE=
+  BUILD_DSP_FALSE='#'
+else
+  BUILD_DSP_TRUE='#'
+  BUILD_DSP_FALSE=
+fi
+
+
+# Check whether --enable-standalone was given.
+if test "${enable_standalone+set}" = set; then :
+  enableval=$enable_standalone; if test "x${enableval}" = xno; then :
+  build_standalone=false
+else
+  build_standalone=true
+fi
+else
+  build_standalone=true
+fi
+
+ if test x$build_standalone = xtrue; then
+  BUILD_STANDALONE_TRUE=
+  BUILD_STANDALONE_FALSE='#'
+else
+  BUILD_STANDALONE_TRUE='#'
+  BUILD_STANDALONE_FALSE=
+fi
+
+
+# Check whether --enable-hosted was given.
+if test "${enable_hosted+set}" = set; then :
+  enableval=$enable_hosted; if test "x${enableval}" = xno; then :
+  build_hosted=false
+else
+  build_hosted=true
+fi
+else
+  if test "x${HOST_OS}" = xlinux; then :
+  build_hosted=true
+else
+  build_hosted=false
+fi
+fi
+
+ if test x$build_hosted = xtrue; then
+  BUILD_HOSTED_TRUE=
+  BUILD_HOSTED_FALSE='#'
+else
+  BUILD_HOSTED_TRUE='#'
+  BUILD_HOSTED_FALSE=
+fi
+
+
+# Check whether --enable-single was given.
+if test "${enable_single+set}" = set; then :
+  enableval=$enable_single; if test "x${enableval}" = xno; then :
+  build_single=false
+else
+  build_single=true
+fi
+else
+  build_single=true
+fi
+
+ if test x$build_single = xtrue; then
+  BUILD_SINGLE_TRUE=
+  BUILD_SINGLE_FALSE='#'
+else
+  BUILD_SINGLE_TRUE='#'
+  BUILD_SINGLE_FALSE=
+fi
+
+
+# Check whether --enable-example was given.
+if test "${enable_example+set}" = set; then :
+  enableval=$enable_example; if test "x${enableval}" = xno; then :
+  build_example=false
+else
+  build_example=true
+fi
+else
+  build_example=false
+fi
+
+ if test x$build_example = xtrue; then
+  BUILD_EXAMPLE_TRUE=
+  BUILD_EXAMPLE_FALSE='#'
+else
+  BUILD_EXAMPLE_TRUE='#'
+  BUILD_EXAMPLE_FALSE=
+fi
+
+
 
 # Check whether --with-libfdt was given.
 if test "${with_libfdt+set}" = set; then :
@@ -4787,7 +4821,7 @@ rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
 
 fi
 
-if test x$build_dsp = xfalse -a x$build_standalone = xtrue; then :
+if test x$build_host = xtrue -a x$build_standalone = xtrue; then :
 
       for ac_header in valgrind/memcheck.h
 do :
@@ -4804,7 +4838,7 @@ done
 
 fi
 
-if test x$build_dsp = xfalse -a x$build_example = xtrue -a x$build_standalone = xtrue; then :
+if test x$build_host = xtrue -a x$build_standalone = xtrue -a x$build_example = xtrue; then :
 
       saved_CPPFLAGS="$CPPFLAGS"
       saved_LDFLAGS="$LDFLAGS"
@@ -4981,6 +5015,25 @@ DSP_CACHEATTR="${DSP_CACHEATTR:-0x44441141}"
 
 
 
+{ $as_echo "$as_me:${as_lineno-$LINENO}:
+
+  Building host code:            ${build_host}
+  Building DSP code:             ${build_dsp}
+  Building hosted code:          ${build_hosted}
+  Building standalone code:      ${build_standalone}
+  Building single image code:    ${build_single}
+  Using threads:                 ${use_threads}
+" >&5
+$as_echo "$as_me:
+
+  Building host code:            ${build_host}
+  Building DSP code:             ${build_dsp}
+  Building hosted code:          ${build_hosted}
+  Building standalone code:      ${build_standalone}
+  Building single image code:    ${build_single}
+  Using threads:                 ${use_threads}
+" >&6;}
+
 cat >confcache <<\_ACEOF
 # This file is a shell script that caches the results of configure
 # tests run on this system so they can be shared between configure
@@ -5154,6 +5207,18 @@ if test -z "${am__fastdepCCAS_TRUE}" && test -z "${am__fastdepCCAS_FALSE}"; then
   as_fn_error $? "conditional \"am__fastdepCCAS\" was never defined.
 Usually this means the macro was only invoked conditionally." "$LINENO" 5
 fi
+if test -z "${HOST_OS_LINUX_TRUE}" && test -z "${HOST_OS_LINUX_FALSE}"; then
+  as_fn_error $? "conditional \"HOST_OS_LINUX\" was never defined.
+Usually this means the macro was only invoked conditionally." "$LINENO" 5
+fi
+if test -z "${USE_THREADS_TRUE}" && test -z "${USE_THREADS_FALSE}"; then
+  as_fn_error $? "conditional \"USE_THREADS\" was never defined.
+Usually this means the macro was only invoked conditionally." "$LINENO" 5
+fi
+if test -z "${BUILD_HOST_TRUE}" && test -z "${BUILD_HOST_FALSE}"; then
+  as_fn_error $? "conditional \"BUILD_HOST\" was never defined.
+Usually this means the macro was only invoked conditionally." "$LINENO" 5
+fi
 if test -z "${BUILD_DSP_TRUE}" && test -z "${BUILD_DSP_FALSE}"; then
   as_fn_error $? "conditional \"BUILD_DSP\" was never defined.
 Usually this means the macro was only invoked conditionally." "$LINENO" 5
@@ -5172,14 +5237,6 @@ Usually this means the macro was only invoked conditionally." "$LINENO" 5
 fi
 if test -z "${BUILD_EXAMPLE_TRUE}" && test -z "${BUILD_EXAMPLE_FALSE}"; then
   as_fn_error $? "conditional \"BUILD_EXAMPLE\" was never defined.
-Usually this means the macro was only invoked conditionally." "$LINENO" 5
-fi
-if test -z "${HOST_OS_LINUX_TRUE}" && test -z "${HOST_OS_LINUX_FALSE}"; then
-  as_fn_error $? "conditional \"HOST_OS_LINUX\" was never defined.
-Usually this means the macro was only invoked conditionally." "$LINENO" 5
-fi
-if test -z "${USE_THREADS_TRUE}" && test -z "${USE_THREADS_FALSE}"; then
-  as_fn_error $? "conditional \"USE_THREADS\" was never defined.
 Usually this means the macro was only invoked conditionally." "$LINENO" 5
 fi
 
