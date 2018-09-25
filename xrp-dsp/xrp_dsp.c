@@ -25,12 +25,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <xtensa/tie/xt_sync.h>
 #include <xtensa/xtruntime.h>
 
 #include "xrp_api.h"
 #include "xrp_debug.h"
 #include "xrp_dsp_hw.h"
+#include "xrp_dsp_sync.h"
 #include "xrp_ns.h"
 #include "xrp_types.h"
 #include "xrp_kernel_dsp_interface.h"
@@ -294,19 +294,19 @@ static void do_handshake(struct xrp_dsp_sync *shared_sync)
 
 	pr_debug("%s, shared_sync = %p\n", __func__, shared_sync);
 
-	while (XT_L32AI(&shared_sync->sync, 0) != XRP_DSP_SYNC_START) {
+	while (xrp_l32ai(&shared_sync->sync) != XRP_DSP_SYNC_START) {
 		dcache_region_invalidate(&shared_sync->sync,
 					 sizeof(shared_sync->sync));
 	}
 
-	XT_S32RI(XRP_DSP_SYNC_DSP_READY, &shared_sync->sync, 0);
+	xrp_s32ri(XRP_DSP_SYNC_DSP_READY, &shared_sync->sync);
 	dcache_region_writeback(&shared_sync->sync,
 				sizeof(shared_sync->sync));
 
 	for (;;) {
 		dcache_region_invalidate(&shared_sync->sync,
 					 sizeof(shared_sync->sync));
-		v = XT_L32AI(&shared_sync->sync, 0);
+		v = xrp_l32ai(&shared_sync->sync);
 		if (v == XRP_DSP_SYNC_HOST_TO_DSP)
 			break;
 		if (v != XRP_DSP_SYNC_DSP_READY)
@@ -315,7 +315,7 @@ static void do_handshake(struct xrp_dsp_sync *shared_sync)
 
 	xrp_hw_set_sync_data(shared_sync->hw_sync_data);
 
-	XT_S32RI(XRP_DSP_SYNC_DSP_TO_HOST, &shared_sync->sync, 0);
+	xrp_s32ai(XRP_DSP_SYNC_DSP_TO_HOST, &shared_sync->sync);
 	dcache_region_writeback(&shared_sync->sync,
 				sizeof(shared_sync->sync));
 
@@ -329,7 +329,7 @@ static void do_handshake(struct xrp_dsp_sync *shared_sync)
 static inline int xrp_request_valid(struct xrp_dsp_cmd *dsp_cmd,
 				    uint32_t *pflags)
 {
-	uint32_t flags = XT_L32AI(&dsp_cmd->flags, 0);
+	uint32_t flags = xrp_l32ai(&dsp_cmd->flags);
 
 	*pflags = flags;
 	return (flags & (XRP_DSP_CMD_FLAG_REQUEST_VALID |
@@ -344,7 +344,7 @@ static void complete_request(struct xrp_dsp_cmd *dsp_cmd, uint32_t flags)
 
 	dcache_region_writeback(dsp_cmd,
 				sizeof(*dsp_cmd));
-	XT_S32RI(flags, &dsp_cmd->flags, 0);
+	xrp_s32ri(flags, &dsp_cmd->flags);
 	dcache_region_writeback(&dsp_cmd->flags,
 				sizeof(dsp_cmd->flags));
 	xrp_hw_send_host_irq();

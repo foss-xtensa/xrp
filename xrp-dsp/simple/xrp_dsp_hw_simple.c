@@ -24,11 +24,11 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <xtensa/tie/xt_interrupt.h>
-#include <xtensa/tie/xt_sync.h>
 #include <xtensa/xtruntime.h>
 
-#include "xrp_dsp_hw.h"
 #include "xrp_debug.h"
+#include "xrp_dsp_hw.h"
+#include "xrp_dsp_sync.h"
 #include "xrp_types.h"
 #include "xrp_hw_simple_dsp_interface.h"
 
@@ -57,17 +57,17 @@ static void xrp_irq_handler(void)
 {
 	pr_debug("%s\n", __func__);
 	if (device_irq_mode == XRP_IRQ_LEVEL)
-		XT_S32RI(0, device_mmio(device_irq_offset), 0);
+		xrp_s32ri(0, device_mmio(device_irq_offset));
 }
 
 void xrp_hw_send_host_irq(void)
 {
 	switch (host_irq_mode) {
 	case XRP_IRQ_EDGE:
-		XT_S32RI(0, host_mmio(host_irq_offset), 0);
+		xrp_s32ri(0, host_mmio(host_irq_offset));
 		/* fall through */
 	case XRP_IRQ_LEVEL:
-		XT_S32RI(1u << host_irq_bit, host_mmio(host_irq_offset), 0);
+		xrp_s32ri(1u << host_irq_bit, host_mmio(host_irq_offset));
 		break;
 	default:
 		break;

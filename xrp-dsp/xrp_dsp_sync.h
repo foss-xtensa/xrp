@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016 - 2017 Cadence Design Systems Inc.
+ * Copyright (c) 2018 Cadence Design Systems Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -21,43 +21,38 @@
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <stdint.h>
-#include <stdio.h>
-#include <xtensa/xtruntime.h>
+#ifndef XRP_DSP_SYNC_H
+#define XRP_DSP_SYNC_H
 
-#include "xrp_api.h"
-#include "xrp_dsp_hw.h"
+#ifdef HAVE_XTENSA_TIE_XT_SYNC_H
+#include <xtensa/tie/xt_sync.h>
+#else
+#include <xtensa/tie/xt_core.h>
+#endif
 
-static enum xrp_status run_command_loop(void)
+#ifdef HAVE_XTENSA_TIE_XT_SYNC_H
+static inline uint32_t xrp_l32ai(volatile void *p)
 {
-	enum xrp_status status;
-	struct xrp_device *device = xrp_open_device(0, &status);
-
-	if (status != XRP_STATUS_SUCCESS)
-		return status;
-
-	for (;;) {
-		status = xrp_device_dispatch(device);
-		if (status == XRP_STATUS_PENDING)
-			xrp_hw_wait_device_irq();
-		else if (status != XRP_STATUS_SUCCESS)
-			return status;
-	}
+	return XT_L32AI(p, 0);
 }
 
-void xrp_user_initialize(enum xrp_status *status) __attribute__((weak));
-void xrp_user_initialize(enum xrp_status *status)
+static inline void xrp_s32ri(uint32_t v, volatile void *p)
 {
-	*status = XRP_STATUS_SUCCESS;
+	XT_S32RI(v, p, 0);
+}
+#else
+static inline uint32_t xrp_l32ai(volatile void *p)
+{
+	uint32_t v = *(const volatile uint32_t *)p;
+	XT_MEMW();
+	return v;
 }
 
-int main()
+static inline void xrp_s32ri(uint32_t v, volatile void *p)
 {
-	enum xrp_status status = XRP_STATUS_SUCCESS;
-
-	xrp_user_initialize(&status);
-
-	if (status != XRP_STATUS_SUCCESS)
-		return status;
-	return run_command_loop();
+	XT_MEMW();
+	*(volatile uint32_t *)p = v;
 }
+#endif
+
+#endif
