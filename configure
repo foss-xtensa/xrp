@@ -4789,7 +4789,36 @@ fi
 
 
 
-if test x$build_dsp = xfalse; then :
+if test x$build_dsp = xtrue; then :
+
+      for ac_header in xtensa/tie/xt_sync.h
+do :
+  ac_fn_c_check_header_mongrel "$LINENO" "xtensa/tie/xt_sync.h" "ac_cv_header_xtensa_tie_xt_sync_h" "$ac_includes_default"
+if test "x$ac_cv_header_xtensa_tie_xt_sync_h" = xyes; then :
+  cat >>confdefs.h <<_ACEOF
+#define HAVE_XTENSA_TIE_XT_SYNC_H 1
+_ACEOF
+
+fi
+
+done
+
+      for ac_header in xtensa/tie/xt_interrupt.h
+do :
+  ac_fn_c_check_header_mongrel "$LINENO" "xtensa/tie/xt_interrupt.h" "ac_cv_header_xtensa_tie_xt_interrupt_h" "$ac_includes_default"
+if test "x$ac_cv_header_xtensa_tie_xt_interrupt_h" = xyes; then :
+  cat >>confdefs.h <<_ACEOF
+#define HAVE_XTENSA_TIE_XT_INTERRUPT_H 1
+_ACEOF
+
+fi
+
+done
+
+
+fi
+
+if test x$build_host = xtrue; then :
 
       { $as_echo "$as_me:${as_lineno-$LINENO}: checking for working _Atomic support" >&5
 $as_echo_n "checking for working _Atomic support... " >&6; }
