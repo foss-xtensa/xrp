@@ -555,76 +555,66 @@ sequence. Generated makefile supports all standard targets, e.g. 'make install'
 would install generated library and header file into selected directory
 structure.
 
-One build directory may be configured to build code either for the host or for
-the DSP, but not for both. This behavior is controlled by the configure switch
-'--enable-dsp'.
+Normally one build directory is configured per host architecture, so, e.g. to
+build libraries for a hosted (arm64 + xtensa DSP) system two build directories
+are needed: one for the host code (arm64) and one for the DSP code (xtensa).
 
-Switches '--enable-hosted' (on by default), '--enable-standalone' (off by
-default) and '--enable-single' (off by default) enable building of hosted
-variant of library/example, standalone variant or single image variant
-respectively.
+Switches '--enable-host' (on by default) and '--enable-dsp' (on when host
+triplet specifies xtensa host) enable building of host and DSP libraries and
+examples respectively.
+
+Switches '--enable-hosted' (on when host triplet specifies linux host),
+'--enable-standalone' (on by default) and '--enable-single' (on by default)
+enable building of hosted variant of library/example, standalone variant or
+single image variant respectively.
 
 Switch '--enable-threads' (detect by default) enables or disables use of
 thread library for asynchronous processing. When omitted the configure script
 checks for POSIX or XOS threads availability.
 
-- Xtensa DSP code needs an xcc-based toolchain. Provide the following
-  environment variable to the configure or to make:
+- Xtensa code needs an xcc-based toolchain. Provide the following environment
+  variable to the configure or to make:
   - CC: name of the compiler together with the DSP xtensa core specification.
-  Without any other options this will produce DSP XRP library
+  Without any other options this will produce all host and DSP XRP libraries
+  for xtensa:
+
+  xrp-host/libxrp-host-standalone.a
+  xrp-host/libxrp-host-single.a
+  xrp-common/libxrp-common.a
+  xrp-dsp/simple/libxrp-dsp-hw-simple.a
   xrp-dsp/libxrp-dsp.a
 
-  $ ./configure --host=xtensa-elf --enable-dsp CC=xt-xcc
+  $ ./configure --host=xtensa-elf CC=xt-xcc
   $ make
 
 - host side code needs a toolchain for the host. Without additional
-  switches the following will produce linux XRP library for hosted mode,
-  xrp-host/libxrp-host-hosted.a:
+  switches the following will produce linux XRP libraries for hosted,
+  standalone and single-image modes:
+
+  xrp-host/libxrp-host-standalone.a
+  xrp-host/libxrp-host-hosted.a
+  xrp-host/libxrp-host-single.a
+  xrp-common/libxrp-common.a
 
   $ ./configure
-  $ make
-
-  The following will produce linux XRP library for standalone mode,
-  xrp-host/libxrp-host-standalone.a:
-
-  $ ./configure --enable-standalone --disable-hosted
-  $ make
-
-  The following will produce bare-metal XRP library for standalone mode,
-  xrp-host/libxrp-host-standalone.a:
-
-  $ ./configure --host=xtensa-elf --enable-standalone --disable-hosted \
-    CC=xt-xcc
-  $ make
-
-  The following will produce linux XRP library for single image mode,
-  xrp-host/libxrp-host-single.a:
-
-  $ ./configure --enable-single --disable-hosted
-  $ make
-
-  The following will produce bare-metal XRP library for single image mode,
-  xrp-host/libxrp-host-single.a:
-
-  $ ./configure --host=xtensa-elf --enable-single --disable-hosted \
-    CC=xt-xcc
   $ make
 
 
 Building XRP examples.
 =====================
 
-An example application may be built in addition to the XRP library. The switch
-'--enable-standalone' configures for building standalone library or example.
-Not specifying it or specifying '--disable-standalone' configures for building
-hosted library or example.
+Example applications may be built in addition to the XRP libraries. The switch
+'--enable-standalone' controls building of the standalone libraries and
+examples. The switch '--enable-hosted' controls building of the hosted
+libraries and examples.
 
-- adding switch '--enable-example' to the DSP build configuration will produce
-  example firmware for hosted mode. Provide the following environment variable
-  to the configure or make:
+- adding switch '--enable-example' to the hosted DSP build configuration will
+  produce example firmware for hosted mode. Provide the following environment
+  variable to the configure or make:
   - DSP_LSP: path to the LSP to be used.
 
-  $ ./configure --host=xtensa-elf --enable-dsp --enable-example \
+  $ ./configure --host=xtensa-elf --disable-host --disable-standalone \
+    --enable-example \
     DSP_LSP=MW-MP/P6_0/xtensa-elf/lib/sim-stacklocal \
     CC='xt-xcc --xtensa-core=visionp6cnn_ao_exls'
   $ make
@@ -634,13 +624,13 @@ hosted library or example.
   its name need to be specified in the "firmware" parameter inside the xrp
   device node in the device tree.
 
-- adding switches '--enable-example' '--enable-standalone' to the DSP build
-  configuration will produce example firmware for standalone mode. Provide
-  the following environment variable to the configure or make:
+- adding switch '--enable-example' to the standalone DSP build configuration
+  will produce example firmware for standalone mode. Provide the following
+  environment variable to the configure or make:
   - DSP_COMM_BASE: base address of the DSP communication area.
 
-  $ ./configure --host=xtensa-elf --enable-dsp --enable-example \
-    --enable-standalone \
+  $ ./configure --host=xtensa-elf --disable-host --disable-hosted \
+    --enable-standalone --enable-example \
     DSP_LSP=MW-MP/P6_0/xtensa-elf/lib/sim-stacklocal \
     DSP_COMM_BASE=0xf0000000 \
     CC='xt-xcc --xtensa-core=visionp6cnn_ao_exls'
@@ -650,31 +640,21 @@ hosted library or example.
   firmware a path to it needs to be passed to the XTSC.
 
 - adding switch '--enable-example' to the linux host build configuration will
-  produce example linux host application for hosted mode.
+  produce example linux host applications for hosted, standalone and
+  single-image modes:
+
+  xrp-example/xrp-host-hosted
+  xrp-example/xrp-host-single
+  xrp-example/xrp-host-standalone
 
   $ ./configure --enable-example
   $ make
 
-  The result is xrp-example/xrp-host-hosted.
+- the following will produce bare-metal examples for standalone and
+  single-image modes:
 
-- adding switches '--enable-example' '--enable-standalone' to the linux build
-  configuration will produce example linux application for standalone mode.
-
-  $ ./configure --enable-example --enable-standalone
-  $ make
-
-  The result is xrp-example/xrp-host-standalone.
-
-- the following will produce bare-metal example for standalone mode,
+  xrp-example/xrp-host-single
   xrp-example/xrp-host-standalone
 
-  $ ./configure --host=xtensa-elf --enable-example --enable-standalone \
-    --disable-hosted CC=xt-xcc
+  $ ./configure --host=xtensa-elf CC=xt-xcc --enable-example
   $ make
-
-- the following will produce bare-metal example for single-image mode,
-  xrp-example/xrp-host-single
-
-  $ ./configure --host=xtensa-elf --enable-example --enable-single \
-    --disable-hosted CC=xt-xcc
-  $ make LDFLAGS="-Wl,--defsym,xrp_xos_thread_stack_size=0x2000"
