@@ -118,6 +118,7 @@ bin_PROGRAMS = $(am__EXEEXT_1) $(am__EXEEXT_2) $(am__EXEEXT_3) \
 @BUILD_HOSTED_TRUE@@BUILD_HOST_TRUE@am__append_3 = xrp-host-hosted
 @BUILD_DSP_TRUE@@BUILD_HOSTED_TRUE@am__append_4 = xrp-dsp-hosted
 @BUILD_HOST_TRUE@@BUILD_SINGLE_TRUE@am__append_5 = xrp-host-single
+@HOST_OS_LINUX_TRUE@am__append_6 = -lrt
 subdir = xrp-example
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/configure.ac
@@ -169,9 +170,9 @@ am_xrp_host_standalone_OBJECTS =  \
 xrp_host_standalone_OBJECTS = $(am_xrp_host_standalone_OBJECTS)
 xrp_host_standalone_DEPENDENCIES =  \
 	../xrp-host/libxrp-host-standalone.a $(am__DEPENDENCIES_1) \
-	$(am__DEPENDENCIES_1)
+	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
 xrp_host_standalone_LINK = $(CCLD) $(xrp_host_standalone_CFLAGS) \
-	$(CFLAGS) $(xrp_host_standalone_LDFLAGS) $(LDFLAGS) -o $@
+	$(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o $@
 AM_V_P = $(am__v_P_@AM_V@)
 am__v_P_ = $(am__v_P_@AM_DEFAULT_V@)
 am__v_P_0 = false
@@ -356,7 +357,6 @@ AM_CPPFLAGS = -I$(srcdir)/.. -I$(srcdir)/../xrp-common
 AM_CFLAGS = -W -Wall
 @BUILD_HOST_TRUE@@BUILD_STANDALONE_TRUE@BUILT_SOURCES = xrp.dtb
 @BUILD_HOST_TRUE@@BUILD_STANDALONE_TRUE@CLEANFILES = xrp.dtb
-@HOST_OS_LINUX_TRUE@xrp_host_standalone_LDFLAGS = -lrt
 dsp_cppflags = $(AM_CPPFLAGS) -I$(srcdir)/../xrp-dsp
 dsp_ldflags = $(AM_LDFLAGS) \
 	      -mlsp=$(DSP_LSP) \
@@ -382,7 +382,8 @@ xrp_dsp_hosted_LDADD = ../xrp-dsp/libxrp-dsp.a \
 
 xrp_host_standalone_SOURCES = host_main.c xrp_dtb.s
 xrp_host_standalone_CFLAGS = $(AM_CFLAGS) $(THREAD_CFLAGS)
-xrp_host_standalone_LDADD = ../xrp-host/libxrp-host-standalone.a $(THREADS_LDFLAGS) $(LIBFDT_LDFLAGS) -lfdt
+xrp_host_standalone_LDADD = ../xrp-host/libxrp-host-standalone.a \
+	$(THREADS_LDFLAGS) $(LIBFDT_LDFLAGS) -lfdt $(am__append_6)
 xrp_host_hosted_SOURCES = host_main.c
 xrp_host_hosted_CFLAGS = $(AM_CFLAGS) $(THREAD_CFLAGS)
 xrp_host_hosted_LDADD = ../xrp-host/libxrp-host-hosted.a $(THREADS_LDFLAGS)
