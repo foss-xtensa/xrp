@@ -52,10 +52,6 @@ bin_PROGRAMS += xrp-host-single
 endif
 endif
 
-if HOST_OS_LINUX
-xrp_host_standalone_LDFLAGS = -lrt
-endif
-
 dsp_cppflags = $(AM_CPPFLAGS) -I$(srcdir)/../xrp-dsp
 dsp_ldflags = $(AM_LDFLAGS) \
 	      -mlsp=$(DSP_LSP) \
@@ -80,6 +76,10 @@ xrp_dsp_hosted_LDADD = ../xrp-dsp/libxrp-dsp.a \
 xrp_host_standalone_SOURCES = host_main.c xrp_dtb.s
 xrp_host_standalone_CFLAGS = $(AM_CFLAGS) $(THREAD_CFLAGS)
 xrp_host_standalone_LDADD = ../xrp-host/libxrp-host-standalone.a $(THREADS_LDFLAGS) $(LIBFDT_LDFLAGS) -lfdt
+
+if HOST_OS_LINUX
+xrp_host_standalone_LDADD += -lrt
+endif
 
 xrp_host_hosted_SOURCES = host_main.c
 xrp_host_hosted_CFLAGS = $(AM_CFLAGS) $(THREAD_CFLAGS)
