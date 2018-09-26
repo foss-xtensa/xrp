@@ -117,7 +117,7 @@ static inline int xrp_thread_create(xrp_thread *thread,
 	int32_t rc;
 
 	if (!thread_stack_size)
-		thread_stack_size = XOS_STACK_MIN_SIZE;
+		thread_stack_size = 0x2000 + XOS_STACK_EXTRA;
 
 	stack = malloc(thread_stack_size);
 	if (stack == NULL)
