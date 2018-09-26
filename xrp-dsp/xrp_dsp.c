@@ -315,7 +315,7 @@ static void do_handshake(struct xrp_dsp_sync *shared_sync)
 
 	xrp_hw_set_sync_data(shared_sync->hw_sync_data);
 
-	xrp_s32ai(XRP_DSP_SYNC_DSP_TO_HOST, &shared_sync->sync);
+	xrp_s32ri(XRP_DSP_SYNC_DSP_TO_HOST, &shared_sync->sync);
 	dcache_region_writeback(&shared_sync->sync,
 				sizeof(shared_sync->sync));
 
