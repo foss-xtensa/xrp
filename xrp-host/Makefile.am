@@ -52,7 +52,7 @@ libxrp_host_standalone_a_SOURCES = xrp_host_common.c \
 				   $(queue_sources) \
 				   standalone/xrp_host.c \
 				   standalone/xrp_@HOST_OS@.c \
-				   standalone/xrp_alloc.c
+				   ../xrp-kernel/xrp_alloc.c
 
 libxrp_host_hosted_a_CPPFLAGS = $(AM_CPPFLAGS) \
 				-I$(srcdir)/hosted \
