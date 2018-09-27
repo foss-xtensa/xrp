@@ -314,7 +314,7 @@ Kernel driver requirements.
 ==========================
 
 The linux kernel driver is tested with a number of linux kernel versions from
-3.18 to 4.11 and is known to work on xtensa, 32- and 64-bit ARM and x86 linux.
+3.18 to 4.16 and is known to work on xtensa, 32- and 64-bit ARM and x86 linux.
 
 The driver makes the following assumptions:
 - DSP has the same endianness as the host.
@@ -408,11 +408,11 @@ buffers of the buffer group. The function may not retain pointers to any
 buffers passed to it for later use and must release all references to buffers
 and buffer group it could have made before returning. Return value shall
 reflect whether the command was recognized and processed or not. IOW
-XRP_STATUS_SUCCESS should be returned in status if out_data is filled in,
-otherwise there should be XRP_STATUS_FAILURE. This return value is then
-returned from the xrp_device_dispatch. In case it was XRP_STATUS_FAILURE
-the host also gets XRP_STATUS_FAILURE for the command. handler_context is a
-pointer that was passed to the namespace handler registration function.
+XRP_STATUS_SUCCESS should be returned if out_data is filled in, otherwise
+XRP_STATUS_FAILURE shall be returned. This return value is then returned from
+the xrp_device_dispatch. In case it was XRP_STATUS_FAILURE the host also gets
+XRP_STATUS_FAILURE for the command. handler_context is a pointer that was
+passed to the namespace handler registration function.
 
 Linux application that uses XRP starts with opening XRP devices with
 xrp_open_device function. XRP devices may have different capabilities and run
@@ -471,14 +471,15 @@ when it doesn't have any mappings.
 
 In hosted mode XRP linux kernel driver manages DSP devices. When the driver
 gets loaded or device binding is added through sysfs the driver's probe
-function is called for each matching device node. It halts and resets the DSP,
-loads the firmware image and sets up the communication area address in shared
-memory. It then releases the DSP from reset and tries to synchronize with the
-firmware through the communication area. When successfull it sends selected IRQ
-parameters to the firmware and tests that chosen IRQs actually work. In case
-of success a new character device is created for that DSP. Linux userspace XRP
-library may then open that device and interact with it by ioctl and mmap system
-calls.
+function is called for each matching device node. Depending on the power
+management settings of the kernel and of the hardware-specific driver the
+each DSP may be initialized once in the driver probe callback and then run
+continuously or it may be initialized when the corresponding device is first
+opened by the user and shut down after it's been closed by the last user.
+Please see xrp-kernel/README.porting for the description of the DSP life cycle
+from the kernel driver point of view. Each configured DSP is represented by a
+character device. Linux userspace XRP library may then open that device and
+interact with it by means of ioctl and mmap system calls.
 
 In standalone mode XTSC simulator loads firmware images for all simulated
 DSP cores. Each firmware image has its communication area address preconfigured
