@@ -189,7 +189,7 @@ libxrp_host_standalone_a_AR = $(AR) $(ARFLAGS)
 libxrp_host_standalone_a_LIBADD =
 am__libxrp_host_standalone_a_SOURCES_DIST = xrp_host_common.c \
 	xrp_sync_queue.c xrp_threaded_queue.c standalone/xrp_host.c \
-	standalone/xrp_@HOST_OS@.c standalone/xrp_alloc.c
+	standalone/xrp_@HOST_OS@.c ../xrp-kernel/xrp_alloc.c
 @USE_THREADS_FALSE@am__objects_3 = libxrp_host_standalone_a-xrp_sync_queue.$(OBJEXT)
 @USE_THREADS_TRUE@am__objects_3 = libxrp_host_standalone_a-xrp_threaded_queue.$(OBJEXT)
 am_libxrp_host_standalone_a_OBJECTS =  \
@@ -197,7 +197,7 @@ am_libxrp_host_standalone_a_OBJECTS =  \
 	$(am__objects_3) \
 	standalone/libxrp_host_standalone_a-xrp_host.$(OBJEXT) \
 	standalone/libxrp_host_standalone_a-xrp_@HOST_OS@.$(OBJEXT) \
-	standalone/libxrp_host_standalone_a-xrp_alloc.$(OBJEXT)
+	../xrp-kernel/libxrp_host_standalone_a-xrp_alloc.$(OBJEXT)
 libxrp_host_standalone_a_OBJECTS =  \
 	$(am_libxrp_host_standalone_a_OBJECTS)
 AM_V_P = $(am__v_P_@AM_V@)
@@ -393,7 +393,7 @@ libxrp_host_standalone_a_SOURCES = xrp_host_common.c \
 				   $(queue_sources) \
 				   standalone/xrp_host.c \
 				   standalone/xrp_@HOST_OS@.c \
-				   standalone/xrp_alloc.c
+				   ../xrp-kernel/xrp_alloc.c
 
 libxrp_host_hosted_a_CPPFLAGS = $(AM_CPPFLAGS) \
 				-I$(srcdir)/hosted \
@@ -522,9 +522,15 @@ standalone/libxrp_host_standalone_a-xrp_host.$(OBJEXT):  \
 standalone/libxrp_host_standalone_a-xrp_@HOST_OS@.$(OBJEXT):  \
 	standalone/$(am__dirstamp) \
 	standalone/$(DEPDIR)/$(am__dirstamp)
-standalone/libxrp_host_standalone_a-xrp_alloc.$(OBJEXT):  \
-	standalone/$(am__dirstamp) \
-	standalone/$(DEPDIR)/$(am__dirstamp)
+../xrp-kernel/$(am__dirstamp):
+	@$(MKDIR_P) ../xrp-kernel
+	@: > ../xrp-kernel/$(am__dirstamp)
+../xrp-kernel/$(DEPDIR)/$(am__dirstamp):
+	@$(MKDIR_P) ../xrp-kernel/$(DEPDIR)
+	@: > ../xrp-kernel/$(DEPDIR)/$(am__dirstamp)
+../xrp-kernel/libxrp_host_standalone_a-xrp_alloc.$(OBJEXT):  \
+	../xrp-kernel/$(am__dirstamp) \
+	../xrp-kernel/$(DEPDIR)/$(am__dirstamp)
 
 libxrp-host-standalone.a: $(libxrp_host_standalone_a_OBJECTS) $(libxrp_host_standalone_a_DEPENDENCIES) $(EXTRA_libxrp_host_standalone_a_DEPENDENCIES) 
 	$(AM_V_at)-rm -f libxrp-host-standalone.a
@@ -534,6 +540,7 @@ libxrp-host-standalone.a: $(libxrp_host_standalone_a_OBJECTS) $(libxrp_host_stan
 mostlyclean-compile:
 	-rm -f *.$(OBJEXT)
 	-rm -f ../xrp-common/*.$(OBJEXT)
+	-rm -f ../xrp-kernel/*.$(OBJEXT)
 	-rm -f hosted/*.$(OBJEXT)
 	-rm -f single/*.$(OBJEXT)
 	-rm -f standalone/*.$(OBJEXT)
@@ -542,6 +549,7 @@ distclean-compile:
 	-rm -f *.tab.c
 
 @AMDEP_TRUE@@am__include@ @am__quote@../xrp-common/$(DEPDIR)/libxrp_host_single_a-xrp_ns.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@../xrp-kernel/$(DEPDIR)/libxrp_host_standalone_a-xrp_alloc.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libxrp_host_hosted_a-xrp_host_common.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libxrp_host_hosted_a-xrp_sync_queue.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libxrp_host_hosted_a-xrp_threaded_queue.Po@am__quote@
@@ -554,7 +562,6 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@hosted/$(DEPDIR)/libxrp_host_hosted_a-xrp_@HOST_OS@.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@single/$(DEPDIR)/libxrp_host_single_a-xrp_single.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@standalone/$(DEPDIR)/libxrp_host_standalone_a-xrp_@HOST_OS@.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@standalone/$(DEPDIR)/libxrp_host_standalone_a-xrp_alloc.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@standalone/$(DEPDIR)/libxrp_host_standalone_a-xrp_host.Po@am__quote@
 
 .c.o:
@@ -769,19 +776,19 @@ standalone/libxrp_host_standalone_a-xrp_@HOST_OS@.obj: standalone/xrp_@HOST_OS@.
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libxrp_host_standalone_a_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o standalone/libxrp_host_standalone_a-xrp_@HOST_OS@.obj `if test -f 'standalone/xrp_@HOST_OS@.c'; then $(CYGPATH_W) 'standalone/xrp_@HOST_OS@.c'; else $(CYGPATH_W) '$(srcdir)/standalone/xrp_@HOST_OS@.c'; fi`
 
-standalone/libxrp_host_standalone_a-xrp_alloc.o: standalone/xrp_alloc.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libxrp_host_standalone_a_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT standalone/libxrp_host_standalone_a-xrp_alloc.o -MD -MP -MF standalone/$(DEPDIR)/libxrp_host_standalone_a-xrp_alloc.Tpo -c -o standalone/libxrp_host_standalone_a-xrp_alloc.o `test -f 'standalone/xrp_alloc.c' || echo '$(srcdir)/'`standalone/xrp_alloc.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) standalone/$(DEPDIR)/libxrp_host_standalone_a-xrp_alloc.Tpo standalone/$(DEPDIR)/libxrp_host_standalone_a-xrp_alloc.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='standalone/xrp_alloc.c' object='standalone/libxrp_host_standalone_a-xrp_alloc.o' libtool=no @AMDEPBACKSLASH@
+../xrp-kernel/libxrp_host_standalone_a-xrp_alloc.o: ../xrp-kernel/xrp_alloc.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libxrp_host_standalone_a_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT ../xrp-kernel/libxrp_host_standalone_a-xrp_alloc.o -MD -MP -MF ../xrp-kernel/$(DEPDIR)/libxrp_host_standalone_a-xrp_alloc.Tpo -c -o ../xrp-kernel/libxrp_host_standalone_a-xrp_alloc.o `test -f '../xrp-kernel/xrp_alloc.c' || echo '$(srcdir)/'`../xrp-kernel/xrp_alloc.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) ../xrp-kernel/$(DEPDIR)/libxrp_host_standalone_a-xrp_alloc.Tpo ../xrp-kernel/$(DEPDIR)/libxrp_host_standalone_a-xrp_alloc.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../xrp-kernel/xrp_alloc.c' object='../xrp-kernel/libxrp_host_standalone_a-xrp_alloc.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libxrp_host_standalone_a_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o standalone/libxrp_host_standalone_a-xrp_alloc.o `test -f 'standalone/xrp_alloc.c' || echo '$(srcdir)/'`standalone/xrp_alloc.c
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libxrp_host_standalone_a_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o ../xrp-kernel/libxrp_host_standalone_a-xrp_alloc.o `test -f '../xrp-kernel/xrp_alloc.c' || echo '$(srcdir)/'`../xrp-kernel/xrp_alloc.c
 
-standalone/libxrp_host_standalone_a-xrp_alloc.obj: standalone/xrp_alloc.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libxrp_host_standalone_a_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT standalone/libxrp_host_standalone_a-xrp_alloc.obj -MD -MP -MF standalone/$(DEPDIR)/libxrp_host_standalone_a-xrp_alloc.Tpo -c -o standalone/libxrp_host_standalone_a-xrp_alloc.obj `if test -f 'standalone/xrp_alloc.c'; then $(CYGPATH_W) 'standalone/xrp_alloc.c'; else $(CYGPATH_W) '$(srcdir)/standalone/xrp_alloc.c'; fi`
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) standalone/$(DEPDIR)/libxrp_host_standalone_a-xrp_alloc.Tpo standalone/$(DEPDIR)/libxrp_host_standalone_a-xrp_alloc.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='standalone/xrp_alloc.c' object='standalone/libxrp_host_standalone_a-xrp_alloc.obj' libtool=no @AMDEPBACKSLASH@
+../xrp-kernel/libxrp_host_standalone_a-xrp_alloc.obj: ../xrp-kernel/xrp_alloc.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libxrp_host_standalone_a_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT ../xrp-kernel/libxrp_host_standalone_a-xrp_alloc.obj -MD -MP -MF ../xrp-kernel/$(DEPDIR)/libxrp_host_standalone_a-xrp_alloc.Tpo -c -o ../xrp-kernel/libxrp_host_standalone_a-xrp_alloc.obj `if test -f '../xrp-kernel/xrp_alloc.c'; then $(CYGPATH_W) '../xrp-kernel/xrp_alloc.c'; else $(CYGPATH_W) '$(srcdir)/../xrp-kernel/xrp_alloc.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) ../xrp-kernel/$(DEPDIR)/libxrp_host_standalone_a-xrp_alloc.Tpo ../xrp-kernel/$(DEPDIR)/libxrp_host_standalone_a-xrp_alloc.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../xrp-kernel/xrp_alloc.c' object='../xrp-kernel/libxrp_host_standalone_a-xrp_alloc.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libxrp_host_standalone_a_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o standalone/libxrp_host_standalone_a-xrp_alloc.obj `if test -f 'standalone/xrp_alloc.c'; then $(CYGPATH_W) 'standalone/xrp_alloc.c'; else $(CYGPATH_W) '$(srcdir)/standalone/xrp_alloc.c'; fi`
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libxrp_host_standalone_a_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o ../xrp-kernel/libxrp_host_standalone_a-xrp_alloc.obj `if test -f '../xrp-kernel/xrp_alloc.c'; then $(CYGPATH_W) '../xrp-kernel/xrp_alloc.c'; else $(CYGPATH_W) '$(srcdir)/../xrp-kernel/xrp_alloc.c'; fi`
 install-includeHEADERS: $(include_HEADERS)
 	@$(NORMAL_INSTALL)
 	@list='$(include_HEADERS)'; test -n "$(includedir)" || list=; \
@@ -921,6 +928,8 @@ distclean-generic:
 	-test . = "$(srcdir)" || test -z "$(CONFIG_CLEAN_VPATH_FILES)" || rm -f $(CONFIG_CLEAN_VPATH_FILES)
 	-rm -f ../xrp-common/$(DEPDIR)/$(am__dirstamp)
 	-rm -f ../xrp-common/$(am__dirstamp)
+	-rm -f ../xrp-kernel/$(DEPDIR)/$(am__dirstamp)
+	-rm -f ../xrp-kernel/$(am__dirstamp)
 	-rm -f hosted/$(DEPDIR)/$(am__dirstamp)
 	-rm -f hosted/$(am__dirstamp)
 	-rm -f single/$(DEPDIR)/$(am__dirstamp)
@@ -936,7 +945,7 @@ clean: clean-am
 clean-am: clean-generic clean-libLIBRARIES mostlyclean-am
 
 distclean: distclean-am
-	-rm -rf ../xrp-common/$(DEPDIR) ./$(DEPDIR) hosted/$(DEPDIR) single/$(DEPDIR) standalone/$(DEPDIR)
+	-rm -rf ../xrp-common/$(DEPDIR) ../xrp-kernel/$(DEPDIR) ./$(DEPDIR) hosted/$(DEPDIR) single/$(DEPDIR) standalone/$(DEPDIR)
 	-rm -f Makefile
 distclean-am: clean-am distclean-compile distclean-generic \
 	distclean-tags
@@ -982,7 +991,7 @@ install-ps-am:
 installcheck-am:
 
 maintainer-clean: maintainer-clean-am
-	-rm -rf ../xrp-common/$(DEPDIR) ./$(DEPDIR) hosted/$(DEPDIR) single/$(DEPDIR) standalone/$(DEPDIR)
+	-rm -rf ../xrp-common/$(DEPDIR) ../xrp-kernel/$(DEPDIR) ./$(DEPDIR) hosted/$(DEPDIR) single/$(DEPDIR) standalone/$(DEPDIR)
 	-rm -f Makefile
 maintainer-clean-am: distclean-am maintainer-clean-generic
 
