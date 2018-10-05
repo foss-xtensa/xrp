@@ -1,0 +1,190 @@
+
+\documentclass[twoside]{book}
+
+% Packages required by doxygen
+\usepackage{fixltx2e}
+\usepackage{calc}
+\usepackage{doxygen}
+\usepackage[export]{adjustbox} % also loads graphicx
+\usepackage{graphicx}
+\usepackage[utf8]{inputenc}
+\usepackage{makeidx}
+\usepackage{multicol}
+\usepackage{multirow}
+\PassOptionsToPackage{warn}{textcomp}
+\usepackage{textcomp}
+\usepackage[nointegrals]{wasysym}
+\usepackage[table]{xcolor}
+\usepackage[toc,page]{appendix}
+
+% Font selection
+\usepackage[T1]{fontenc}
+\usepackage[scaled=.90]{helvet}
+\usepackage{courier}
+\usepackage{amssymb}
+\usepackage{sectsty}
+\renewcommand{\familydefault}{\sfdefault}
+\allsectionsfont{%
+  \fontseries{bc}\selectfont%
+  \color{darkgray}%
+}
+\renewcommand{\DoxyLabelFont}{%
+  \fontseries{bc}\selectfont%
+  \color{darkgray}%
+}
+\newcommand{\+}{\discretionary{\mbox{\scriptsize$\hookleftarrow$}}{}{}}
+
+% Page & text layout
+\usepackage[paperheight=9in,paperwidth=7in,top=0.75in,bottom=0.75in,right=0.75in,left=1in,heightrounded]{geometry}
+\tolerance=750
+\hfuzz=15pt
+\hbadness=750
+\setlength{\emergencystretch}{15pt}
+\setlength{\parindent}{0cm}
+\setlength{\parskip}{0.2cm}
+\makeatletter
+\renewcommand{\paragraph}{%
+  \@startsection{paragraph}{4}{0ex}{-1.0ex}{1.0ex}{%
+    \normalfont\normalsize\bfseries\SS@parafont%
+  }%
+}
+\renewcommand{\subparagraph}{%
+  \@startsection{subparagraph}{5}{0ex}{-1.0ex}{1.0ex}{%
+    \normalfont\normalsize\bfseries\SS@subparafont%
+  }%
+}
+\makeatother
+
+% Suppress hyphenation
+\hyphenpenalty=10000
+\exhyphenpenalty=10000
+
+% Headers & footers
+\usepackage{fancyhdr}
+\pagestyle{fancyplain}
+
+\renewcommand{\headrulewidth}{0pt}
+\renewcommand{\footrulewidth}{0pt}
+\renewcommand{\chaptermark}[1]{\markboth{\chaptername\ \thechapter.\ #1}{\chaptername\ \thechapter.\ #1}}
+\renewcommand{\sectionmark}[1]{}
+
+\fancyhead[LE]{\fancyplain{}{\bfseries\sl\rightmark}}
+\fancyhead[CE]{\fancyplain{}{}}
+\fancyhead[RE]{\fancyplain{}{}}
+\fancyhead[LO]{\fancyplain{}{}}
+\fancyhead[CO]{\fancyplain{}{}}
+\fancyhead[RO]{\fancyplain{}{\bfseries\sl\leftmark}}
+\fancyfoot[LE]{\fancyplain{}{\bfseries\scriptsize\sl\thepage}}
+\fancyfoot[CE]{\fancyplain{}{}}
+\fancyfoot[RE]{\fancyplain{}{\bfseries\scriptsize\sl XRP Reference Manual }}
+\fancyfoot[LO]{\fancyplain{}{\bfseries\scriptsize\sl XRP Reference Manual }}
+\fancyfoot[CO]{\fancyplain{}{}}
+\fancyfoot[RO]{\fancyplain{}{\bfseries\scriptsize\sl\thepage}}
+
+% Image Captions
+\usepackage{caption}
+\renewcommand{\thefigure}{\thechapter-\arabic{figure}}
+\captionsetup[figure]{labelformat=simple, labelsep=period}
+
+% Chapter headings defined here, for some reason they don't work inline
+\usepackage{xrp}
+
+% Indices & bibliography
+\usepackage{natbib}
+\usepackage[titles]{tocloft}
+\setcounter{tocdepth}{2}
+\setcounter{secnumdepth}{5}
+\makeindex
+
+% Hyperlinks (required, but should be loaded last)
+\usepackage{ifpdf}
+\ifpdf
+  \usepackage[pdftex,pagebackref=true]{hyperref}
+\else
+  \usepackage[ps2pdf,pagebackref=true]{hyperref}
+\fi
+\hypersetup{%
+  colorlinks=true,%
+  linkcolor=blue,%
+  citecolor=blue,%
+  unicode%
+}
+
+% Custom commands
+\newcommand{\clearemptydoublepage}{%
+  \newpage{\pagestyle{empty}\cleardoublepage}%
+}
+
+\newcommand{\twodigits}[1]{%
+  \ifnum#1<10 0#1\else #1\fi
+}
+
+%===== C O N T E N T S =====
+
+\begin{document}
+
+% Titlepage & ToC
+\hypersetup{pageanchor=false,
+             bookmarks=true,
+             bookmarksnumbered=true,
+             pdfencoding=unicode
+            }
+\pagenumbering{roman}
+\begin{titlepage}
+\vspace*{1.0in}
+\includegraphics[scale=0.9]{Cadence_Logo_Red}
+\vspace*{0.2in}
+\hrule height0.5pt
+\vspace*{0.5cm}
+{\Huge\sl\bfseries Xtensa\raisebox{0.8ex}{\normalsize\textregistered} Remote Processing Library (XRP)}\\
+\begin{flushright}
+\vspace*{0.5cm}
+{\Large\bfseries Reference Manual}\\
+\vspace*{8.5cm}
+Cadence Design Systems, Inc.\\
+2655 Seely Ave.\\
+San Jose, CA 95134\\
+www.cadence.com\\
+\end{flushright}
+\newpage
+\pagestyle{empty}
+{\small
+Copyright {\copyright} 2006-{\the\year} Cadence Design Systems, Inc.\\
+Printed in the United States of America\\
+All Rights Reserved\\
+\vspace*{0.5cm}
+\newline This publication is provided "AS IS." Cadence Design Systems, Inc. (hereafter "Cadence") does not make any warranty of any kind, either expressed or implied, including, but not limited to, the implied warranties of merchantability and fitness for a particular purpose. Information in this document is provided solely to enable system and software developers to use Tensilica processors. Unless specifically set forth herein, there are no express or implied patent, copyright or any other intellectual property rights or licenses granted hereunder to design or fabricate Tensilica integrated circuits or integrated circuits based on the information in this document. Tensilica does not warrant that the contents of this publication, whether individually or as one or more groups, meets your requirements or that the publication is error-free. This publication could include technical inaccuracies or typographical errors. Changes may be made to the information herein, and these changes may be incorporated in new editions of this publication.
+\vspace*{0.2cm}
+\newline Cadence, the Cadence logo, Allegro, Assura, Broadband Spice, CDNLIVE!, Celtic, Chipestimate.com, Conformal, Connections, Denali, Diva, Dracula, Encounter, Flashpoint, FLIX, First Encounter, Incisive, Incyte, InstallScape, NanoRoute, NC-Verilog, OrCAD, OSKit, Palladium, PowerForward, PowerSI, PSpice, Purespec, Puresuite, Quickcycles, SignalStorm, Sigrity, SKILL, SoC Encounter, SourceLink, Spectre, Specman, Specman-Elite, SpeedBridge, Stars \& Strikes, Tensilica, TripleCheck, TurboXim, Vectra, Virtuoso, VoltageStorm Xplorer, Xtensa, and Xtreme are either trademarks or registered trademarks of Cadence Design Systems, Inc. in the United States and/or other jurisdictions. 
+OSCI, SystemC, Open SystemC, Open SystemC Initiative, and SystemC Initiative are registered trademarks of Open SystemC Initiative, Inc. in the United States and other countries and are used with permission. All other trademarks are the property of their respective holders.
+\vspace*{2.5cm}
+\newline Issue Date: \twodigits{\the\month}/{\the\year}
+\newline ????????
+\vspace*{0.4cm}
+\newline
+\vspace*{0.5cm}
+\newline Cadence Design Systems, Inc.
+\newline 2655 Seely Ave.
+\newline San Jose, CA 95134
+\newline www.cadence.com
+}
+\end{titlepage}
+\clearemptydoublepage
+
+% Table of contents
+\phantomsection
+\addcontentsline{toc}{chapter}{Contents}
+\tableofcontents
+\clearemptydoublepage
+% List of tables
+\phantomsection
+\addcontentsline{toc}{chapter}{\listtablename}
+\listoftables
+\clearemptydoublepage
+
+\pagenumbering{arabic}
+\hypersetup{pageanchor=true}
+
+% Switch page style so that headers/footers appear on every page
+\fancypagestyle{plain}
+

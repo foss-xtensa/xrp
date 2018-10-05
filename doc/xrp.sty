@@ -1,0 +1,21 @@
+
+\ProvidesPackage{xrp}
+
+\def\@makechapterhead#1{%
+  {\parindent \z@ \raggedright \normalfont
+    \interlinepenalty\@M
+    \LARGE \bfseries\thechapter.\ #1\par\nobreak
+    \vskip 10\p@
+    \hrule height0.5\p@
+    \vskip 20\p@
+  }}
+
+\def\@makeschapterhead#1{%
+  {\parindent \z@ \raggedright \normalfont
+    \interlinepenalty\@M
+    \LARGE \bfseries  #1\par\nobreak
+    \vskip 10\p@
+    \hrule height0.5\p@
+    \vskip 20\p@
+  }}
+

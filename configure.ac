@@ -32,6 +32,8 @@ AM_PROG_AS
 AC_PROG_RANLIB
 AC_CANONICAL_HOST
 AC_CONFIG_FILES([Makefile
+		 doc/Makefile
+		 doc/xrp.conf
 		 xrp-common/Makefile
 		 xrp-dsp/Makefile
 		 xrp-example/Makefile
