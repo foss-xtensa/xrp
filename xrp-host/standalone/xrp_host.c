@@ -419,10 +419,9 @@ struct xrp_device *xrp_open_device(int idx, enum xrp_status *status)
 	return device;
 }
 
-void xrp_impl_release_device(struct xrp_device *device, enum xrp_status *status)
+void xrp_impl_release_device(struct xrp_device *device)
 {
 	xrp_queue_destroy(&device->impl.queue);
-	set_status(status, XRP_STATUS_SUCCESS);
 }
 
 
@@ -439,19 +438,17 @@ void xrp_impl_create_device_buffer(struct xrp_device *device,
 		set_status(status, XRP_STATUS_FAILURE);
 		return;
 	}
-	xrp_retain_device(device, NULL);
+	xrp_retain_device(device);
 	buffer->device = device;
 	buffer->ptr = p2v(buffer->impl.xrp_allocation->start);
 	buffer->size = size;
 	set_status(status, XRP_STATUS_SUCCESS);
 }
 
-void xrp_impl_release_device_buffer(struct xrp_buffer *buffer,
-				    enum xrp_status *status)
+void xrp_impl_release_device_buffer(struct xrp_buffer *buffer)
 {
 	xrp_free(buffer->impl.xrp_allocation);
-	xrp_release_device(buffer->device, NULL);
-	set_status(status, XRP_STATUS_SUCCESS);
+	xrp_release_device(buffer->device);
 }
 
 /* Queue API. */
@@ -463,11 +460,9 @@ void xrp_impl_create_queue(struct xrp_queue *queue,
 	set_status(status, XRP_STATUS_SUCCESS);
 }
 
-void xrp_impl_release_queue(struct xrp_queue *queue,
-			    enum xrp_status *status)
+void xrp_impl_release_queue(struct xrp_queue *queue)
 {
 	(void)queue;
-	set_status(status, XRP_STATUS_SUCCESS);
 }
 
 /* Communication API */
@@ -529,7 +524,7 @@ static void _xrp_run_command(struct xrp_device *device,
 
 	if (rq->buffer_group) {
 		xrp_mutex_unlock(&rq->buffer_group->mutex);
-		xrp_release_buffer_group(rq->buffer_group, NULL);
+		xrp_release_buffer_group(rq->buffer_group);
 	}
 
 	if (rq->event) {
@@ -541,7 +536,7 @@ static void _xrp_run_command(struct xrp_device *device,
 			event->status = XRP_STATUS_SUCCESS;
 		xrp_cond_broadcast(&event->impl.cond);
 		xrp_cond_unlock(&event->impl.cond);
-		xrp_release_event(event, NULL);
+		xrp_release_event(event);
 	}
 	free(rq->user_buffer_allocation);
 	free(rq);
@@ -572,7 +567,7 @@ void xrp_enqueue_command(struct xrp_queue *queue,
 	rq->out_data_size = out_data_size;
 	rq->buffer_group = buffer_group;
 	if (buffer_group)
-		xrp_retain_buffer_group(buffer_group, NULL);
+		xrp_retain_buffer_group(buffer_group);
 
 	if (in_data_size > XRP_DSP_CMD_INLINE_DATA_SIZE) {
 		long rc = xrp_allocate(device->impl.description->shared_pool,
@@ -668,10 +663,10 @@ void xrp_enqueue_command(struct xrp_queue *queue,
 			set_status(status, XRP_STATUS_FAILURE);
 			return;
 		}
-		xrp_retain_queue(queue, NULL);
+		xrp_retain_queue(queue);
 		event->queue = queue;
 		*evt = event;
-		xrp_retain_event(event, NULL);
+		xrp_retain_event(event);
 		rq->event = event;
 	} else {
 		rq->event = NULL;

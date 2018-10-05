@@ -90,13 +90,13 @@ struct xrp_device *xrp_open_device(int idx, enum xrp_status *status);
 /*
  * Increment device reference count.
  */
-void xrp_retain_device(struct xrp_device *device, enum xrp_status *status);
+void xrp_retain_device(struct xrp_device *device);
 
 /*
  * Decrement device reference count (and free associated resources once the
  * counter gets down to zero).
  */
-void xrp_release_device(struct xrp_device *device, enum xrp_status *status);
+void xrp_release_device(struct xrp_device *device);
 
 
 /*
@@ -117,13 +117,13 @@ struct xrp_buffer *xrp_create_buffer(struct xrp_device *device,
 /*
  * Increment buffer reference count.
  */
-void xrp_retain_buffer(struct xrp_buffer *buffer, enum xrp_status *status);
+void xrp_retain_buffer(struct xrp_buffer *buffer);
 
 /*
  * Decrement buffer reference count (and free the storage if it was allocated
  * once the counter gets down to zero).
  */
-void xrp_release_buffer(struct xrp_buffer *buffer, enum xrp_status *status);
+void xrp_release_buffer(struct xrp_buffer *buffer);
 
 /*
  * Map subbuffer of the buffer. Buffer may be mapped multiple times.
@@ -165,15 +165,13 @@ struct xrp_buffer_group *xrp_create_buffer_group(enum xrp_status *status);
 /*
  * Increment buffer group reference count.
  */
-void xrp_retain_buffer_group(struct xrp_buffer_group *group,
-			     enum xrp_status *status);
+void xrp_retain_buffer_group(struct xrp_buffer_group *group);
 
 /*
  * Decrement group reference count (and free it once the counter gets down
  * to zero).
  */
-void xrp_release_buffer_group(struct xrp_buffer_group *group,
-			      enum xrp_status *status);
+void xrp_release_buffer_group(struct xrp_buffer_group *group);
 
 /*
  * Add buffer to the group and get its index.
@@ -247,15 +245,13 @@ struct xrp_queue *xrp_create_ns_queue(struct xrp_device *device,
 /*
  * Increment queue reference count.
  */
-void xrp_retain_queue(struct xrp_queue *queue,
-		      enum xrp_status *status);
+void xrp_retain_queue(struct xrp_queue *queue);
 
 /*
  * Decrement queue reference count (and free it once the counter gets down
  * to zero).
  */
-void xrp_release_queue(struct xrp_queue *queue,
-		       enum xrp_status *status);
+void xrp_release_queue(struct xrp_queue *queue);
 
 
 /*
@@ -265,15 +261,13 @@ void xrp_release_queue(struct xrp_queue *queue,
 /*
  * Increment event reference count.
  */
-void xrp_retain_event(struct xrp_event *event,
-		      enum xrp_status *status);
+void xrp_retain_event(struct xrp_event *event);
 
 /*
  * Decrement event reference count (and free it once the counter gets down
  * to zero).
  */
-void xrp_release_event(struct xrp_event *event,
-		       enum xrp_status *status);
+void xrp_release_event(struct xrp_event *event);
 
 
 /*

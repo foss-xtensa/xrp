@@ -88,22 +88,18 @@ static inline void set_status(enum xrp_status *status, enum xrp_status v)
 		*status = v;
 }
 
-static enum xrp_status retain_refcounted(struct xrp_refcounted *ref)
+static void retain_refcounted(struct xrp_refcounted *ref)
 {
 	if (ref) {
 		++ref->count;
-		return XRP_STATUS_SUCCESS;
 	}
-	return XRP_STATUS_FAILURE;
 }
 
-static enum xrp_status release_refcounted(struct xrp_refcounted *ref)
+static void release_refcounted(struct xrp_refcounted *ref)
 {
 	if (ref) {
-		if (ref->count-- > 0)
-			return XRP_STATUS_SUCCESS;
+		--ref->count;
 	}
-	return XRP_STATUS_FAILURE;
 }
 
 struct xrp_device *xrp_open_device(int idx, enum xrp_status *status)
@@ -120,14 +116,14 @@ struct xrp_device *xrp_open_device(int idx, enum xrp_status *status)
 	}
 }
 
-void xrp_retain_device(struct xrp_device *device, enum xrp_status *status)
+void xrp_retain_device(struct xrp_device *device)
 {
-	set_status(status, retain_refcounted(&device->ref));
+	retain_refcounted(&device->ref);
 }
 
-void xrp_release_device(struct xrp_device *device, enum xrp_status *status)
+void xrp_release_device(struct xrp_device *device)
 {
-	set_status(status, release_refcounted(&device->ref));
+	release_refcounted(&device->ref);
 }
 
 struct xrp_buffer *xrp_create_buffer(struct xrp_device *device,
@@ -141,14 +137,14 @@ struct xrp_buffer *xrp_create_buffer(struct xrp_device *device,
 	return NULL;
 }
 
-void xrp_retain_buffer(struct xrp_buffer *buffer, enum xrp_status *status)
+void xrp_retain_buffer(struct xrp_buffer *buffer)
 {
-	set_status(status, retain_refcounted(&buffer->ref));
+	retain_refcounted(&buffer->ref);
 }
 
-void xrp_release_buffer(struct xrp_buffer *buffer, enum xrp_status *status)
+void xrp_release_buffer(struct xrp_buffer *buffer)
 {
-	set_status(status, release_refcounted(&buffer->ref));
+	release_refcounted(&buffer->ref);
 }
 
 void *xrp_map_buffer(struct xrp_buffer *buffer, size_t offset, size_t size,
@@ -215,16 +211,14 @@ struct xrp_buffer_group *xrp_create_buffer_group(enum xrp_status *status)
 	return NULL;
 }
 
-void xrp_retain_buffer_group(struct xrp_buffer_group *group,
-			     enum xrp_status *status)
+void xrp_retain_buffer_group(struct xrp_buffer_group *group)
 {
-	set_status(status, retain_refcounted(&group->ref));
+	retain_refcounted(&group->ref);
 }
 
-void xrp_release_buffer_group(struct xrp_buffer_group *group,
-			      enum xrp_status *status)
+void xrp_release_buffer_group(struct xrp_buffer_group *group)
 {
-	set_status(status, release_refcounted(&group->ref));
+	release_refcounted(&group->ref);
 }
 
 size_t xrp_add_buffer_to_group(struct xrp_buffer_group *group,
@@ -245,7 +239,7 @@ struct xrp_buffer *xrp_get_buffer_from_group(struct xrp_buffer_group *group,
 {
 	if (idx < group->n_buffers) {
 		set_status(status, XRP_STATUS_SUCCESS);
-		xrp_retain_buffer(group->buffer + idx, NULL);
+		xrp_retain_buffer(group->buffer + idx);
 		return group->buffer + idx;
 	}
 	set_status(status, XRP_STATUS_FAILURE);

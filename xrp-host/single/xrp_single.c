@@ -80,10 +80,9 @@ struct xrp_device *xrp_open_device(int idx, enum xrp_status *status)
 	return device;
 }
 
-void xrp_impl_release_device(struct xrp_device *device, enum xrp_status *status)
+void xrp_impl_release_device(struct xrp_device *device)
 {
 	(void)device;
-	set_status(status, XRP_STATUS_SUCCESS);
 }
 
 
@@ -103,11 +102,9 @@ void xrp_impl_create_device_buffer(struct xrp_device *device,
 		set_status(status, XRP_STATUS_FAILURE);
 }
 
-void xrp_impl_release_device_buffer(struct xrp_buffer *buffer,
-				    enum xrp_status *status)
+void xrp_impl_release_device_buffer(struct xrp_buffer *buffer)
 {
 	free(buffer->ptr);
-	set_status(status, XRP_STATUS_SUCCESS);
 }
 
 /* Queue API. */
@@ -190,10 +187,10 @@ static void xrp_request_process(struct xrp_queue_item *q,
 			 rq->buffer_group,
 			 &status);
 
-	xrp_release_queue(rq->queue, NULL);
+	xrp_release_queue(rq->queue);
 
 	if (rq->buffer_group)
-		xrp_release_buffer_group(rq->buffer_group, NULL);
+		xrp_release_buffer_group(rq->buffer_group);
 
 	if (rq->event) {
 		struct xrp_event *event = rq->event;
@@ -201,7 +198,7 @@ static void xrp_request_process(struct xrp_queue_item *q,
 		event->status = status;
 		xrp_cond_broadcast(&event->impl.cond);
 		xrp_cond_unlock(&event->impl.cond);
-		xrp_release_event(event, NULL);
+		xrp_release_event(event);
 	}
 	free(rq->in_data);
 	free(rq);
@@ -214,10 +211,9 @@ void xrp_impl_create_queue(struct xrp_queue *queue,
 	set_status(status, XRP_STATUS_SUCCESS);
 }
 
-void xrp_impl_release_queue(struct xrp_queue *queue, enum xrp_status *status)
+void xrp_impl_release_queue(struct xrp_queue *queue)
 {
 	(void)queue;
-	set_status(status, XRP_STATUS_SUCCESS);
 }
 
 /* Communication API */
@@ -235,7 +231,7 @@ void xrp_enqueue_command(struct xrp_queue *queue,
 	rq = malloc(sizeof(*rq));
 	in_data_copy = malloc(in_data_size);
 	if (buffer_group)
-		xrp_retain_buffer_group(buffer_group, NULL);
+		xrp_retain_buffer_group(buffer_group);
 	else
 		buffer_group = xrp_create_buffer_group(status);
 
@@ -243,13 +239,13 @@ void xrp_enqueue_command(struct xrp_queue *queue,
 		free(in_data_copy);
 		free(rq);
 		if (buffer_group)
-			xrp_release_buffer_group(buffer_group, NULL);
+			xrp_release_buffer_group(buffer_group);
 		set_status(status, XRP_STATUS_FAILURE);
 		return;
 	}
 
 	memcpy(in_data_copy, in_data, in_data_size);
-	xrp_retain_queue(queue, NULL);
+	xrp_retain_queue(queue);
 	rq->queue = queue;
 	rq->in_data = in_data_copy;
 	rq->in_data_size = in_data_size;
@@ -263,14 +259,14 @@ void xrp_enqueue_command(struct xrp_queue *queue,
 		if (!event) {
 			free(rq->in_data);
 			free(rq);
-			xrp_release_buffer_group(buffer_group, NULL);
+			xrp_release_buffer_group(buffer_group);
 			set_status(status, XRP_STATUS_FAILURE);
 			return;
 		}
-		xrp_retain_queue(queue, NULL);
+		xrp_retain_queue(queue);
 		event->queue = queue;
 		*evt = event;
-		xrp_retain_event(event, NULL);
+		xrp_retain_event(event);
 		rq->event = event;
 	} else {
 		rq->event = NULL;

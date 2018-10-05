@@ -78,8 +78,8 @@ static enum xrp_status example_v1_handler(void *handler_context,
 		dst = xrp_map_buffer(dbuf, 0, sz, XRP_WRITE, NULL);
 
 		if (!src || !dst) {
-			xrp_release_buffer(sbuf, NULL);
-			xrp_release_buffer(dbuf, NULL);
+			xrp_release_buffer(sbuf);
+			xrp_release_buffer(dbuf);
 			break;
 		}
 
@@ -88,8 +88,8 @@ static enum xrp_status example_v1_handler(void *handler_context,
 		memcpy(dst, src, sz);
 		xrp_unmap_buffer(sbuf, src, NULL);
 		xrp_unmap_buffer(dbuf, dst, NULL);
-		xrp_release_buffer(sbuf, NULL);
-		xrp_release_buffer(dbuf, NULL);
+		xrp_release_buffer(sbuf);
+		xrp_release_buffer(dbuf);
 	}
 
 	xrp_buffer_group_get_info(buffer_group, XRP_BUFFER_GROUP_SIZE_SIZE_T,
@@ -183,7 +183,7 @@ void __attribute__((constructor)) dsp_test_register(void)
 		goto err_release;
 	}
 err_release:
-	xrp_release_device(device, NULL);
+	xrp_release_device(device);
 	if (status != XRP_STATUS_SUCCESS)
 		abort();
 }

@@ -75,12 +75,9 @@ struct xrp_device *xrp_open_device(int idx, enum xrp_status *status)
 	return device;
 }
 
-void xrp_impl_release_device(struct xrp_device *device, enum xrp_status *status)
+void xrp_impl_release_device(struct xrp_device *device)
 {
-	if (close(device->impl.fd) == -1)
-		set_status(status, XRP_STATUS_FAILURE);
-	else
-		set_status(status, XRP_STATUS_SUCCESS);
+	close(device->impl.fd);
 }
 
 
@@ -96,11 +93,11 @@ void xrp_impl_create_device_buffer(struct xrp_device *device,
 	};
 	int ret;
 
-	xrp_retain_device(device, NULL);
+	xrp_retain_device(device);
 	buffer->device = device;
 	ret = ioctl(buffer->device->impl.fd, XRP_IOCTL_ALLOC, &ioctl_alloc);
 	if (ret < 0) {
-		xrp_release_device(buffer->device, NULL);
+		xrp_release_device(buffer->device);
 		set_status(status, XRP_STATUS_FAILURE);
 		return;
 	}
@@ -109,20 +106,15 @@ void xrp_impl_create_device_buffer(struct xrp_device *device,
 	set_status(status, XRP_STATUS_SUCCESS);
 }
 
-void xrp_impl_release_device_buffer(struct xrp_buffer *buffer,
-				    enum xrp_status *status)
+void xrp_impl_release_device_buffer(struct xrp_buffer *buffer)
 {
 	struct xrp_ioctl_alloc ioctl_alloc = {
 		.addr = (uintptr_t)buffer->ptr,
 	};
-	int ret = ioctl(buffer->device->impl.fd,
-			XRP_IOCTL_FREE, &ioctl_alloc);
+	ioctl(buffer->device->impl.fd,
+	      XRP_IOCTL_FREE, &ioctl_alloc);
 
-	xrp_release_device(buffer->device, NULL);
-	if (ret < 0)
-		set_status(status, XRP_STATUS_FAILURE);
-	else
-		set_status(status, XRP_STATUS_SUCCESS);
+	xrp_release_device(buffer->device);
 }
 
 /* Queue API. */
@@ -191,7 +183,7 @@ static void xrp_request_process(struct xrp_queue_item *q,
 			 &status);
 
 	if (rq->buffer_group)
-		xrp_release_buffer_group(rq->buffer_group, NULL);
+		xrp_release_buffer_group(rq->buffer_group);
 
 	if (rq->event) {
 		struct xrp_event *event = rq->event;
@@ -199,7 +191,7 @@ static void xrp_request_process(struct xrp_queue_item *q,
 		event->status = status;
 		xrp_cond_broadcast(&event->impl.cond);
 		xrp_cond_unlock(&event->impl.cond);
-		xrp_release_event(event, NULL);
+		xrp_release_event(event);
 	}
 	free(rq->in_data);
 	free(rq);
@@ -212,10 +204,9 @@ void xrp_impl_create_queue(struct xrp_queue *queue,
 	set_status(status, XRP_STATUS_SUCCESS);
 }
 
-void xrp_impl_release_queue(struct xrp_queue *queue, enum xrp_status *status)
+void xrp_impl_release_queue(struct xrp_queue *queue)
 {
 	xrp_queue_destroy(&queue->impl.queue);
-	set_status(status, XRP_STATUS_SUCCESS);
 }
 
 /* Communication API */
@@ -255,17 +246,17 @@ void xrp_enqueue_command(struct xrp_queue *queue,
 			set_status(status, XRP_STATUS_FAILURE);
 			return;
 		}
-		xrp_retain_queue(queue, NULL);
+		xrp_retain_queue(queue);
 		event->queue = queue;
 		*evt = event;
-		xrp_retain_event(event, NULL);
+		xrp_retain_event(event);
 		rq->event = event;
 	} else {
 		rq->event = NULL;
 	}
 
 	if (buffer_group)
-		xrp_retain_buffer_group(buffer_group, NULL);
+		xrp_retain_buffer_group(buffer_group);
 	rq->buffer_group = buffer_group;
 
 	set_status(status, XRP_STATUS_SUCCESS);

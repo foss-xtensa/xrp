@@ -31,16 +31,15 @@
 
 /* Device API. */
 
-void xrp_retain_device(struct xrp_device *device, enum xrp_status *status)
+void xrp_retain_device(struct xrp_device *device)
 {
 	retain_refcounted(device);
-	set_status(status, XRP_STATUS_SUCCESS);
 }
 
-void xrp_release_device(struct xrp_device *device, enum xrp_status *status)
+void xrp_release_device(struct xrp_device *device)
 {
-	if (last_release_refcounted(device, status)) {
-		xrp_impl_release_device(device, status);
+	if (last_release_refcounted(device)) {
+		xrp_impl_release_device(device);
 		free(device);
 	}
 }
@@ -85,17 +84,16 @@ struct xrp_buffer *xrp_create_buffer(struct xrp_device *device,
 	return buf;
 }
 
-void xrp_retain_buffer(struct xrp_buffer *buffer, enum xrp_status *status)
+void xrp_retain_buffer(struct xrp_buffer *buffer)
 {
 	retain_refcounted(buffer);
-	set_status(status, XRP_STATUS_SUCCESS);
 }
 
-void xrp_release_buffer(struct xrp_buffer *buffer, enum xrp_status *status)
+void xrp_release_buffer(struct xrp_buffer *buffer)
 {
-	if (last_release_refcounted(buffer, status)) {
+	if (last_release_refcounted(buffer)) {
 		if (buffer->type == XRP_BUFFER_TYPE_DEVICE)
-			xrp_impl_release_device_buffer(buffer, status);
+			xrp_impl_release_device_buffer(buffer);
 		free(buffer);
 	}
 }
@@ -121,7 +119,8 @@ void xrp_unmap_buffer(struct xrp_buffer *buffer, void *p,
 	if (p >= buffer->ptr &&
 	    (size_t)((char *)p - (char *)buffer->ptr) <= buffer->size) {
 		(void)--buffer->map_count;
-		xrp_release_buffer(buffer, status);
+		xrp_release_buffer(buffer);
+		set_status(status, XRP_STATUS_SUCCESS);
 	} else {
 		set_status(status, XRP_STATUS_FAILURE);
 	}
@@ -179,22 +178,19 @@ struct xrp_buffer_group *xrp_create_buffer_group(enum xrp_status *status)
 	return group;
 }
 
-void xrp_retain_buffer_group(struct xrp_buffer_group *group,
-			     enum xrp_status *status)
+void xrp_retain_buffer_group(struct xrp_buffer_group *group)
 {
 	retain_refcounted(group);
-	set_status(status, XRP_STATUS_SUCCESS);
 }
 
-void xrp_release_buffer_group(struct xrp_buffer_group *group,
-			      enum xrp_status *status)
+void xrp_release_buffer_group(struct xrp_buffer_group *group)
 {
-	if (last_release_refcounted(group, status)) {
+	if (last_release_refcounted(group)) {
 		size_t i;
 
 		xrp_mutex_lock(&group->mutex);
 		for (i = 0; i < group->n_buffers; ++i)
-			xrp_release_buffer(group->buffer[i].buffer, NULL);
+			xrp_release_buffer(group->buffer[i].buffer);
 		xrp_mutex_unlock(&group->mutex);
 		xrp_mutex_destroy(&group->mutex);
 		free(group->buffer);
@@ -207,7 +203,6 @@ size_t xrp_add_buffer_to_group(struct xrp_buffer_group *group,
 			       enum xrp_access_flags access_flags,
 			       enum xrp_status *status)
 {
-	enum xrp_status s;
 	size_t n_buffers;
 
 	xrp_mutex_lock(&group->mutex);
@@ -226,12 +221,7 @@ size_t xrp_add_buffer_to_group(struct xrp_buffer_group *group,
 		group->capacity = (group->capacity + 2) * 2;
 	}
 
-	xrp_retain_buffer(buffer, &s);
-	if (s != XRP_STATUS_SUCCESS) {
-		xrp_mutex_unlock(&group->mutex);
-		set_status(status, s);
-		return -1;
-	}
+	xrp_retain_buffer(buffer);
 	group->buffer[group->n_buffers].buffer = buffer;
 	group->buffer[group->n_buffers].access_flags = access_flags;
 	n_buffers = group->n_buffers++;
@@ -246,27 +236,22 @@ void xrp_set_buffer_in_group(struct xrp_buffer_group *group,
 			     enum xrp_access_flags access_flags,
 			     enum xrp_status *status)
 {
-	enum xrp_status s;
+	struct xrp_buffer *old_buffer;
 
-	xrp_retain_buffer(buffer, &s);
+	xrp_retain_buffer(buffer);
 
-	if (s == XRP_STATUS_SUCCESS) {
-		struct xrp_buffer *old_buffer;
-
-		xrp_mutex_lock(&group->mutex);
-		if (index < group->n_buffers) {
-			old_buffer = group->buffer[index].buffer;
-			group->buffer[index].buffer = buffer;
-			group->buffer[index].access_flags = access_flags;
-			s = XRP_STATUS_SUCCESS;
-		} else {
-			old_buffer = buffer;
-			s = XRP_STATUS_FAILURE;
-		}
-		xrp_mutex_unlock(&group->mutex);
-		xrp_release_buffer(old_buffer, NULL);
+	xrp_mutex_lock(&group->mutex);
+	if (index < group->n_buffers) {
+		old_buffer = group->buffer[index].buffer;
+		group->buffer[index].buffer = buffer;
+		group->buffer[index].access_flags = access_flags;
+		set_status(status, XRP_STATUS_SUCCESS);
+	} else {
+		old_buffer = buffer;
+		set_status(status, XRP_STATUS_FAILURE);
 	}
-	set_status(status, s);
+	xrp_mutex_unlock(&group->mutex);
+	xrp_release_buffer(old_buffer);
 }
 
 struct xrp_buffer *xrp_get_buffer_from_group(struct xrp_buffer_group *group,
@@ -278,7 +263,8 @@ struct xrp_buffer *xrp_get_buffer_from_group(struct xrp_buffer_group *group,
 	xrp_mutex_lock(&group->mutex);
 	if (idx < group->n_buffers) {
 		buffer = group->buffer[idx].buffer;
-		xrp_retain_buffer(buffer, status);
+		xrp_retain_buffer(buffer);
+		set_status(status, XRP_STATUS_SUCCESS);
 	} else {
 		set_status(status, XRP_STATUS_FAILURE);
 	}
@@ -336,18 +322,12 @@ struct xrp_queue *xrp_create_ns_queue(struct xrp_device *device,
 				      enum xrp_status *status)
 {
 	struct xrp_queue *queue;
-	enum xrp_status s;
 
-	xrp_retain_device(device, &s);
-	if (s != XRP_STATUS_SUCCESS) {
-		set_status(status, s);
-		return NULL;
-	}
-
+	xrp_retain_device(device);
 	queue = alloc_refcounted(sizeof(*queue));
 
 	if (!queue) {
-		xrp_release_device(device, NULL);
+		xrp_release_device(device);
 		set_status(status, XRP_STATUS_FAILURE);
 		return NULL;
 	}
@@ -363,17 +343,16 @@ struct xrp_queue *xrp_create_ns_queue(struct xrp_device *device,
 	return queue;
 }
 
-void xrp_retain_queue(struct xrp_queue *queue, enum xrp_status *status)
+void xrp_retain_queue(struct xrp_queue *queue)
 {
 	retain_refcounted(queue);
-	set_status(status, XRP_STATUS_SUCCESS);
 }
 
-void xrp_release_queue(struct xrp_queue *queue, enum xrp_status *status)
+void xrp_release_queue(struct xrp_queue *queue)
 {
-	if (last_release_refcounted(queue, status)) {
-		xrp_impl_release_queue(queue, status);
-		xrp_release_device(queue->device, status);
+	if (last_release_refcounted(queue)) {
+		xrp_impl_release_queue(queue);
+		xrp_release_device(queue->device);
 		free(queue);
 	}
 }
@@ -381,17 +360,16 @@ void xrp_release_queue(struct xrp_queue *queue, enum xrp_status *status)
 
 /* Event API. */
 
-void xrp_retain_event(struct xrp_event *event, enum xrp_status *status)
+void xrp_retain_event(struct xrp_event *event)
 {
 	retain_refcounted(event);
-	set_status(status, XRP_STATUS_SUCCESS);
 }
 
-void xrp_release_event(struct xrp_event *event, enum xrp_status *status)
+void xrp_release_event(struct xrp_event *event)
 {
-	if (last_release_refcounted(event, status)) {
-		xrp_impl_release_event(event, status);
-		xrp_release_queue(event->queue, NULL);
+	if (last_release_refcounted(event)) {
+		xrp_impl_release_event(event);
+		xrp_release_queue(event->queue);
 		free(event);
 	}
 }
@@ -421,5 +399,5 @@ void xrp_run_command_sync(struct xrp_queue *queue,
 	}
 	xrp_wait(evt, NULL);
 	xrp_event_status(evt, status);
-	xrp_release_event(evt, NULL);
+	xrp_release_event(evt);
 }

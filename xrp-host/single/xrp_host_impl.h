@@ -40,18 +40,15 @@ struct xrp_buffer_impl {
 struct xrp_queue_impl {
 };
 
-void xrp_impl_release_device(struct xrp_device *device,
-			     enum xrp_status *status);
+void xrp_impl_release_device(struct xrp_device *device);
 
 void xrp_impl_create_device_buffer(struct xrp_device *device,
 				   struct xrp_buffer *buffer,
 				   size_t size,
 				   enum xrp_status *status);
-void xrp_impl_release_device_buffer(struct xrp_buffer *buffer,
-				    enum xrp_status *status);
+void xrp_impl_release_device_buffer(struct xrp_buffer *buffer);
 
 void xrp_impl_create_queue(struct xrp_queue *queue,
 			   enum xrp_status *status);
-void xrp_impl_release_queue(struct xrp_queue *queue,
-			    enum xrp_status *status);
+void xrp_impl_release_queue(struct xrp_queue *queue);
 #endif

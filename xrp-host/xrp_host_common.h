@@ -109,10 +109,9 @@ static inline void retain_refcounted(void *buf)
 	(void)++ref->count;
 }
 
-static inline int last_release_refcounted(void *buf, enum xrp_status *status)
+static inline int last_release_refcounted(void *buf)
 {
 	struct xrp_refcounted *ref = buf;
-	set_status(status, XRP_STATUS_SUCCESS);
 	return --ref->count == 0;
 }
 

@@ -77,11 +77,8 @@ static void f1(int devid)
 		assert(mismatch == 0);
 	}
 
-	xrp_release_queue(queue, &status);
-	assert(status == XRP_STATUS_SUCCESS);
-	status = -1;
-	xrp_release_device(device, &status);
-	assert(status == XRP_STATUS_SUCCESS);
+	xrp_release_queue(queue);
+	xrp_release_device(device);
 }
 
 /* Test asynchronous API */
@@ -133,15 +130,9 @@ static void f2(int devid)
 	xrp_enqueue_command(queue, NULL, 0, NULL, 0, group, event + 1, &status);
 	assert(status == XRP_STATUS_SUCCESS);
 	status = -1;
-	xrp_release_buffer_group(group, &status);
-	assert(status == XRP_STATUS_SUCCESS);
-	status = -1;
-	xrp_release_buffer(buf, &status);
-	assert(status == XRP_STATUS_SUCCESS);
-	status = -1;
-	xrp_release_queue(queue, &status);
-	assert(status == XRP_STATUS_SUCCESS);
-	status = -1;
+	xrp_release_buffer_group(group);
+	xrp_release_buffer(buf);
+	xrp_release_queue(queue);
 	xrp_wait(event[1], &status);
 	assert(status == XRP_STATUS_SUCCESS);
 	status = -1;
@@ -151,14 +142,9 @@ static void f2(int devid)
 	xrp_wait(event[0], &status);
 	assert(status == XRP_STATUS_SUCCESS);
 	status = -1;
-	xrp_release_event(event[0], &status);
-	assert(status == XRP_STATUS_SUCCESS);
-	status = -1;
-	xrp_release_event(event[1], &status);
-	assert(status == XRP_STATUS_SUCCESS);
-	status = -1;
-	xrp_release_device(device, &status);
-	assert(status == XRP_STATUS_SUCCESS);
+	xrp_release_event(event[0]);
+	xrp_release_event(event[1]);
+	xrp_release_device(device);
 }
 
 /* Test data transfer from and to device and user buffers */
@@ -218,9 +204,7 @@ static void f3(int devid)
 			xrp_run_command_sync(queue, &sz, sizeof(sz), NULL, 0, group, &status);
 			assert(status == XRP_STATUS_SUCCESS);
 			status = -1;
-			xrp_release_buffer_group(group, &status);
-			assert(status == XRP_STATUS_SUCCESS);
-			status = -1;
+			xrp_release_buffer_group(group);
 
 			data1 = xrp_map_buffer(buf1, 0, sz, XRP_READ_WRITE, &status);
 			assert(status == XRP_STATUS_SUCCESS);
@@ -250,21 +234,14 @@ static void f3(int devid)
 			xrp_unmap_buffer(buf2, data2, &status);
 			assert(status == XRP_STATUS_SUCCESS);
 			status = -1;
-			xrp_release_buffer(buf1, &status);
-			assert(status == XRP_STATUS_SUCCESS);
-			status = -1;
-			xrp_release_buffer(buf2, &status);
-			assert(status == XRP_STATUS_SUCCESS);
-			status = -1;
+			xrp_release_buffer(buf1);
+			xrp_release_buffer(buf2);
 			free(p1);
 			free(p2);
 		}
 	}
-	xrp_release_queue(queue, &status);
-	assert(status == XRP_STATUS_SUCCESS);
-	status = -1;
-	xrp_release_device(device, &status);
-	assert(status == XRP_STATUS_SUCCESS);
+	xrp_release_queue(queue);
+	xrp_release_device(device);
 }
 
 /* Test xrp_set_buffer_in_group */
@@ -307,23 +284,12 @@ static void f4(int devid)
 	assert(status == XRP_STATUS_SUCCESS);
 	status = -1;
 	assert(buf3 == buf2);
-	xrp_release_buffer(buf1, &status);
-	assert(status == XRP_STATUS_SUCCESS);
-	status = -1;
-	xrp_release_buffer(buf2, &status);
-	assert(status == XRP_STATUS_SUCCESS);
-	status = -1;
-	xrp_release_buffer(buf3, &status);
-	assert(status == XRP_STATUS_SUCCESS);
-	status = -1;
-	xrp_release_buffer_group(group, &status);
-	assert(status == XRP_STATUS_SUCCESS);
-	status = -1;
-	xrp_release_queue(queue, &status);
-	assert(status == XRP_STATUS_SUCCESS);
-	status = -1;
-	xrp_release_device(device, &status);
-	assert(status == XRP_STATUS_SUCCESS);
+	xrp_release_buffer(buf1);
+	xrp_release_buffer(buf2);
+	xrp_release_buffer(buf3);
+	xrp_release_buffer_group(group);
+	xrp_release_queue(queue);
+	xrp_release_device(device);
 }
 
 /* Test xrp_buffer[_group]_get_info */
@@ -386,20 +352,11 @@ static void f5(int devid)
 	status = -1;
 	assert(sz == 1);
 
-	xrp_release_buffer(buf1, &status);
-	assert(status == XRP_STATUS_SUCCESS);
-	status = -1;
-	xrp_release_buffer(buf2, &status);
-	assert(status == XRP_STATUS_SUCCESS);
-	status = -1;
-	xrp_release_buffer_group(group, &status);
-	assert(status == XRP_STATUS_SUCCESS);
-	status = -1;
-	xrp_release_queue(queue, &status);
-	assert(status == XRP_STATUS_SUCCESS);
-	status = -1;
-	xrp_release_device(device, &status);
-	assert(status == XRP_STATUS_SUCCESS);
+	xrp_release_buffer(buf1);
+	xrp_release_buffer(buf2);
+	xrp_release_buffer_group(group);
+	xrp_release_queue(queue);
+	xrp_release_device(device);
 }
 
 /* Test default namespace */
@@ -423,11 +380,8 @@ static void f6(int devid)
 	assert(status == XRP_STATUS_SUCCESS);
 	status = -1;
 
-	xrp_release_queue(queue, &status);
-	assert(status == XRP_STATUS_SUCCESS);
-	status = -1;
-	xrp_release_device(device, &status);
-	assert(status == XRP_STATUS_SUCCESS);
+	xrp_release_queue(queue);
+	xrp_release_device(device);
 }
 
 /* Test command errors */
@@ -463,11 +417,8 @@ static void f7(int devid)
 	assert(status == XRP_STATUS_FAILURE);
 	status = -1;
 
-	xrp_release_queue(queue, &status);
-	assert(status == XRP_STATUS_SUCCESS);
-	status = -1;
-	xrp_release_device(device, &status);
-	assert(status == XRP_STATUS_SUCCESS);
+	xrp_release_queue(queue);
+	xrp_release_device(device);
 }
 
 enum {
