@@ -443,40 +443,6 @@ void xrp_device_unregister_namespace(struct xrp_device *device,
 				     const void *nsid,
 				     enum xrp_status *status);
 
-
-/* Legacy DSP-specific interface (framework-style) */
-
-/*
- * DSP side callbacks.
- */
-
-/*
- * Optional initialization callback.
- */
-void xrp_user_initialize(enum xrp_status *status);
-
-/*
- * This callback is called on the DSP side to process queued command.
- * in_data, out_data and buffer_group correspond to the same parameters of the
- * host side API calls.
- *
- * On return from this function buffer group and individual buffer reference
- * counters shall be restored to their entry values. out_data buffer shall be
- * updated with command return value.
- * Neither in_data nor out_data may be referenced after this function returns.
- *
- * Value returned in status shall describe whether xrp_run_command itself was
- * successful or not, not the command it was requested to run.
- * I.e. if the command was not recognized or its handler could not be called
- * due to insufficient memory, that's XRP_STATUS_FAILURE returned in status.
- * If the command was run that's XRP_STATUS_SUCCESS regardless of the
- * command-specific status, which should be returned in out_data.
- */
-void xrp_run_command(const void *in_data, size_t in_data_size,
-		     void *out_data, size_t out_data_size,
-		     struct xrp_buffer_group *buffer_group,
-		     enum xrp_status *status);
-
 /*
  * Helper function that terminates fast simulation
  */

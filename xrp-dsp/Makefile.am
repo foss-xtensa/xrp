@@ -31,5 +31,4 @@ AM_CFLAGS = -W -Wall
 include_HEADERS = ../xrp_api.h xrp_dsp_hw.h
 lib_LIBRARIES = libxrp-dsp.a
 
-libxrp_dsp_a_SOURCES = xrp_dsp.c \
-		       xrp_dsp_framework.c
+libxrp_dsp_a_SOURCES = xrp_dsp.c
