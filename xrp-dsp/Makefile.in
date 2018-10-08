@@ -159,8 +159,7 @@ am__v_AR_0 = @echo "  AR      " $@;
 am__v_AR_1 = 
 libxrp_dsp_a_AR = $(AR) $(ARFLAGS)
 libxrp_dsp_a_LIBADD =
-am_libxrp_dsp_a_OBJECTS = xrp_dsp.$(OBJEXT) \
-	xrp_dsp_framework.$(OBJEXT)
+am_libxrp_dsp_a_OBJECTS = xrp_dsp.$(OBJEXT)
 libxrp_dsp_a_OBJECTS = $(am_libxrp_dsp_a_OBJECTS)
 AM_V_P = $(am__v_P_@AM_V@)
 am__v_P_ = $(am__v_P_@AM_DEFAULT_V@)
@@ -381,9 +380,7 @@ AM_CPPFLAGS = -I$(srcdir)/.. \
 AM_CFLAGS = -W -Wall
 include_HEADERS = ../xrp_api.h xrp_dsp_hw.h
 lib_LIBRARIES = libxrp-dsp.a
-libxrp_dsp_a_SOURCES = xrp_dsp.c \
-		       xrp_dsp_framework.c
-
+libxrp_dsp_a_SOURCES = xrp_dsp.c
 all: all-recursive
 
 .SUFFIXES:
@@ -461,7 +458,6 @@ distclean-compile:
 	-rm -f *.tab.c
 
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/xrp_dsp.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/xrp_dsp_framework.Po@am__quote@
 
 .c.o:
 @am__fastdepCC_TRUE@	$(AM_V_CC)depbase=`echo $@ | sed 's|[^/]*$$|$(DEPDIR)/&|;s|\.o$$||'`;\
