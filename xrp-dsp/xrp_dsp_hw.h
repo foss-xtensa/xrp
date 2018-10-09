@@ -21,13 +21,55 @@
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
+/*!
+ * \file xrp_dsp_hw.h
+ * \brief Interface between generic and HW-specific DSP libraries.
+ */
+
 #ifndef XRP_DSP_HW_H
 #define XRP_DSP_HW_H
 
+/*!
+ * \brief Initialize HW-specific DSP code
+ *
+ * Initialize HW-specific DSP code.
+ * DSP main must call this function before any other xrp_hw_* function is
+ * called.
+ */
 void xrp_hw_init(void);
+
+/*!
+ * \brief Send IRQ to the host
+ *
+ * Send IRQ to the host.
+ */
 void xrp_hw_send_host_irq(void);
+
+/*!
+ * \brief Wait for the IRQ from the host
+ *
+ * The XRP is idle. If there's no other work go to low-power state and wait
+ * for IRQ from the host.
+ */
 void xrp_hw_wait_device_irq(void);
+
+/*!
+ * \brief Set HW-specific data passed from the host
+ *
+ * Consume HW-specific data passed from the host during synchronization.
+ * Format of this data is specific to the HW port and both DSP and kernel
+ * driver must agree about it.
+ */
 void xrp_hw_set_sync_data(void *p);
+
+/*!
+ * \brief Indicate panic to the host
+ *
+ * Indicate to the host that DSP cannot recover from the state it is in.
+ * This function does best effort to inform the host, but there are no
+ * guarantees. It may as well do nothing. In the worst case the host will
+ * observe a timeout on its request and do recovery then.
+ */
 void xrp_hw_panic(void);
 
 #endif
