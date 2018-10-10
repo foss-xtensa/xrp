@@ -123,7 +123,7 @@ DIST_COMMON = $(srcdir)/Makefile.am $(top_srcdir)/configure \
 am__CONFIG_DISTCLEAN_FILES = config.status config.cache config.log \
  configure.lineno config.status.lineno
 mkinstalldirs = $(install_sh) -d
-CONFIG_CLEAN_FILES =
+CONFIG_CLEAN_FILES = doc/Makefile doc/xrp.conf
 CONFIG_CLEAN_VPATH_FILES =
 AM_V_P = $(am__v_P_@AM_V@)
 am__v_P_ = $(am__v_P_@AM_DEFAULT_V@)
@@ -185,7 +185,8 @@ am__DIST_COMMON = $(srcdir)/Makefile.in $(top_srcdir)/autoconf/compile \
 	$(top_srcdir)/autoconf/config.guess \
 	$(top_srcdir)/autoconf/config.sub \
 	$(top_srcdir)/autoconf/install-sh \
-	$(top_srcdir)/autoconf/missing README autoconf/compile \
+	$(top_srcdir)/autoconf/missing $(top_srcdir)/doc/Makefile.in \
+	$(top_srcdir)/doc/xrp.conf.in README autoconf/compile \
 	autoconf/config.guess autoconf/config.sub autoconf/depcomp \
 	autoconf/install-sh autoconf/missing
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
@@ -379,6 +380,10 @@ $(top_srcdir)/configure: @MAINTAINER_MODE_TRUE@ $(am__configure_deps)
 $(ACLOCAL_M4): @MAINTAINER_MODE_TRUE@ $(am__aclocal_m4_deps)
 	$(am__cd) $(srcdir) && $(ACLOCAL) $(ACLOCAL_AMFLAGS)
 $(am__aclocal_m4_deps):
+doc/Makefile: $(top_builddir)/config.status $(top_srcdir)/doc/Makefile.in
+	cd $(top_builddir) && $(SHELL) ./config.status $@
+doc/xrp.conf: $(top_builddir)/config.status $(top_srcdir)/doc/xrp.conf.in
+	cd $(top_builddir) && $(SHELL) ./config.status $@
 
 # This directory's subdirectories are mostly independent; you can cd
 # into them and run 'make' without going through this Makefile.

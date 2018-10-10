@@ -4201,7 +4201,7 @@ IFS=$ac_save_IFS
 case $host_os in *\ *) host_os=`echo "$host_os" | sed 's/ /-/g'`;; esac
 
 
-ac_config_files="$ac_config_files Makefile xrp-common/Makefile xrp-dsp/Makefile xrp-example/Makefile xrp-host/Makefile"
+ac_config_files="$ac_config_files Makefile doc/Makefile doc/xrp.conf xrp-common/Makefile xrp-dsp/Makefile xrp-example/Makefile xrp-host/Makefile"
 
 
 # Check whether --enable-threads was given.
@@ -5860,6 +5860,8 @@ do
   case $ac_config_target in
     "depfiles") CONFIG_COMMANDS="$CONFIG_COMMANDS depfiles" ;;
     "Makefile") CONFIG_FILES="$CONFIG_FILES Makefile" ;;
+    "doc/Makefile") CONFIG_FILES="$CONFIG_FILES doc/Makefile" ;;
+    "doc/xrp.conf") CONFIG_FILES="$CONFIG_FILES doc/xrp.conf" ;;
     "xrp-common/Makefile") CONFIG_FILES="$CONFIG_FILES xrp-common/Makefile" ;;
     "xrp-dsp/Makefile") CONFIG_FILES="$CONFIG_FILES xrp-dsp/Makefile" ;;
     "xrp-example/Makefile") CONFIG_FILES="$CONFIG_FILES xrp-example/Makefile" ;;
