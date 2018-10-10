@@ -157,12 +157,6 @@ AC_ARG_WITH([libfdt],
 AC_SUBST(LIBFDT_CPPFLAGS)
 AC_SUBST(LIBFDT_LDFLAGS)
 
-AS_IF([test x$build_dsp = xtrue],
-      [
-      AC_CHECK_HEADERS([xtensa/tie/xt_sync.h])
-      AC_CHECK_HEADERS([xtensa/tie/xt_interrupt.h])
-      ])
-
 AS_IF([test x$build_host = xtrue],
       [
       AC_MSG_CHECKING([for working _Atomic support])

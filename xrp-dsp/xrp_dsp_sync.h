@@ -24,13 +24,14 @@
 #ifndef XRP_DSP_SYNC_H
 #define XRP_DSP_SYNC_H
 
-#ifdef HAVE_XTENSA_TIE_XT_SYNC_H
+#include <xtensa/config/core.h>
+#if XCHAL_HAVE_RELEASE_SYNC
 #include <xtensa/tie/xt_sync.h>
 #else
 #include <xtensa/tie/xt_core.h>
 #endif
 
-#ifdef HAVE_XTENSA_TIE_XT_SYNC_H
+#if XCHAL_HAVE_RELEASE_SYNC
 static inline uint32_t xrp_l32ai(volatile void *p)
 {
 	return XT_L32AI(p, 0);

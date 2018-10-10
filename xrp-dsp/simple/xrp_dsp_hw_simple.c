@@ -23,7 +23,8 @@
 
 #include <stdint.h>
 #include <stdio.h>
-#ifdef HAVE_XTENSA_TIE_XT_INTERRUPT_H
+#include <xtensa/config/core.h>
+#if XCHAL_HAVE_INTERRUPTS
 #include <xtensa/tie/xt_interrupt.h>
 #endif
 #include <xtensa/xtruntime.h>
@@ -55,7 +56,7 @@ static uint32_t host_irq_offset;
 static uint32_t host_irq_bit;
 
 
-#ifdef HAVE_XTENSA_TIE_XT_INTERRUPT_H
+#if XCHAL_HAVE_INTERRUPTS
 static void xrp_irq_handler(void)
 {
 	pr_debug("%s\n", __func__);
@@ -80,7 +81,7 @@ void xrp_hw_send_host_irq(void)
 
 void xrp_hw_wait_device_irq(void)
 {
-#ifdef HAVE_XTENSA_TIE_XT_INTERRUPT_H
+#if XCHAL_HAVE_INTERRUPTS
 	unsigned old_intlevel;
 
 	if (device_irq_mode == XRP_IRQ_NONE)
@@ -130,7 +131,7 @@ void xrp_hw_set_sync_data(void *p)
 	}
 
 	if (device_irq_mode != XRP_IRQ_NONE) {
-#ifdef HAVE_XTENSA_TIE_XT_INTERRUPT_H
+#if XCHAL_HAVE_INTERRUPTS
 		_xtos_interrupt_disable(device_irq);
 		_xtos_set_interrupt_handler(device_irq, xrp_irq_handler);
 #endif
