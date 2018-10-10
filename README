@@ -36,8 +36,7 @@ XRP API uses the following terms:
          there's no ordering between commands in different queues.
 
 - buffer: a descriptor for a contiguous piece of memory. A buffer must be
-          mapped before its memory is accessible. A buffer must be unmapped
-          before it may be passed to a device. A buffer may be allocated in
+          mapped before its memory is accessible. A buffer may be allocated in
           the device specific memory or in the generic system memory. A buffer
           in the device specific memory is the most effective way to pass
           bulk data to/from the Xtensa DSP, it is physically contiguous and
@@ -466,8 +465,9 @@ read only or read/write access. The host specifies allowed access when it adds
 the buffer to the buffer group, the DSP will not be able to use the buffer in
 a way not enabled by the host. When buffer mapping is no longer needed it may
 be unmapped with the xrp_unmap_bufer function. Each mapping of the buffer must
-be unmapped individually. A buffer is only allowed to cross host/DSP boundary
-when it doesn't have any mappings.
+be unmapped individually. User is responsible for unmapping buffers before
+passing them between the host and the DSP or for making sure that buffer
+content is not accessed on one side when it's being processed on the other.
 
 In hosted mode XRP linux kernel driver manages DSP devices. When the driver
 gets loaded or device binding is added through sysfs the driver's probe

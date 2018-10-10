@@ -302,8 +302,6 @@ void xrp_event_status(struct xrp_event *event, enum xrp_status *status);
  * exceeding 16 bytes in size. Larger buffers may require additional data
  * copying depending on the implementation.
  *
- * All buffers in the passed group must be unmapped at that point.
- *
  * status is the result of command execution. Command execution is
  * successfull if the command was delivered to the DSP and the response was
  * delivered back. Otherwise the command execution is failed. IOW execution
@@ -329,8 +327,6 @@ void xrp_run_command_sync(struct xrp_queue *queue,
  * Optimal processing is guaranteed for in_data and out_data buffers not
  * exceeding 16 bytes in size. Larger buffers may require additional data
  * copying depending on the implementation.
- *
- * All buffers in the passed group must be unmapped at that point.
  *
  * If event is non-NULL then a pointer to an event corresponding to the
  * queued command is returned. This event can be waited for with xrp_wait,

@@ -625,12 +625,6 @@ void xrp_enqueue_command(struct xrp_queue *queue,
 	for (i = 0; i < n_buffers; ++i) {
 		phys_addr_t addr;
 
-		if (buffer_group->buffer[i].buffer->map_count > 0) {
-			xrp_mutex_unlock(&buffer_group->mutex);
-			set_status(status, XRP_STATUS_FAILURE);
-			return;
-
-		}
 		if (buffer_group->buffer[i].buffer->type == XRP_BUFFER_TYPE_DEVICE) {
 			addr = buffer_group->buffer[i].buffer->impl.xrp_allocation->start;
 		} else {

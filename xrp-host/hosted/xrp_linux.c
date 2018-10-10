@@ -146,11 +146,6 @@ static void _xrp_run_command(struct xrp_queue *queue,
 		size_t i;
 
 		for (i = 0; i < n_buffers; ++i) {
-			if (buffer_group->buffer[i].buffer->map_count > 0) {
-				xrp_mutex_unlock(&buffer_group->mutex);
-				set_status(status, XRP_STATUS_FAILURE);
-				return;
-			}
 			ioctl_buffer[i] = (struct xrp_ioctl_buffer){
 				.flags = buffer_group->buffer[i].access_flags,
 				.size = buffer_group->buffer[i].buffer->size,
