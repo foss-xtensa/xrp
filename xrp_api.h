@@ -444,6 +444,19 @@ void xrp_device_unregister_namespace(struct xrp_device *device,
 				     enum xrp_status *status);
 
 /*
+ * Enable or disable shared memory cache management.
+ * Note that this call does not change memory caching attributes, it only
+ * enables flushing and invalidating used regions of shared memory in the
+ * XRP code.
+ *
+ * \param device: device for which shared memory cache management state is
+ *                changed
+ * \param enable: whether cache management shall be enabled (non-zero) or
+ *                disabled (0)
+ */
+void xrp_device_enable_cache(struct xrp_device *device, int enable);
+
+/*
  * Helper function that terminates fast simulation
  */
 void xrp_exit(void);

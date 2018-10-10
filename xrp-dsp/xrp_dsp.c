@@ -70,6 +70,12 @@ struct xrp_buffer_group {
 };
 
 
+void xrp_device_enable_cache(struct xrp_device *device, int enable)
+{
+	(void)device;
+	manage_cache = enable;
+}
+
 static inline void dcache_region_invalidate(void *p, size_t sz)
 {
 	if (manage_cache)
