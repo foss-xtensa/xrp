@@ -214,6 +214,14 @@ case "${HW_PORT}" in
 		;;
 esac
 
+AS_IF([test x$build_dsp = xtrue],
+      [
+      # xtos_set_interrupt_handler is not available in all XTOS versions,
+      # but is preferred to _xtos_set_interrupt_handler when it's present.
+      #
+      AC_CHECK_FUNC([xtos_set_interrupt_handler])
+      ])
+
 AC_CONFIG_FILES([xrp-dsp/simple/Makefile])
 AC_CONFIG_FILES([xrp-dsp/hikey960/Makefile])
 

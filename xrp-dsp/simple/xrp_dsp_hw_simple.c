@@ -23,14 +23,11 @@
 
 #include <stdint.h>
 #include <stdio.h>
-#include <xtensa/config/core.h>
-#if XCHAL_HAVE_INTERRUPTS
-#include <xtensa/tie/xt_interrupt.h>
-#endif
 #include <xtensa/xtruntime.h>
 
 #include "xrp_debug.h"
 #include "xrp_dsp_hw.h"
+#include "xrp_dsp_interrupt.h"
 #include "xrp_dsp_sync.h"
 #include "xrp_types.h"
 #include "xrp_hw_simple_dsp_interface.h"
@@ -133,7 +130,7 @@ void xrp_hw_set_sync_data(void *p)
 	if (device_irq_mode != XRP_IRQ_NONE) {
 #if XCHAL_HAVE_INTERRUPTS
 		_xtos_interrupt_disable(device_irq);
-		_xtos_set_interrupt_handler(device_irq, xrp_irq_handler);
+		xrp_set_interrupt_handler(device_irq, xrp_irq_handler);
 #endif
 	}
 }
