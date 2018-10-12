@@ -48,6 +48,7 @@ enum xrp_irq_mode {
 	XRP_IRQ_NONE,
 	XRP_IRQ_LEVEL,
 	XRP_IRQ_EDGE,
+	XRP_IRQ_EDGE_SW,
 	XRP_IRQ_MAX,
 };
 
@@ -81,8 +82,22 @@ static inline void reg_write32(struct xrp_hw_simple *hw, unsigned addr, u32 v)
 		__raw_writel(v, hw->regs + addr);
 }
 
+static inline u32 reg_read32(struct xrp_hw_simple *hw, unsigned addr)
+{
+	if (hw->regs)
+		return __raw_readl(hw->regs + addr);
+	else
+		return 0;
+}
+
 static void *get_hw_sync_data(void *hw_arg, size_t *sz)
 {
+	static const u32 irq_mode[] = {
+		[XRP_IRQ_NONE] = XRP_DSP_SYNC_IRQ_MODE_NONE,
+		[XRP_IRQ_LEVEL] = XRP_DSP_SYNC_IRQ_MODE_LEVEL,
+		[XRP_IRQ_EDGE] = XRP_DSP_SYNC_IRQ_MODE_EDGE,
+		[XRP_IRQ_EDGE_SW] = XRP_DSP_SYNC_IRQ_MODE_EDGE,
+	};
 	struct xrp_hw_simple *hw = hw_arg;
 	struct xrp_hw_simple_sync_data *hw_sync_data =
 		kmalloc(sizeof(*hw_sync_data), GFP_KERNEL);
@@ -95,7 +110,7 @@ static void *get_hw_sync_data(void *hw_arg, size_t *sz)
 		.host_irq_mode = hw->host_irq_mode,
 		.host_irq_offset = hw->host_irq[0],
 		.host_irq_bit = hw->host_irq[1],
-		.device_irq_mode = hw->device_irq_mode,
+		.device_irq_mode = irq_mode[hw->device_irq_mode],
 		.device_irq_offset = hw->device_irq[0],
 		.device_irq_bit = hw->device_irq[1],
 		.device_irq = hw->device_irq[2],
@@ -126,6 +141,13 @@ static void send_irq(void *hw_arg)
 	struct xrp_hw_simple *hw = hw_arg;
 
 	switch (hw->device_irq_mode) {
+	case XRP_IRQ_EDGE_SW:
+		reg_write32(hw, hw->device_irq_host_offset,
+			    BIT(hw->device_irq[1]));
+		while ((reg_read32(hw, hw->device_irq_host_offset) &
+			BIT(hw->device_irq[1])))
+			mb();
+		break;
 	case XRP_IRQ_EDGE:
 		reg_write32(hw, hw->device_irq_host_offset, 0);
 		/* fallthrough */

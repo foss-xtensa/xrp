@@ -52,6 +52,7 @@ enum {
 	XRP_IRQ_NONE,
 	XRP_IRQ_LEVEL,
 	XRP_IRQ_EDGE,
+	XRP_IRQ_EDGE_SW,
 	XRP_IRQ_MAX,
 };
 
@@ -121,6 +122,13 @@ static inline void xrp_send_device_irq(struct xrp_device_description *desc)
 	void *device_irq = p2v(desc->io_base + desc->device_irq_host_offset);
 
 	switch (desc->device_irq_mode) {
+	case XRP_IRQ_EDGE_SW:
+		xrp_comm_write32(device_irq, 1 << desc->device_irq[1]);
+		/* Wait for interrupt delivery proxy in XTSC to clear */
+		while ((xrp_comm_read32(device_irq) &
+			(1 << desc->device_irq[1])))
+			;
+		break;
 	case XRP_IRQ_EDGE:
 		xrp_comm_write32(device_irq, 0);
 		/* fallthrough */
@@ -139,6 +147,7 @@ static void synchronize(struct xrp_device_description *desc)
 		[XRP_IRQ_NONE] = XRP_DSP_SYNC_IRQ_MODE_NONE,
 		[XRP_IRQ_LEVEL] = XRP_DSP_SYNC_IRQ_MODE_LEVEL,
 		[XRP_IRQ_EDGE] = XRP_DSP_SYNC_IRQ_MODE_EDGE,
+		[XRP_IRQ_EDGE_SW] = XRP_DSP_SYNC_IRQ_MODE_EDGE,
 	};
 
 	struct xrp_dsp_sync *shared_sync = desc->comm_ptr;

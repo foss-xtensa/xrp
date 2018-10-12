@@ -17,7 +17,8 @@ Optional properties:
 - device-irq-host-offset: offset of the 32-bit device IRQ MMIO register from
   the DSP MMIO block start as seen by the host. If omitted device-irq cell 0
   is used;
-- device-irq-mode: 0 for none (polling), 1 for level, 2 for edge.
+- device-irq-mode: 0 for none (polling), 1 for level, 2 for edge, 3 for
+  software-assisted (by LUA script in the XTSC) edge.
 
 - host-irq: 2 32-bit cells:
   - first: offset of the 32-bit device IRQ MMIO register from the DSP MMIO
