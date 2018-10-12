@@ -37,32 +37,32 @@ action accompanied by a vector of buffers with data or storage for that action.
 \idxentry{Introduction!Goals}
 
 XRP has been designed and implemented with the following major goals in mind:
-- isolate users from the details of memory subsystem and support passing buffers
-  with all types of memory between the host and DSPs transparently;
-- allow for effective (without copying) sharing of buffers between the userspace
-  process and the DSP firmware;
-- provide single set of API calls that allows running user code without
-  modifications natively and in various simulation/debug modes;
-- allow for porting to new hardware without modification of the existing code.
+- Isolate users from the details of memory subsystem and support passing buffers
+  with all types of memory between the host and DSPs transparently
+- Allow for effective (without copying) sharing of buffers between the userspace
+  process and the DSP firmware
+- Provide single set of API calls that allows running user code without
+  modifications natively and in various simulation/debug modes
+- Allow for porting to new hardware without modification of the existing code
 
 \section introduction_terminology Terminology
 \idxentry{Introduction!Terminology}
 
 XRP API uses the following terms:
 
-- device: single Xtensa DSP core. Devices are numbered sequentially from 0
+- Device: single Xtensa DSP core. Devices are numbered sequentially from 0
           to N - 1. There's an API call that opens device by its number.
 
-- namespace: an independent command handler on the DSP side identified by an
+- Namespace: an independent command handler on the DSP side identified by an
              UUID. Multiple namespaces may be active on the DSP side
              simultaneously. Namespace may be registered and deregistered
              dynamically.
 
-- queue: a communication stream between an application and a namespace on a
+- Queue: a communication stream between an application and a namespace on a
          device. Commands queued into one queue are processed in order and
          there's no ordering between commands in different queues.
 
-- buffer: a descriptor for a contiguous piece of memory. A buffer must be
+- Buffer: a descriptor for a contiguous piece of memory. A buffer must be
           mapped before its memory is accessible. A buffer may be allocated in
           the device specific memory or in the generic system memory. A buffer
           in the device specific memory is the most effective way to pass
@@ -71,7 +71,7 @@ XRP API uses the following terms:
           memory may be physically noncontiguous and tranferring data may
           require copying to/from the intermediate bounce buffer.
 
-- buffer group: a vector of buffers and associated allowed access flags.
+- Buffer group: a vector of buffers and associated allowed access flags.
                 Buffers are numbered sequentially from 0 to N - 1. A buffer
                 may be added to the end of a group. A buffer descriptor may be
                 acquired from the buffer group by index. A buffer may be added
@@ -80,7 +80,7 @@ XRP API uses the following terms:
                 the buffer descriptor acquired from the buffer group may be
                 mapped.
 
-- message: a unit of communication between the XRP API users. A message may be
+- Message: a unit of communication between the XRP API users. A message may be
            sent by the master to a queue synchronously or asynchronously. It
            is processed synchronously by the Xtensa DSP and the reply is
            delivered back to master. If a message was sent synchronously the
@@ -97,96 +97,94 @@ XRP API uses the following terms:
 \section introduction_requirements Requirements
 \idxentry{Introduction!Requirements}
 
-DSP side XRP code does not have any specific hardware requiremets, it should
-be able to work on a very broad range of Xtensa cores. It is tested with xtensa
+The DSP side XRP code does not have any specific hardware requirements, it should
+work on a very broad range of Xtensa cores. It is tested with Xtensa
 software versions RF.5 and later.
 
-The linux kernel driver is tested with a number of linux kernel versions from
-3.18 to 4.16 and is known to work on xtensa, 32- and 64-bit ARM and x86 linux.
+The Linux kernel driver is tested with a number of Linux kernel versions from
+3.18 to 4.16 and is known to work on Xtensa, 32- and 64-bit ARM and x86 Linux.
 
 The driver makes the following assumptions:
-- DSP has the same endianness as the host.
-- DSP memory where firmware must be loaded (possibly including DRAM and IRAM)
-  is writable from the linux host. Host may access that memory at physical
-  addresses different from their physical addresses used by the DSP (i.e.
+- The DSP has the same endianness as the host.
+- The DSP memory where firmware must be loaded (possibly including DRAM and IRAM)
+  is writable from the Linux host. The host may access that memory at physical
+  addresses different from their physical addresses used by the DSP (i.e.,
   multiple DSPs may have identical configurations, and thus IRAM and DRAM at
-  the same addresses, but the host need to see each IRAM and DRAM at physical
-  addresses that don't overlap in order to be able to load firmware to each
-  DSP).
-- the driver provides functions to manage contiguous memory allocation for the
-  DSP. These functions manage physical memory pool configured for the DSP.
+  the same addresses, but the host needs to see each IRAM and DRAM at physical
+  addresses that do not overlap to load firmware to each DSP).
+- The driver provides functions to manage contiguous memory allocation for the
+  DSP. These functions manage the physical memory pool configured for the DSP.
   The DSP must have access to all of this physical memory, but not necessarily
-  at the same physical address as the host;
-- the generic XRP driver is sufficient for shared-memory based operation with
-  host and DSPs working in polling mode. If there are hardware-specific steps
-  needed to enable DSPs, or DSPs or host need to work in IRQ mode then an
+  at the same physical address as the host.
+- The generic XRP driver is sufficient for the shared-memory based operation with
+  the host and DSPs working in polling mode. If there are hardware-specific steps
+  needed to enable DSPs, or DSPs or host need to work in the IRQ mode, then an
   additional hardware-specific XRP driver is needed for that system.
 
-There's an example of such additional driver in the package, called
-  xrp_hw_simple, which may be used as a reference/template. It makes the
-  following assumptions:
-- there exists reset and runstall memory-mapped registers for each DSP core,
-  DSP doesn't need any additional setup to run (i.e. no clock setup, no power
-  management, default reset vector);
-- there may exist memory-mapped register for sending IRQ to DSP core; if it
-  exists then in addition to always available polling mode the DSP firmware
-  may run in IRQ mode;
-- there may exist memory-mapped register for sending IRQ from DSP to the host;
-  if it exists then in addition to always available polling mode the linux
-  driver may run in IRQ mode.
+In the package an example driver is provided, xrp_hw_simple, which may be used as a
+reference/template. It makes the following assumptions:
+- Each DSP core has reset and runstall memory-mapped registers,
+  the DSP does not need any additional setup to run (such as no clock setup, no power
+  management, default reset vector).
+- There may exist a memory-mapped register for sending an IRQ to the DSP core; if it
+  exists, then in addition to the always available polling mode the DSP firmware
+  may run in the IRQ mode.
+- There may exist a memory-mapped register for sending the IRQ from the DSP to the host;
+  if it exists, then in addition to the always available polling mode the linux
+  driver may run in the IRQ mode.
 
 
 \section introduction_licensing Licensing
 \idxentry{Introduction!Licensing}
 
-Host and DSP XRP library code and examples are licensed under an MIT-style open
-source license. Linux kernel driver code is dual-licensed under an MIT-style open
+The host and DSP XRP library code and examples are licensed under an MIT-style open
+source license. The Linux kernel driver code is dual-licensed under an MIT-style open
 source license and under the GPLv2+ license.
 
 
-\page implementations XRP implementations
+\page implementations XRP Implementations
 \idxentry{Implementations}
 
 There are three implementations of the XRP interface for the host side: hosted,
-standalone and single image.
-Hosted implementation requires additional support from the host OS which is
-provided through the OS kernel driver. Standalone implementation talks to the
-DSP directly and is self-sufficient. Single image implementation runs host and
+standalone, and single image.
+The hosted implementation requires additional support from the host OS, which is
+provided through the OS kernel driver. The standalone implementation communicates with the
+DSP directly and is self-sufficient. The single image implementation runs the host and
 DSP code in a single process context, requests are either served synchronously
 or asynchronously in the XRP queue thread context.
-DSP XRP implementation can be configured to work with either hosted or
-standalone host XRP. Single image implementation doesn't use DSP XRP code and
-is not xtensa specific.
+The DSP XRP implementation can be configured to work with either hosted or
+standalone host XRP. The Single image implementation does not use the DSP XRP code and
+is not Xtensa specific.
 
-\section implementations_hosted Hosted implementation
+\section implementations_hosted Hosted Implementation
 \idxentry{Implementations!Hosted}
 
-Hosted implementation runs on a system where CPU cores running host OS code
+A hosted implementation runs on a system where CPU cores running host OS code
 and Xtensa DSP cores are connected to shared memory. It may be a hardware or
-a simulated system. It consists of the following three parts: hosted host
-implementation of the XRP interface, OS kernel driver and DSP implementation
+a simulated system. It consists of the following three parts: a hosted host
+implementation of the XRP interface, an OS kernel driver, and a DSP implementation
 of the XRP interface.
-- hosted host XRP implementation is a library code that runs in a userspace
+- A hosted host XRP implementation is a library code that runs in a userspace
   processes. It communicates with devices managed by the OS kernel driver
-  through the file-based interface exposed by the driver;
-- OS kernel driver consists of the generic XRP implementation and an
-  optional hardware-specific XRP driver. Generic XRP driver does the
-  following:
-  - loads firmware into the DSP cores, performs initial synchronization and
-    manages request queue;
-  - manages dedicated physical memory of the Xtensa DSP cores;
-  - maps and unmaps userspace buffers associated with requests making them
+  through the file-based interface exposed by the driver.
+- The OS kernel driver consists of the generic XRP implementation and an
+  optional hardware-specific XRP driver. The generic XRP driver performs the
+  following actions:
+  - Loads firmware into the DSP cores, performs initial synchronization, and
+    manages the request queue
+  - Manages the dedicated physical memory of the Xtensa DSP cores
+  - Maps and unmaps the userspace buffers associated with requests making them
     physically contiguous.
-  Hardware-specific XRP driver does the following:
-  - manages Xtensa DSP cores: stalls/unstalls, resets, selects reset vector,
-    configures shared memory/used IRQs, clocks, power, other relevant details
-    to get cores going;
-  - receives IRQs from DSPs and forwards them to the generic XRP driver;
-  - communicates hardware information to the hardware-specific part of the DSP
+  The hardware-specific XRP driver performs the following actions:
+  - Manages the Xtensa DSP cores: stalls/unstalls, resets, selects reset vector,
+    configures shared memory/used IRQs, clocks, power, and other relevant details
+    to get the cores going.
+  - Receives IRQs from DSPs and forwards them to the generic XRP driver.
+  - Communicates hardware information to the hardware-specific part of the DSP
     XRP library.
 - Xtensa DSP side XRP implementation is a library code that runs as a part
-  of firmware on Xtensa DSP implementing DSP subset of the XRP API. It
-  receives requests, invokes handler and sends replies back to host.
+  of the firmware on an Xtensa DSP implementing the DSP subset of the XRP API. It
+  receives requests, invokes the handler, and sends replies back to the host.
 
 \latexonly \begin{samepage} \endlatexonly
 <pre>
@@ -230,11 +228,11 @@ of the XRP interface.
 </pre>
 \latexonly \end{samepage} \endlatexonly
 
-Hosted implementation may run in a system that is separate from the DSP
-subsystem, i.e. the following configuration is possible: hosted host XRP
-library and generic XRP kernel driver are running in an emulator that
-communicates over shared memory with the DSP subsystem running in XTSC model.
-This way it is possible to simulate heterogeneous setups, like Aarch64-based
+A hosted implementation may run in a system that is separate from the DSP
+subsystem. For example, the following configuration is possible: a hosted host XRP
+library and a generic XRP kernel driver are running in an emulator that
+communicates over shared memory with the DSP subsystem running in an XTSC model.
+Hence, it is possible to simulate heterogeneous setups, such as an Aarch64-based
 host + Xtensa DSPs.
 
 \latexonly \begin{samepage} \endlatexonly
@@ -288,17 +286,17 @@ host + Xtensa DSPs.
 \latexonly \end{samepage} \endlatexonly
 
 
-\section implementations_standalone Standalone implementation
+\section implementations_standalone Standalone Implementation
 \idxentry{Implementations!Standalone}
 
-Standalone implementation can run on a linux-based system that communicates
-with unmodified Xtensa DSP code running in a simulator on the same linux-based
+A standalone implementation can run on a Linux-based system that communicates
+with an unmodified Xtensa DSP code running in a simulator on the same Linux-based
 system.
-It consists of the following two parts: standalone host implementation of the
-XRP interface and the DSP implementation of the XRP interface.
-- standalone host XRP implementation is a library code that runs in a process
+It consists of the following two parts: the standalone host implementation of the
+XRP interface, and the DSP implementation of the XRP interface.
+- The standalone host XRP implementation is a library code that runs in a process
   that directly communicates through the shared memory with the Xtensa DSP
-  side XRP code;
+  side XRP code.
 
 \latexonly \begin{samepage} \endlatexonly
 <pre>
@@ -345,9 +343,9 @@ XRP interface and the DSP implementation of the XRP interface.
 \latexonly \end{samepage} \endlatexonly
 
 
-Standalone implementation can run natively on a device without OS or with RTOS
-that provides direct access to the hardware, such as memory shared with DSP
-and MMIO:
+The standalone implementation can run natively on a device without an OS or with RTOS
+that provides direct access to the hardware, such as memory that is shared with the DSP
+and MMIO.
 
 \latexonly \begin{samepage} \endlatexonly
 <pre>
@@ -386,11 +384,11 @@ and MMIO:
 \latexonly \end{samepage} \endlatexonly
 
 
-\section implementations_single Single image implementation
+\section implementations_single Single Image Implementation
 \idxentry{Implementations!Single}
 
-Single image implementation can run in a userspace process, or natively on a
-device or in simulator, with or without OS:
+A single image implementation can run in a userspace process, natively on a
+device, or in simulator with or without an OS.
 
 \latexonly \begin{samepage} \endlatexonly
 <pre>
@@ -412,36 +410,36 @@ device or in simulator, with or without OS:
 \page configuration Configuration
 \idxentry{Configuration}
 
-Number and configuration of Xtensa DSPs, details of MMIO registers that
-control them, location and amount of the shared memory all may change. The
+The number and configuration of Xtensa DSPs, details of MMIO registers that
+control them, and the location and amount of the shared memory may all change. The
 following pieces of the code capture the details of the configuration and need
-to be adjusted whenever it is changed:
+to be adjusted when it is changed.
 
-\section configuration_hosted Hosted mode
+\section configuration_hosted Hosted Mode
 \idxentry{Configuration!Hosted}
 
-- the device tree. Linux kernel need to have a device tree node for each
-  Xtensa DSP managed by the XRP linux kernel driver. Please see
+- The device tree. The Linux kernel must have a device tree node for each
+  Xtensa DSP managed by the XRP Linux kernel driver. See
   xrp-kernel/cdns,xrp*.txt for the device tree binding information.
-- DSP firmware bits of the XRP don't have any hardcoded addresses, but the
+- The DSP firmware bits of the XRP do not have any hardcoded addresses, but the
   firmware image depends on the LSP used to link it.
 
-\section configuration_standalone Standalone mode
+\section configuration_standalone Standalone Mode
 \idxentry{Configuration!Standalone}
 
-- the device tree. Although there's no linux kernel and kernel driver involved,
-  the configuration is maintained in the same format as in hosted mode. But in
-  addition to a device node for each managed Xtensa DSP there must be a device
-  node for all segments of memory shared with Xtensa simulators. Please see
+- The device tree. Although there's no Linux kernel and kernel driver involved,
+  the configuration is maintained in the same format as in the hosted mode. But in
+  addition to a device node for each managed Xtensa DSP, there must be a device
+  node for all segments of memory shared with Xtensa simulators. See
   xrp-host/sim/cdns,sim-shmem.txt for the device tree binding information.
-- DSP firmware bits of the XRP built for fast simulation have the base address
+- The DSP firmware bits of the XRP built for fast simulation have the base address
   of the communication area in the shared memory built into it. See how
   DSP_COMM_BASE is used.
 
-\section configuration_single Single Image mode
+\section configuration_single Single Image Mode
 \idxentry{Configuration!Single}
 
-- XRP does not depend on the target hardware. The only configurable parameter
+- The XRP does not depend on the target hardware. The only configurable parameter
   is the thread stack size in case XOS threads are used on Xtensa ELF host.
   It is captured in a symbol `xrp_xos_thread_stack_size` and may be adjusted
   with `-Wl,-defsym,xrp_xos_thread_stack_size=...` option in LDFLAGS at
@@ -450,15 +448,15 @@ to be adjusted whenever it is changed:
 \page operation XRP Operation
 \idxentry{Operation}
 
-DSP payload implements the main function. To start using XRP it must open the
+The DSP payload implements the main function. To start using XRP it must open the
 XRP device. After that it may register handlers for one or more namespaces and
-start processing incoming XRP messages with xrp_device_dispatch() function. It
+start processing incoming XRP messages with the xrp_device_dispatch() function. It
 may call xrp_device_poll() to check for incoming messages and
-xrp_hw_wait_device_irq() to go into waiti state when there's no more work to do.
+xrp_hw_wait_device_irq() to go into the waiti state when there is no more work to do.
 
-The very first message sequence that host XRP sends to the DSP is for
-synchronization. During synchronization process host communicates whether host
-and DSP use IRQ and IRQ numbers/MMIO register locations. Then host and DSP
+The very first message sequence that the host XRP sends to the DSP is for
+synchronization. During the synchronization process, the host communicates whether the host
+and DSP use IRQ and IRQ numbers/MMIO register locations. Next, the host and DSP
 exchange IRQs in directions where IRQs are used.
 
 Namespace handlers registered by the DSP are the functions with the following
@@ -471,7 +469,7 @@ prototype:
                       struct xrp_buffer_group *buffer_group);
 </pre>
 
-It is called from the xrp_device_dispatch() function whenever a command for the
+It is called from the xrp_device_dispatch() function when a command for the
 corresponding namespace is received. The function takes command description
 from the in_data buffer and associated buffer group from the buffer_group. It
 writes command processing results to the out_data buffer and to the relevant
@@ -485,22 +483,22 @@ the xrp_device_dispatch. In case it was XRP_STATUS_FAILURE the host also gets
 XRP_STATUS_FAILURE for the command. handler_context is a pointer that was
 passed to the namespace handler registration function.
 
-Linux application that uses XRP starts with opening XRP devices with
+The Linux application that uses XRP starts with opening XRP devices with the
 xrp_open_device() function. XRP devices may have different capabilities and run
-different firmware, there's nothing in the XRP API about it. Linux application
+different firmware, there is nothing in the XRP API about it. Linux application
 may need to open XRP device and communicate with it to find its capabilities.
-XRP device is identified by an integer index. After opening the device the
-application need to create a command queue with xrp_create_queue() function.
-Once a queue is created an application can send commands through this queue.
-Commands may be sent synchronously with xrp_run_command_sync function or
-asynchronously with xrp_enqueue_command() function. xrp_run_command_sync() returns
+An XRP device is identified by an integer index. After opening the device, the
+application must create a command queue with the xrp_create_queue() function.
+Once a queue is created, an application can send commands through this queue.
+Commands may be sent synchronously with the xrp_run_command_sync function or
+asynchronously with the xrp_enqueue_command() function. xrp_run_command_sync() returns
 when the command execution is complete. xrp_enqueue_command() returns
 immediately, regardless of the completion of the command that it enqueued. It
 may return a pointer to the event that becomes signaled when the command is
-complete. An application may call xrp_wait function to wait for the event.
+complete. An application may call the xrp_wait function to wait for the event.
 Completion of a command means completion of all preceding commands in the same
 command queue.
-A command may operate on data buffers, however it may not reference them by
+A command may operate on data buffers, however, it may not reference them by
 address as the address spaces of the application and DSP payload may be
 different. Instead each contiguous buffer is represented as an xrp_buffer
 object, and a group of buffers related to one command is represented as an
@@ -531,32 +529,32 @@ original buffer addresses:
 | 0xxxxxx100 | 0xxxxxx900 | (at least 8 LS bits are 0)  |
 | 0xxxxxx800 | 0xxxxxx800 | (at least 11 LS bits are 0) |
 
-In order to access memory of the xrp_buffer object the buffer or part of it
+To access memory of the xrp_buffer object, the buffer or part of it
 must be mapped with the xrp_map_buffer() function. A buffer may be mapped for
 read only or read/write access. The host specifies allowed access when it adds
 the buffer to the buffer group, the DSP will not be able to use the buffer in
 a way not enabled by the host. When buffer mapping is no longer needed it may
 be unmapped with the xrp_unmap_bufer() function. Each mapping of the buffer must
-be unmapped individually. User is responsible for unmapping buffers before
+be unmapped individually. The user is responsible for unmapping buffers before
 passing them between the host and the DSP or for making sure that buffer
-content is not accessed on one side when it's being processed on the other.
+content is not accessed on one side when it is being processed on the other.
 
-In hosted mode XRP linux kernel driver manages DSP devices. When the driver
-gets loaded or device binding is added through sysfs the driver's probe
+In hosted mode, the XRP Linux kernel driver manages the DSP devices. When the driver
+gets loaded or device binding is added through sysfs, the driver's probe
 function is called for each matching device node. Depending on the power
-management settings of the kernel and of the hardware-specific driver the
+management settings of the kernel and of the hardware-specific driver, the
 DSP may be initialized once in the driver probe callback and then run
 continuously or it may be initialized when the corresponding device is first
 opened by the user and shut down after it's been closed by the last user.
-Please see xrp-kernel/README.porting for the description of the DSP life cycle
+See xrp-kernel/README.porting for the description of the DSP life cycle
 from the kernel driver point of view. Each configured DSP is represented by a
-character device. Linux userspace XRP library may then open that device and
+character device. The Linux userspace XRP library may then open that device and
 interact with it by means of ioctl and mmap system calls.
 
-In standalone mode XTSC simulator loads firmware images for all simulated
+In standalone mode, the XTSC simulator loads firmware images for all simulated
 DSP cores. Each firmware image has its communication area address preconfigured
-(see DSP_COMM_BASE in this document). Shared physical memory simulated by the
-XTSC is implemented as shared memory of the host platform. In case of linux it
+(see DSP_COMM_BASE in this document). The shared physical memory simulated by the
+XTSC is implemented as shared memory of the host platform. In the Linux case, it
 is backed by files in /dev/shm. Fast simulation mode XRP user library uses
 device tree blob linked with it to find names of the shared memory files and
 addresses of the DSP communication areas. It synchronizes with used DSP nodes
@@ -567,31 +565,31 @@ designated as software IRQ registers and initiates internal write to the real
 MMIO IRQ register when such location is written to.
 It is not possible to use IRQ for communication from the DSP to the host.
 
-\page porting Porting XRP to a new hardware platform
+\page porting Porting XRP to a New Hardware Platform
 \idxentry{Porting}
 
-XRP may be used on wide variety of system configurations. While its core logic
+XRP may be used on a wide variety of system configurations. While its core logic
 does not depend on the hardware details, certain tasks like DSP initialization
-or IRQ delivery may need to be very hardware-specific. For this reason DSP and
+or IRQ delivery may need to be very hardware-specific. For this reason, the DSP and
 kernel code is organized in a way that supports extension: generic code provides
-entry points and uses fixed interface to call hardware-specific operations. 
+entry points and uses fixed interface to call hardware-specific operations.
 
-\section porting_dsp Porting XRP DSP code
+\section porting_dsp Porting XRP DSP Code
 \idxentry{Porting!DSP}
 
 The following tasks that XRP firmware performs during the device lifecycle
 need detailed knowledge about the hardware:
 
-- initialization of the hardware-specific code.
+- Initialization of the hardware-specific code.
 - DSP operation parameters initialization: need to be synchronized with the
   hardware-specific XRP kernel driver on the host side.
-- sending IRQ to the host: need to know the location and layout of the
+- Sending IRQ to the host: need to know the location and layout of the
   register that controls IRQ signal.
-- receiving IRQ from the host: need to know interrupt number, IRQ mode, layout
+- Receiving IRQ from the host: need to know interrupt number, IRQ mode, layout
   and location of a register to clear IRQ on the DSP side.
-- going to the low-power state when there's nothing to do: need to be aware of
+- Going to the low-power state when there's nothing to do: need to be aware of
   other IRQs used on the DSP side.
-- signaling panic to the host.
+- Signaling panic to the host.
 
 The XRP DSP library implements generic XRP functionality and expects that the
 above functions are implemented externally.
@@ -670,7 +668,7 @@ template.
 
 \section porting_dsp_cache Caching shared memory on the DSP
 
-Initially XRP was developed for use with Vision xtensa cores that don't have
+Initially XRP was developed for use with Vision Xtensa cores that do not have
 data cache. Cores that have data cache are supposed to set up shared memory
 region as uncached and use IDMA to transfer data between the shared memory
 buffers and local memory. In case it is desirable to use data cache with
@@ -678,28 +676,28 @@ shared memory on the DSP side, xrp_device_enable_cache() may be used to turn
 on cache management in the DSP XRP code.
 
 \latexonly \newpage \endlatexonly
-\section porting_kernel Porting XRP kernel driver
+\section porting_kernel Porting the XRP Kernel Driver
 \idxentry{Porting!Kernel}
 
 The following tasks that XRP driver performs during the device lifecycle
 need detailed knowledge about the hardware:
 
-- starting and stopping the DSP: need to control power and clock of the DSP,
+- Starting and stopping the DSP: need to control power and clock of the DSP,
   need to know location and layout of the registers that control reset vector
   selection, reset and runstall signals.
-- loading firmware: depending on the way DSP memory is connected to the host
+- Loading firmware: depending on the way DSP memory is connected to the host
   it may vary greatly.
-- sending IRQ to the DSP: need to know the location and layout of the register
+- Sending IRQ to the DSP: need to know the location and layout of the register
   that controls IRQ signal. Information about IRQ number, IRQ mode, layout and
   location or the register to clear IRQ on the DSP side must be made available
   to the DSP.
-- receiving IRQ from the DSP: need to know interrupt number, IRQ mode, layout
+- Receiving IRQ from the DSP: need to know interrupt number, IRQ mode, layout
   and location of a register to clear IRQ on the host side.
-- invalidating/flushing cache for DSP memory: may need to be performed in
+- Invalidating/flushing cache for DSP memory: may need to be performed in
   architecture-specific device-specific manner.
-- copying data/code to hardware-specific memory or setting it to a specific
+- Copying data/code to hardware-specific memory or setting it to a specific
   value. This may require specific alignment/access width for written data.
-- detecting that the DSP firmware has crashed and dumping crash log
+- Detecting that the DSP firmware has crashed and dumping crash log
   information.
 
 The XRP driver is divided into two parts: generic and hardware-specific and
@@ -710,8 +708,8 @@ Generic XRP driver defines three formats of configuration information:
 cdns,xrp, cdns,xrp,v1 and cdns,xrp,cma. The difference is in the way the
 shared memory region is specified and in the contents of the device registers
 (regs device tree property, information returned by the platform_get_resource
-function), please see cdns,xrp.txt, cdns,xrp,v1.txt and cdns,xrp,cma.txt for
-the details. The hardware-specific XRP driver should extend one of these
+function), see cdns,xrp.txt, cdns,xrp,v1.txt and cdns,xrp,cma.txt for
+details. The hardware-specific XRP driver should extend one of these
 formats and define its own format based on it. At the device probe time the
 hardware-specific XRP driver must call xrp_init(), xrp_init_v1() or xrp_init_cma()
 (corresponding to the chosen configuration information format) and pass it a
@@ -719,7 +717,7 @@ pointer to the platform device being probed, to the xvp structure, to the
 xrp_hw_ops structure and an opaque hw_arg pointer. xrp_init() function will
 use platform device to get device registers information to initialize xvp
 structure. Platform device drvdata will be used by the generic XRP driver,
-don't change it in the hardware-specific XRP driver. In case CONFIG_OF is
+do not change it in the hardware-specific XRP driver. When CONFIG_OF is
 enabled, xrp_init() will use device tree node associated with the platform device
 to set up physical address map and get firmware image name. Initialization
 functions return a pointer to struct xvp on success or a negative error code
@@ -754,7 +752,7 @@ whether CONFIG_PM is enabled in the kernel or not these functions will be
 called by the runtime PM kernel code (and it may happen multiple times during
 the device lifetime) or by the xrp_init()/xrp_deinit() functions.
 
-All of the xrp_hw_ops callback functions may be blocking. In case the firmware
+All of the xrp_hw_ops callback functions may be blocking. When the firmware
 cannot be loaded by the generic XRP driver, the hardware-specific XRP can do
 it in the xrp_hw_ops::reset callback.
 
@@ -807,19 +805,19 @@ recovery procedure immediately instead of waiting for response timeout.
 DSP may provide additional information to aid crash debugging, the function
 may extract and print that information.
 
-Porting XRP kernel driver to new hardware is done by developing
+Porting the XRP kernel driver to new hardware is done by developing a
 hardware-specific driver for that hardware with the functionality described
 above. It must be accompanied by the matching hardware-specific library for
-the DSP side. Please see xrp-dsp/README.porting for the details.
+the DSP side. See xrp-dsp/README.porting for details.
 
-There's an example hardware-specific XRP driver xrp_hw_simple that may be used
+An example hardware-specific XRP driver, xrp_hw_simple, is provided that may be used
 as a template.
 
 \page building Configuring and Building XRP
 \idxentry{Building}
 
-XRP sources are installed along with the Xtensa Tools. The sources can be found 
-under 
+XRP sources are installed along with the Xtensa Tools. The sources can be found
+under
 
 <tt><em>\<xtensa_tools_root\></em>/xtensa-elf/src/xrp</tt>
 
@@ -828,7 +826,7 @@ Tools have been installed. The sources are self-contained and can be copied
 elsewhere by copying the directory tree under the xrp directory.
 
 The XRP header files are also present in
- 
+
 <tt><em>\<xtensa_tools_root\></em>/xtensa-elf/include</tt>
 
 This is where the compiler will find them if you use the standard include mechanism:
@@ -837,17 +835,17 @@ This is where the compiler will find them if you use the standard include mechan
 
 XRP DSP library code, ELF host library fox Xtensa and ELF single image library for
 Xtensa are also provided in binary form ready for linking. Linux hosted host
-library, linux standalone host library, linux single image library and kernel driver
+library, Linux standalone host library, Linux single image library and kernel driver
 must be built for a specific system where they will be used.
 
-\section building_kernel Building kernel driver
+\section building_kernel Building the Kernel Driver
 \idxentry{Building!Kernel}
 
-Kernel driver is built using typical kernel module build sequence. Provide the
+The kernel driver is built using a typical kernel module build sequence. Provide the
 following environment variables/make parameters:
-- `ARCH`: target linux architecture;
-- `KSRC`: points to the configured kernel tree;
-- `CROSS_COMPILE`: path and prefix name of the cross compiler.
+- `ARCH`: target linux architecture
+- `KSRC`: points to the configured kernel tree
+- `CROSS_COMPILE`: path and prefix name of the cross compiler
 
 Makefile supports targets "modules", "clean" and all other standard kernel
 targets. Example building for xtensa linux:
@@ -871,7 +869,7 @@ The following XRP kernel module features have additional requirements for the
 kernel configuration:
 - CMA binding needs CONFIG_CMA and CONFIG_DMA_CMA enabled.
 
-\section building_libraries Building XRP libraries
+\section building_libraries Building XRP Libraries
 \idxentry{Building!Libraries}
 
 Userspace and firmware code is built using standard autoconf configure + make
@@ -931,7 +929,7 @@ checks for POSIX or XOS threads availability.
 | xrp-host/libxrp-host-single.a         | Single image host library |
 | xrp-common/libxrp-common.a            | Common XRP code library   |
 
-\section building_examples Building XRP examples
+\section building_examples Building XRP Examples
 \idxentry{Building!Examples}
 
 Example applications may be built in addition to the XRP libraries. The switch
@@ -971,8 +969,8 @@ libraries and examples.
   $ make
 </pre>
 
-  The result is xrp-example/xrp-dsp-standalone. In order to be loaded as a
-  firmware a path to it needs to be passed to the XTSC.
+  The result is xrp-example/xrp-dsp-standalone. To be loaded as
+  firmware, a path to it must be passed to the XTSC.
 
 - adding switch `--enable-example` to the linux host build configuration will
   produce example linux host applications for hosted, standalone and
