@@ -24,8 +24,8 @@
 \page introduction Introduction
 \idxentry{Introduction}
 
-Xtensa Remote Processing (XRP) is a communication interface for linux-based
-systems containing Xtensa processors. It allows linux userspace tasks to send
+Xtensa Remote Processing (XRP) is a communication interface for Linux-based
+systems containing Xtensa processors. It allows Linux userspace tasks to send
 messages to the firmware running on Xtensa processors. Its implementations
 support master-slave communication model with a single host node sending messages
 and one or more DSP nodes executing actions requested in received messages and
@@ -130,7 +130,7 @@ reference/template. It makes the following assumptions:
   exists, then in addition to the always available polling mode the DSP firmware
   may run in the IRQ mode.
 - There may exist a memory-mapped register for sending the IRQ from the DSP to the host;
-  if it exists, then in addition to the always available polling mode the linux
+  if it exists, then in addition to the always available polling mode the Linux
   driver may run in the IRQ mode.
 
 
@@ -290,8 +290,7 @@ host + Xtensa DSPs.
 \idxentry{Implementations!Standalone}
 
 A standalone implementation can run on a Linux-based system that communicates
-with an unmodified Xtensa DSP code running in a simulator on the same Linux-based
-system.
+with Xtensa DSP code running in a simulator on the same Linux-based system.
 It consists of the following two parts: the standalone host implementation of the
 XRP interface, and the DSP implementation of the XRP interface.
 - The standalone host XRP implementation is a library code that runs in a process
@@ -421,8 +420,10 @@ to be adjusted when it is changed.
 - The device tree. The Linux kernel must have a device tree node for each
   Xtensa DSP managed by the XRP Linux kernel driver. See
   xrp-kernel/cdns,xrp*.txt for the device tree binding information.
-- The DSP firmware bits of the XRP do not have any hardcoded addresses, but the
-  firmware image depends on the LSP used to link it.
+- The DSP XRP library does not have any hardcoded addresses, but the firmware
+  image depends on the LSP used to link it. The LSP does not need to have any
+  XRP-specific sections, but it must correctly place the DSP stack and data in
+  local memories or in the region of system memory reserved for that DSP.
 
 \section configuration_standalone Standalone Mode
 \idxentry{Configuration!Standalone}
@@ -431,10 +432,11 @@ to be adjusted when it is changed.
   the configuration is maintained in the same format as in the hosted mode. But in
   addition to a device node for each managed Xtensa DSP, there must be a device
   node for all segments of memory shared with Xtensa simulators. See
-  xrp-host/sim/cdns,sim-shmem.txt for the device tree binding information.
-- The DSP firmware bits of the XRP built for fast simulation have the base address
-  of the communication area in the shared memory built into it. See how
-  DSP_COMM_BASE is used.
+  xrp-host/standalone/cdns,sim-shmem.txt for the device tree binding information.
+- The DSP firmware image built for standalone mode have the base address
+  of the communication area in the shared memory built into it in the symbol
+  xrp_dsp_comm_base_magic. Configuration environment variable DSP_COMM_BASE is
+  used to set that symbol when building example standalone mode firmware.
 
 \section configuration_single Single Image Mode
 \idxentry{Configuration!Single}
@@ -781,7 +783,7 @@ xrp_hw_ops::dma_sync_for_device is used to clean (write back), flush (write
 back and invalidate) or invalidate an area of user memory shared with the DSP
 to transition ownership of that memory to the DSP. xrp_hw_ops::dma_sync_for_cpu
 is used to transition ownership of the memory back to host CPU.
-Standard linux cache management functions (from the DMA API) may be used only
+Standard Linux cache management functions (from the DMA API) may be used only
 when the DSP shared memory is allocated from the system memory, covered by
 struct page's and there's no cache aliasing. If that's not the case then the
 hardware-specific XRP driver may use architecture-specific methods of cache
@@ -838,37 +840,6 @@ Xtensa are also provided in binary form ready for linking. Linux hosted host
 library, Linux standalone host library, Linux single image library and kernel driver
 must be built for a specific system where they will be used.
 
-\section building_kernel Building the Kernel Driver
-\idxentry{Building!Kernel}
-
-The kernel driver is built using a typical kernel module build sequence. Provide the
-following environment variables/make parameters:
-- `ARCH`: target linux architecture
-- `KSRC`: points to the configured kernel tree
-- `CROSS_COMPILE`: path and prefix name of the cross compiler
-
-Makefile supports targets "modules", "clean" and all other standard kernel
-targets. Example building for xtensa linux:
-
-<pre>
-  $ ARCH=xtensa CROSS_COMPILE=xtensa-dc233c-elf- \
-    KSRC=`pwd`/../kernel/xrp-sim-dc233c make -C xrp-kernel modules
-</pre>
-
-The result is kernel object xrp-kernel/xrp.ko loadable into the kernel it was
-built against. To build both xrp.ko and xrp_hw_simple.ko pass
-CONFIG_XRP_HW_SIMPLE=m to the make:
-
-<pre>
-  $ ARCH=xtensa CROSS_COMPILE=xtensa-dc233c-elf- \
-    KSRC=`pwd`/../kernel/xrp-sim-dc233c \
-    make -C xrp-kernel CONFIG_XRP_HW_SIMPLE=m modules
-</pre>
-
-The following XRP kernel module features have additional requirements for the
-kernel configuration:
-- CMA binding needs CONFIG_CMA and CONFIG_DMA_CMA enabled.
-
 \section building_libraries Building XRP Libraries
 \idxentry{Building!Libraries}
 
@@ -885,7 +856,7 @@ Switches `--enable-host` (on by default) and `--enable-dsp` (on when host
 triplet specifies xtensa host) enable building of host and DSP libraries and
 examples respectively.
 
-Switches `--enable-hosted` (on when host triplet specifies linux host),
+Switches `--enable-hosted` (on when host triplet specifies Linux host),
 `--enable-standalone` (on by default) and `--enable-single` (on by default)
 enable building of hosted variant of library/example, standalone variant or
 single image variant respectively.
@@ -914,7 +885,7 @@ checks for POSIX or XOS threads availability.
 | xrp-dsp/libxrp-dsp.a                  | DSP library               |
 
 - host side code needs a toolchain for the host. Without additional
-  switches the following will produce linux XRP libraries for hosted,
+  switches the following will produce Linux XRP libraries for hosted,
   standalone and single-image modes:
 
 <pre>
@@ -951,7 +922,7 @@ libraries and examples.
 </pre>
 
   The result is xrp-example/xrp-dsp-hosted. In order to be loaded as a firmware
-  it needs to be put to the linux file system under /lib/modules/firmware and
+  it needs to be put to the Linux file system under /lib/modules/firmware and
   its name need to be specified in the "firmware" parameter inside the xrp
   device node in the device tree.
 
@@ -972,8 +943,8 @@ libraries and examples.
   The result is xrp-example/xrp-dsp-standalone. To be loaded as
   firmware, a path to it must be passed to the XTSC.
 
-- adding switch `--enable-example` to the linux host build configuration will
-  produce example linux host applications for hosted, standalone and
+- adding switch `--enable-example` to the Linux host build configuration will
+  produce example Linux host applications for hosted, standalone and
   single-image modes:
 
 <pre>
@@ -999,5 +970,43 @@ libraries and examples.
 | ------------------------------- | ----------------------------------- |
 | xrp-example/xrp-host-single     | Single image example                |
 | xrp-example/xrp-host-standalone | Standalone host example application |
+
+\section building_kernel Building the Kernel Driver
+\idxentry{Building!Kernel}
+
+The kernel driver is built using a typical kernel module build sequence. Provide the
+following environment variables/make parameters:
+- `ARCH`: target Linux architecture
+- `KSRC`: points to the configured kernel tree
+- `CROSS_COMPILE`: path and prefix name of the cross compiler
+
+xrp-kernel directory is independent from the rest of the XRP build system,
+it is not configured by the configure script. The Makefile here invokes
+the Linux kernel build system. xrp-kernel/Makefile supports targets "modules",
+"clean" and all other standard kernel targets. xrp-kernel/Kconfig is not used
+when building kernel modules out-of-tree. The whole xrp-kernel directory may
+be integrated into the drivers subtree of the Linux kernel, in which case
+Makefile of the parent directory shall reference xrp-kernel/Makefile, and
+Kconfig of the parent directory shall include xrp-kernel/Kconfig.
+Example building modules out-of-tree for the Aarch64 Linux:
+
+<pre>
+  $ ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- \
+    KSRC=`pwd`/../kernel/build-arm64-3.19 make -C xrp-kernel modules
+</pre>
+
+The result is kernel object xrp-kernel/xrp.ko loadable into the kernel it was
+built against. To build both xrp.ko and xrp_hw_simple.ko pass
+CONFIG_XRP_HW_SIMPLE=m to the make:
+
+<pre>
+  $ ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- \
+    KSRC=`pwd`/../kernel/build-arm64-3.19 \
+    make -C xrp-kernel CONFIG_XRP_HW_SIMPLE=m modules
+</pre>
+
+The following XRP kernel module features have additional requirements for the
+kernel configuration:
+- CMA binding needs CONFIG_CMA and CONFIG_DMA_CMA enabled.
 
 */
