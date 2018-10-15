@@ -23,17 +23,17 @@
 
 /*!
  * \file xrp_api.h
- * \brief XRP API definition.
+ * \brief This section defines XRP API.
  *
  * General API properties:
- * - all status pointers can be NULL;
- * - reference counting is not meant to work across host/DSP boundary, i.e.
- *   DSP may not retain the host buffer;
- * - a buffer allocated for one device can be passed as command parameter to
+ * - All status pointers can be NULL.
+ * - Reference counting is not meant to work across host/DSP boundary, i.e.
+ *   DSP may not retain the host buffer.
+ * - A buffer allocated for one device can be passed as command parameter to
  *   a different device; implementation should do reasonable thing, e.g. use
  *   the original data if possible or transparently migrate it to suitable
- *   memory;
- * - a group of API calls may be host side only, DSP side only, or usable on
+ *   memory.
+ * - A group of API calls may be host side only, DSP side only, or usable on
  *   both sides. When it's usable on both sides there may be additional
  *   restrictions on the DSP side.
  */
@@ -193,7 +193,7 @@ void xrp_buffer_get_info(struct xrp_buffer *buffer, enum xrp_buffer_info info,
  */
 
 /*!
- * \defgroup buffer_group_api Buffer group API
+ * \defgroup buffer_group_api Buffer Group API
  * These calls are available on the host side and on the DSP side with the
  * following restrictions:
  * - buffer groups may not be created on the DSP side;
@@ -441,7 +441,7 @@ void xrp_wait(struct xrp_event *event, enum xrp_status *status);
  */
 
 /*!
- * \defgroup dsp_specific_api DSP-specific interface (library-style)
+ * \defgroup dsp_specific_api DSP-specific Interface (Library-Style)
  * These calls are available only on the DSP side.
  * @{
  */
@@ -542,7 +542,7 @@ void xrp_device_enable_cache(struct xrp_device *device, int enable);
  */
 
 /*!
- * Helper function that terminates fast simulation
+ * Helper function that terminates fast simulation.
  */
 void xrp_exit(void);
 

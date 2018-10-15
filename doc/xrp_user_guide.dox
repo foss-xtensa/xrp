@@ -50,18 +50,6 @@ XRP has been designed and implemented with the following major goals in mind:
 
 XRP API uses the following terms:
 
-- Device: single Xtensa DSP core. Devices are numbered sequentially from 0
-          to N - 1. There's an API call that opens device by its number.
-
-- Namespace: an independent command handler on the DSP side identified by an
-             UUID. Multiple namespaces may be active on the DSP side
-             simultaneously. Namespace may be registered and deregistered
-             dynamically.
-
-- Queue: a communication stream between an application and a namespace on a
-         device. Commands queued into one queue are processed in order and
-         there's no ordering between commands in different queues.
-
 - Buffer: a descriptor for a contiguous piece of memory. A buffer must be
           mapped before its memory is accessible. A buffer may be allocated in
           the device specific memory or in the generic system memory. A buffer
@@ -80,6 +68,9 @@ XRP API uses the following terms:
                 the buffer descriptor acquired from the buffer group may be
                 mapped.
 
+- Device: single Xtensa DSP core. Devices are numbered sequentially from 0
+          to N - 1. There's an API call that opens device by its number.
+
 - Message: a unit of communication between the XRP API users. A message may be
            sent by the master to a queue synchronously or asynchronously. It
            is processed synchronously by the Xtensa DSP and the reply is
@@ -92,6 +83,15 @@ XRP API uses the following terms:
            result description data is written and a buffer group with buffers
            for the bulk data being processed.
 
+
+- Namespace: an independent command handler on the DSP side identified by an
+             UUID. Multiple namespaces may be active on the DSP side
+             simultaneously. Namespace may be registered and deregistered
+             dynamically.
+
+- Queue: a communication stream between an application and a namespace on a
+         device. Commands queued into one queue are processed in order and
+         there's no ordering between commands in different queues.
 
 \latexonly \newpage \endlatexonly
 \section introduction_requirements Requirements
@@ -164,29 +164,13 @@ and Xtensa DSP cores are connected to shared memory. It may be a hardware or
 a simulated system. It consists of the following three parts: a hosted host
 implementation of the XRP interface, an OS kernel driver, and a DSP implementation
 of the XRP interface.
-- A hosted host XRP implementation is a library code that runs in a userspace
-  processes. It communicates with devices managed by the OS kernel driver
-  through the file-based interface exposed by the driver.
-- The OS kernel driver consists of the generic XRP implementation and an
-  optional hardware-specific XRP driver. The generic XRP driver performs the
-  following actions:
-  - Loads firmware into the DSP cores, performs initial synchronization, and
-    manages the request queue
-  - Manages the dedicated physical memory of the Xtensa DSP cores
-  - Maps and unmaps the userspace buffers associated with requests making them
-    physically contiguous.
-  The hardware-specific XRP driver performs the following actions:
-  - Manages the Xtensa DSP cores: stalls/unstalls, resets, selects reset vector,
-    configures shared memory/used IRQs, clocks, power, and other relevant details
-    to get the cores going.
-  - Receives IRQs from DSPs and forwards them to the generic XRP driver.
-  - Communicates hardware information to the hardware-specific part of the DSP
-    XRP library.
-- Xtensa DSP side XRP implementation is a library code that runs as a part
-  of the firmware on an Xtensa DSP implementing the DSP subset of the XRP API. It
-  receives requests, invokes the handler, and sends replies back to the host.
 
-\latexonly \begin{samepage} \endlatexonly
+\latexonly
+\begin{figure}[h]
+\centering
+\begin{maxsizebox}{7cm}{7cm}
+\begin{minipage}{\textwidth}
+\endlatexonly
 <pre>
   ,--------.
   | System |
@@ -226,7 +210,33 @@ of the XRP interface.
   |                                                                     |
   `---------------------------------------------------------------------'
 </pre>
-\latexonly \end{samepage} \endlatexonly
+\latexonly
+\end{minipage}\end{maxsizebox}
+\caption{Hosted Host Interacting With the DSP Through the Kernel Driver}
+\end{figure}
+\endlatexonly
+
+- A hosted host XRP implementation is a library code that runs in a userspace
+  processes. It communicates with devices managed by the OS kernel driver
+  through the file-based interface exposed by the driver.
+- The OS kernel driver consists of the generic XRP implementation and an
+  optional hardware-specific XRP driver. The generic XRP driver performs the
+  following actions:
+  - Loads firmware into the DSP cores, performs initial synchronization, and
+    manages the request queue
+  - Manages the dedicated physical memory of the Xtensa DSP cores
+  - Maps and unmaps the userspace buffers associated with requests making them
+    physically contiguous.
+  The hardware-specific XRP driver performs the following actions:
+  - Manages the Xtensa DSP cores: stalls/unstalls, resets, selects reset vector,
+    configures shared memory/used IRQs, clocks, power, and other relevant details
+    to get the cores going.
+  - Receives IRQs from DSPs and forwards them to the generic XRP driver.
+  - Communicates hardware information to the hardware-specific part of the DSP
+    XRP library.
+- Xtensa DSP side XRP implementation is a library code that runs as a part
+  of the firmware on an Xtensa DSP implementing the DSP subset of the XRP API. It
+  receives requests, invokes the handler, and sends replies back to the host.
 
 A hosted implementation may run in a system that is separate from the DSP
 subsystem. For example, the following configuration is possible: a hosted host XRP
@@ -235,55 +245,53 @@ communicates over shared memory with the DSP subsystem running in an XTSC model.
 Hence, it is possible to simulate heterogeneous setups, such as an Aarch64-based
 host + Xtensa DSPs.
 
-\latexonly \begin{samepage} \endlatexonly
+\latexonly
+\begin{figure}[H]
+\centering
+\begin{maxsizebox}{7cm}{7cm}
+\begin{minipage}{\textwidth}
+\endlatexonly
 <pre>
   ,--------------------------------.        ,-------------------------.
   | Host system simulation process |        | XTSC simulation process |
-  |                                `-----.  |                         `----.
-  | ,-----------.                        |  |  ,-------.-------.           |
-  | | Host CPUS |                        |  |  | DSP 0 | DSP 1 | ...       |
-  | |           `----------------------. |  |  |       `-------------.     |
-  | | ,--------------.                 | |  |  | ,-----------------. |     |
-  | | | User process | ...             | |  |  | |   DSP payload   | |     |
-  | | |              `---------------. | |  |  | `-----------------' |     |
-  | | | ,--------------------------. | | |  |  |     ^         |     |     |
-  | | | |  User application code   | | | |  |  |     |         v     |     |
-  | | | `--------------------------' | | |  |  | ,-----------------. |     |
-  | | |             |       ^        | | |  |  | | DSP XRP library | |     |
-  | | |             v       |        | | |  |  | `-----------------' |     |
-  | | | ,--------------------------. | | |  |  |     ^    ^    |     |     |
-  | | | |  Hosted host XRP library | | | |  |  |     |    |    v     |<~.  |
-  | | | `--------------------------' | | |  |  |     | ,-----------. |<~|  |
-  | | `------------ | ----- ^ -------' | |  |  |     | |HW-specific|<~~~|  |
-  | |               |       |          | |  |  |     | |XRP library|<~~~|  |
-  | | ,--------.    |       |          | |  |  |     | `-----------' |  |  |
-  | | | Kernel |    |       |          | |  |  `---- | --------------'  |  |
-  | | |        `--- v ----- | -------. | |  |        |                  |  |
-  | | | ,--------------------------. | | |  |        |                  |  |
-  | | | |   XRP OS kernel driver   | | | |  |        |                  |  |
-  | | | `--------------------------' | | |  |        |                  |  |
-  | | `---------------- ^ -----------' | |  |        |                  |  |
-  | `------------------ | -------------' |  |        |                  |  |
-  |                     v                |  |        v                  |  |
-  | ,----------------------------------------------------------------.  |  |
-  | |                        Shared memory                           |  |  |
-  | `----------------------------------------------------------------'  |  |
-  |                                      |  |             |             |  |
-  `--------------------------------------'  |             v             |  |
-                                            |  ,---------------------.  |  |
-                                            |  |  Helper LUA script  |  |  |
-                                            |  `---------------------'  |  |
-                                            |             |             |  |
-                                            |             v             |  |
-                                            |  ,---------------------.  |  |
-                                            |  |     DSP 0 MMIO      |~~|  |
-                                            |  |     DSP 1 MMIO      |~~|  |
-                                            |  |         ...         |~~'  |
-                                            |  `---------------------'     |
-                                            |                              |
-                                            `------------------------------'
+  |                                `-----.  |                         `------------------.
+  | ,-----------.                        |  | ,-------.-------.                          |
+  | | Host CPUS |                        |  | | DSP 0 | DSP 1 | ...                      |
+  | |           `----------------------. |  | |       `-------------.                    |
+  | | ,--------------.                 | |  | | ,-----------------. |                    |
+  | | | User process | ...             | |  | | |   DSP payload   | |                    |
+  | | |              `---------------. | |  | | `-----------------' |                    |
+  | | | ,--------------------------. | | |  | |     ^         |     |                    |
+  | | | |  User application code   | | | |  | |     |         v     |                    |
+  | | | `--------------------------' | | |  | | ,-----------------. |                    |
+  | | |             |       ^        | | |  | | | DSP XRP library | |                    |
+  | | |             v       |        | | |  | | `-----------------' |                    |
+  | | | ,--------------------------. | | |  | |     ^    ^    |     |                    |
+  | | | |  Hosted host XRP library | | | |  | |     |    |    v     |   ,--------------. |
+  | | | `--------------------------' | | |  | |     | ,-----------. |   |              | |
+  | | `------------ | ----- ^ -------' | |  | |     | |HW-specific| |<~~|  DSP 0 MMIO  | |
+  | |               |       |          | |  | |     | |XRP library|<~~~~|  DSP 1 MMIO  | |
+  | | ,--------.    |       |          | |  | |     | `-----------' |   |      ...     | |
+  | | | Kernel |    |       |          | |  | `---- | --------------'   `--------------' |
+  | | |        `--- v ----- | -------. | |  |       |                           ^        |
+  | | | ,--------------------------. | | |  |       |                           |        |
+  | | | |   XRP OS kernel driver   | | | |  |       |            ,---------------------. |
+  | | | `--------------------------' | | |  |       |            |  Helper LUA script  | |
+  | | `---------------- ^ -----------' | |  |       |            `---------------------' |
+  | `------------------ | -------------' |  |       |                           ^        |
+  |                     v                |  |       v                           |        |
+  | ,----------------------------------------------------------------------------------. |
+  | |                                 Shared memory                                    | |
+  | `----------------------------------------------------------------------------------' |
+  |                                      |  |                                            |
+  `--------------------------------------'  `--------------------------------------------'
 </pre>
-\latexonly \end{samepage} \endlatexonly
+\latexonly
+\end{minipage}\end{maxsizebox}
+\caption{Hosted Host System in an Emulator Process Interacting With Standalone
+DSP in a Separate XTSC Process}
+\end{figure}
+\endlatexonly
 
 
 \section implementations_standalone Standalone Implementation
@@ -296,57 +304,69 @@ XRP interface, and the DSP implementation of the XRP interface.
 - The standalone host XRP implementation is a library code that runs in a process
   that directly communicates through the shared memory with the Xtensa DSP
   side XRP code.
+- The DSP implementation of the XRP interface is the same for both hosted and
+  standalone host. The only difference is in the way the DSP firmware gets the
+  shared memory address. In hosted mode the kernel driver loads the firmware
+  to each DSP. The kernel driver modifies the value of the global symbol
+  `xrp_dsp_comm_base` in the DSP firmware image to point to the origin of the
+  shared memory for that DSP. In standalone mode that symbol points to another
+  symbol, `xrp_dsp_comm_base_magic`, that must be defined (via
+  `-Wl,--defsym,xrp_dsp_comm_base_magic=...`, through the linker script, or by
+  other means) and point to the origin of the shared memory for that DSP.
 
-\latexonly \begin{samepage} \endlatexonly
+\latexonly
+\begin{figure}[H]
+\centering
+\begin{maxsizebox}{7cm}{7cm}
+\begin{minipage}{\textwidth}
+\endlatexonly
 <pre>
-  ,--------------.                       ,-------------------------.
-  | User process |                       | XTSC simulation process |
-  |              `--------------------.  |                         `----.
-  |                                   |  |  ,-------.-------.           |
-  |                                   |  |  | DSP 0 | DSP 1 | ...       |
-  |                                   |  |  |       `-------------.     |
-  |  ,-----------------------------.  |  |  | ,-----------------. |     |
-  |  |    User application code    |  |  |  | |   DSP payload   | |     |
-  |  `-----------------------------'  |  |  | `-----------------' |     |
-  |              |       ^            |  |  |     ^         |     |     |
-  |              v       |            |  |  |     |         v     |     |
-  |  ,-----------------------------.  |  |  | ,-----------------. |     |
-  |  | Standalone host XRP library |  |  |  | | DSP XRP library | |     |
-  |  `-----------------------------'  |  |  | `-----------------' |     |
-  |                  ^                |  |  |     ^    ^    |     |     |
-  |                  |                |  |  |     |    |    v     |<~.  |
-  |                  |                |  |  |     | ,-----------. |<~|  |
-  |                  |                |  |  |     | |HW-specific|<~~~|  |
-  |                  |                |  |  |     | |XRP library|<~~~|  |
-  |                  |                |  |  |     | `-----------' |  |  |
-  |                  |                |  |  `---- | --------------'  |  |
-  |                  v                |  |        v                  |  |
-  |  ,------------------------------------------------------------.  |  |
-  |  |                       Shared memory                        |  |  |
-  |  `------------------------------------------------------------'  |  |
-  |                                   |  |             |             |  |
-  `-----------------------------------'  |             v             |  |
-                                         |  ,---------------------.  |  |
-                                         |  |  Helper LUA script  |  |  |
-                                         |  `---------------------'  |  |
-                                         |             |             |  |
-                                         |             v             |  |
-                                         |  ,---------------------.  |  |
-                                         |  |     DSP 0 MMIO      |~~|  |
-                                         |  |     DSP 1 MMIO      |~~|  |
-                                         |  |         ...         |~~'  |
-                                         |  `---------------------'     |
-                                         |                              |
-                                         `------------------------------'
+  ,--------------.                      ,-------------------------.
+  | User process |                      | XTSC simulation process |
+  |              `-------------------.  |                         `--------------------.
+  |                                  |  |  ,-------.-------.                           |
+  |                                  |  |  | DSP 0 | DSP 1 | ...                       |
+  |                                  |  |  |       `-------------.                     |
+  |  ,-----------------------------. |  |  | ,-----------------. |                     |
+  |  |    User application code    | |  |  | |   DSP payload   | |                     |
+  |  `-----------------------------' |  |  | `-----------------' |                     |
+  |              |       ^           |  |  |     ^         |     |                     |
+  |              v       |           |  |  |     |         v     |                     |
+  |  ,-----------------------------. |  |  | ,-----------------. |                     |
+  |  | Standalone host XRP library | |  |  | | DSP XRP library | |                     |
+  |  `-----------------------------' |  |  | `-----------------' |                     |
+  |                  ^               |  |  |     ^    ^    |     |                     |
+  |                  |               |  |  |     |    |    v     |   ,--------------.  |
+  |                  |               |  |  |     | ,-----------. |   |              |  |
+  |                  |               |  |  |     | |HW-specific| |<~~|  DSP 0 MMIO  |  |
+  |                  |               |  |  |     | |XRP library|<~~~~|  DSP 1 MMIO  |  |
+  |                  |               |  |  |     | `-----------' |   |      ...     |  |
+  |                  |               |  |  `---- | --------------'   `--------------'  |
+  |                  |               |  |        |                           ^         |
+  |                  v               |  |        v                           |         |
+  |  ,---------------------------------------------------.    ,---------------------.  |
+  |  |                    Shared memory                  |--->|  Helper LUA script  |  |
+  |  `---------------------------------------------------'    `---------------------'  |
+  |                                  |  |                                              |
+  `----------------------------------'  `----------------------------------------------'
 </pre>
-\latexonly \end{samepage} \endlatexonly
-
+\latexonly
+\end{minipage}\end{maxsizebox}
+\caption{Standalone Host Application Process Interacting With Standalone
+DSP in a Separate XTSC Process}
+\end{figure}
+\endlatexonly
 
 The standalone implementation can run natively on a device without an OS or with RTOS
 that provides direct access to the hardware, such as memory that is shared with the DSP
 and MMIO.
 
-\latexonly \begin{samepage} \endlatexonly
+\latexonly
+\begin{figure}[H]
+\centering
+\begin{maxsizebox}{7cm}{7cm}
+\begin{minipage}{\textwidth}
+\endlatexonly
 <pre>
   ,--------.
   | System |
@@ -380,7 +400,12 @@ and MMIO.
   |                                         `--------------------'      |
   `---------------------------------------------------------------------'
 </pre>
-\latexonly \end{samepage} \endlatexonly
+\latexonly
+\end{minipage}\end{maxsizebox}
+\caption{Standalone Host Application Process Interacting With the DSP Inside
+the Same System}
+\end{figure}
+\endlatexonly
 
 
 \section implementations_single Single Image Implementation
@@ -389,7 +414,12 @@ and MMIO.
 A single image implementation can run in a userspace process, natively on a
 device, or in simulator with or without an OS.
 
-\latexonly \begin{samepage} \endlatexonly
+\latexonly
+\begin{figure}[H]
+\centering
+\begin{maxsizebox}{7cm}{7cm}
+\begin{minipage}{\textwidth}
+\endlatexonly
 <pre>
   ,---------.
   | Process |
@@ -404,7 +434,11 @@ device, or in simulator with or without an OS.
   |  `---------------------------------------------------'  |
   `---------------------------------------------------------'
 </pre>
-\latexonly \end{samepage} \endlatexonly
+\latexonly
+\end{minipage}\end{maxsizebox}
+\caption{XRP Application and DSP Payload in Single Image Mode}
+\end{figure}
+\endlatexonly
 
 \page configuration Configuration
 \idxentry{Configuration}
@@ -444,7 +478,7 @@ to be adjusted when it is changed.
 - The XRP does not depend on the target hardware. The only configurable parameter
   is the thread stack size in case XOS threads are used on Xtensa ELF host.
   It is captured in a symbol `xrp_xos_thread_stack_size` and may be adjusted
-  with `-Wl,-defsym,xrp_xos_thread_stack_size=...` option in LDFLAGS at
+  with `-Wl,--defsym,xrp_xos_thread_stack_size=...` option in LDFLAGS at
   configure or build time.
 
 \page operation XRP Operation
@@ -477,17 +511,17 @@ from the in_data buffer and associated buffer group from the buffer_group. It
 writes command processing results to the out_data buffer and to the relevant
 buffers of the buffer group. The function may not retain pointers to any
 buffers passed to it for later use and must release all references to buffers
-and buffer group it could have made before returning. Return value shall
+and the buffer group it may have made before returning. The return value shall
 reflect whether the command was recognized and processed or not. IOW
 XRP_STATUS_SUCCESS should be returned if out_data is filled in, otherwise
 XRP_STATUS_FAILURE shall be returned. This return value is then returned from
-the xrp_device_dispatch. In case it was XRP_STATUS_FAILURE the host also gets
-XRP_STATUS_FAILURE for the command. handler_context is a pointer that was
+the xrp_device_dispatch. If it was XRP_STATUS_FAILURE, the host also gets the
+XRP_STATUS_FAILURE for the command. The handler_context is a pointer that was
 passed to the namespace handler registration function.
 
 The Linux application that uses XRP starts with opening XRP devices with the
 xrp_open_device() function. XRP devices may have different capabilities and run
-different firmware, there is nothing in the XRP API about it. Linux application
+different firmware, there is nothing in the XRP API about it. The Linux application
 may need to open XRP device and communicate with it to find its capabilities.
 An XRP device is identified by an integer index. After opening the device, the
 application must create a command queue with the xrp_create_queue() function.
@@ -668,12 +702,12 @@ There's an example hardware-specific DSP XRP library xrp_hw_simple that works
 together with the host side xrp_hw_simple kernel driver and may be used as a
 template.
 
-\section porting_dsp_cache Caching shared memory on the DSP
+\section porting_dsp_cache Caching Shared Memory on the DSP
 
 Initially XRP was developed for use with Vision Xtensa cores that do not have
-data cache. Cores that have data cache are supposed to set up shared memory
+data cache. Cores that have a data cache are supposed to set up a shared memory
 region as uncached and use IDMA to transfer data between the shared memory
-buffers and local memory. In case it is desirable to use data cache with
+buffers and local memory. When it is desirable to use data cache with
 shared memory on the DSP side, xrp_device_enable_cache() may be used to turn
 on cache management in the DSP XRP code.
 
@@ -681,7 +715,7 @@ on cache management in the DSP XRP code.
 \section porting_kernel Porting the XRP Kernel Driver
 \idxentry{Porting!Kernel}
 
-The following tasks that XRP driver performs during the device lifecycle
+The following tasks that the XRP driver performs during the device lifecycle
 need detailed knowledge about the hardware:
 
 - Starting and stopping the DSP: need to control power and clock of the DSP,
@@ -706,7 +740,7 @@ The XRP driver is divided into two parts: generic and hardware-specific and
 the actions listed above must be implemented in the hardware-specific part.
 The interface between parts is defined in the header xrp_hw.h
 
-Generic XRP driver defines three formats of configuration information:
+The generic XRP driver defines three formats of configuration information:
 cdns,xrp, cdns,xrp,v1 and cdns,xrp,cma. The difference is in the way the
 shared memory region is specified and in the contents of the device registers
 (regs device tree property, information returned by the platform_get_resource
@@ -752,10 +786,10 @@ xrp_runtime_suspend() function. Hardware-specific XRP driver should register
 these functions as its platform_driver::driver.pm callbacks. Depending on
 whether CONFIG_PM is enabled in the kernel or not these functions will be
 called by the runtime PM kernel code (and it may happen multiple times during
-the device lifetime) or by the xrp_init()/xrp_deinit() functions.
+the device lifetime) or by the xrp_init() / xrp_deinit() functions.
 
 All of the xrp_hw_ops callback functions may be blocking. When the firmware
-cannot be loaded by the generic XRP driver, the hardware-specific XRP can do
+cannot be loaded by the generic XRP driver, the hardware-specific XRP can load
 it in the xrp_hw_ops::reset callback.
 
 The data returned from the xrp_hw_ops::get_hw_sync_data must be allocated with
@@ -765,10 +799,10 @@ and passed to the xrp_hw_set_sync_data DSP-side hardware-specific XRP
 callback. After that the DSP side of XRP must be capable of exchanging IRQs
 with the host in directions chosen in configuration.
 
-The hardware-specific XRP driver must pass XRP_INIT_USE_HOST_IRQ flag in the
-init_flags parameter of the xrp_init() in order to use IRQ for the DSP-to-host
-notification. The hardware-specific XRP driver must install IRQ handler and
-call xrp_irq_handler function from it. The xrp_hw_ops::send_irq callback is
+The hardware-specific XRP driver must pass the XRP_INIT_USE_HOST_IRQ flag in the
+init_flags parameter of the xrp_init() to use IRQ for the DSP-to-host
+notification. The hardware-specific XRP driver must install the IRQ handler and
+call the xrp_irq_handler() function from it. The xrp_hw_ops::send_irq callback is
 used to send IRQ to the DSP.
 
 xrp_hw_ops::cacheable determines if dma_sync_for_device and dma_sync_for_cpu
@@ -785,7 +819,7 @@ to transition ownership of that memory to the DSP. xrp_hw_ops::dma_sync_for_cpu
 is used to transition ownership of the memory back to host CPU.
 Standard Linux cache management functions (from the DMA API) may be used only
 when the DSP shared memory is allocated from the system memory, covered by
-struct page's and there's no cache aliasing. If that's not the case then the
+struct page's and there's no cache aliasing. If that's not the case, then the
 hardware-specific XRP driver may use architecture-specific methods of cache
 management or forbid direct use of cached memory entirely.
 
@@ -799,15 +833,15 @@ for copying data/code to the hardware-specific memory. memcpy_tohw and
 memset_io with addresses/sizes aligned to 4 are used when these functions are
 not specialized.
 
-xrp_hw_ops::panic_check is an optional function which is called in wait loops
-associated with synchronization/command completion. If hardware-specific part
-has a way to detect DSP firmware crash it may implement this function and
-return true to indicate that firmware has crashed. This would help to start
-recovery procedure immediately instead of waiting for response timeout.
-DSP may provide additional information to aid crash debugging, the function
+xrp_hw_ops::panic_check is an optional function that is called in wait loops
+associated with synchronization/command completion. If the hardware-specific part
+has a way to detect a DSP firmware crash, it may implement this function and
+return true to indicate that firmware has crashed. This helps to start the
+recovery procedure immediately instead of waiting for the response timeout.
+The DSP may provide additional information to aid crash debugging, where the function
 may extract and print that information.
 
-Porting the XRP kernel driver to new hardware is done by developing a
+Porting the XRP kernel driver to new hardware is accomplished by developing a
 hardware-specific driver for that hardware with the functionality described
 above. It must be accompanied by the matching hardware-specific library for
 the DSP side. See xrp-dsp/README.porting for details.
@@ -823,7 +857,7 @@ under
 
 <tt><em>\<xtensa_tools_root\></em>/xtensa-elf/src/xrp</tt>
 
-where <tt><em>\<xtensa_tools_root\></em></tt> is the directory where the Xtensa
+where <tt><em>\<xtensa_tools_root\></em></tt> is the directory the Xtensa
 Tools have been installed. The sources are self-contained and can be copied
 elsewhere by copying the directory tree under the xrp directory.
 
@@ -974,8 +1008,9 @@ libraries and examples.
 \section building_kernel Building the Kernel Driver
 \idxentry{Building!Kernel}
 
-The kernel driver is built using a typical kernel module build sequence. Provide the
-following environment variables/make parameters:
+The kernel driver is built using a typical kernel module build sequence. At
+least the following environment variables/make parameters must be provided by
+the user:
 - `ARCH`: target Linux architecture
 - `KSRC`: points to the configured kernel tree
 - `CROSS_COMPILE`: path and prefix name of the cross compiler

@@ -23,7 +23,8 @@
 
 /*!
  * \file xrp_dsp_hw.h
- * \brief Interface between generic and HW-specific DSP libraries.
+ * \brief This section defines interface between generic and HW-specific DSP
+ * libraries.
  */
 
 #ifndef XRP_DSP_HW_H
@@ -32,7 +33,6 @@
 /*!
  * \brief Initialize HW-specific DSP code
  *
- * Initialize HW-specific DSP code.
  * DSP main must call this function before any other xrp_hw_* function is
  * called.
  */
@@ -40,8 +40,6 @@ void xrp_hw_init(void);
 
 /*!
  * \brief Send IRQ to the host
- *
- * Send IRQ to the host.
  */
 void xrp_hw_send_host_irq(void);
 
@@ -65,10 +63,10 @@ void xrp_hw_set_sync_data(void *p);
 /*!
  * \brief Indicate panic to the host
  *
- * Indicate to the host that DSP cannot recover from the state it is in.
- * This function does best effort to inform the host, but there are no
- * guarantees. It may as well do nothing. In the worst case the host will
- * observe a timeout on its request and do recovery then.
+ * Indicate to the host that the DSP cannot recover from the state it is in.
+ * This function makes a best effort to inform the host, but there are no
+ * guarantees. It may as well do nothing. In the worst case, the host will
+ * observe a timeout on its request and then perform recovery.
  */
 void xrp_hw_panic(void);
 
