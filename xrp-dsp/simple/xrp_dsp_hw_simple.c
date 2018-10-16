@@ -23,6 +23,7 @@
 
 #include <stdint.h>
 #include <stdio.h>
+#include <xtensa/hal.h>
 #include <xtensa/xtruntime.h>
 
 #include "xrp_debug.h"
@@ -79,17 +80,25 @@ void xrp_hw_send_host_irq(void)
 void xrp_hw_wait_device_irq(void)
 {
 #if XCHAL_HAVE_INTERRUPTS
-	unsigned old_intlevel;
+	unsigned intstate;
 
 	if (device_irq_mode == XRP_IRQ_NONE)
 		return;
 
 	pr_debug("%s: waiting for device IRQ...\n", __func__);
-	old_intlevel = XTOS_SET_INTLEVEL(XCHAL_NUM_INTLEVELS - 1);
+#if XCHAL_HAVE_XEA3
+	intstate = xthal_disable_interrupts();
+#else
+	intstate = XTOS_SET_INTLEVEL(XCHAL_NUM_INTLEVELS - 1);
+#endif
 	_xtos_interrupt_enable(device_irq);
 	XT_WAITI(0);
 	_xtos_interrupt_disable(device_irq);
-	XTOS_RESTORE_INTLEVEL(old_intlevel);
+#if XCHAL_HAVE_XEA3
+	xthal_restore_interrupts(intstate);
+#else
+	XTOS_RESTORE_INTLEVEL(intstate);
+#endif
 #endif
 }
 
@@ -129,6 +138,10 @@ void xrp_hw_set_sync_data(void *p)
 
 	if (device_irq_mode != XRP_IRQ_NONE) {
 #if XCHAL_HAVE_INTERRUPTS
+#if XCHAL_HAVE_XEA3
+		xthal_interrupt_sens_set(device_irq,
+					 device_irq_mode == XRP_IRQ_LEVEL);
+#endif
 		_xtos_interrupt_disable(device_irq);
 		xrp_set_interrupt_handler(device_irq, xrp_irq_handler);
 #endif
