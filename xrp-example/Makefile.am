@@ -77,6 +77,12 @@ xrp_host_standalone_SOURCES = host_main.c xrp_dtb.s
 xrp_host_standalone_CFLAGS = $(AM_CFLAGS) $(THREAD_CFLAGS)
 xrp_host_standalone_LDADD = ../xrp-host/libxrp-host-standalone.a $(THREADS_LDFLAGS) $(LIBFDT_LDFLAGS) -lfdt
 
+if HOST_OS_ELF
+xrp_host_standalone_LDFLAGS = $(AM_LDFLAGS) \
+			      -mlsp=$(HOST_LSP) \
+			      -Wl,--defsym,_memmap_cacheattr_reset=$(HOST_CACHEATTR)
+endif
+
 if HOST_OS_LINUX
 xrp_host_standalone_LDADD += -lrt
 endif

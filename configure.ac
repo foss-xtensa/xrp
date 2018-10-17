@@ -75,6 +75,7 @@ AC_SUBST(THREADS_IMPL,["${THREADS_IMPL:-single}"])
 AC_SUBST(THREADS_CFLAGS)
 AC_SUBST(THREADS_LDFLAGS)
 AM_CONDITIONAL([HOST_OS_LINUX], [test x$HOST_OS = xlinux])
+AM_CONDITIONAL([HOST_OS_ELF], [test x$HOST_OS = xelf])
 
 AM_CONDITIONAL([USE_THREADS], [test x$use_threads = xtrue])
 
@@ -236,6 +237,12 @@ AC_ARG_VAR(DSP_COMM_BASE, [DSP communication base address for standalone
 
 AC_SUBST(DSP_CACHEATTR, ["${DSP_CACHEATTR:-0x44441141}"])
 AC_ARG_VAR(DSP_CACHEATTR, [default DSP memmap cacheattr for example firmware])
+
+AC_SUBST(HOST_LSP, ["${DSP_LSP:-\$(srcdir)/MW-MP/P6_1/xtensa-elf/lib/sim-stacklocal}"])
+AC_ARG_VAR(HOST_LSP, [use specific Xtensa LSP for example standalone ELF host])
+
+AC_SUBST(HOST_CACHEATTR, ["${HOST_CACHEATTR:-0x22222222}"])
+AC_ARG_VAR(HOST_CACHEATTR, [default standalone ELF host memmap cacheattr])
 
 AC_ARG_VAR(DTC, [Device Tree Compiler to use])
 
