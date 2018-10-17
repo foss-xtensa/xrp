@@ -623,6 +623,8 @@ ac_subst_vars='am__EXEEXT_FALSE
 am__EXEEXT_TRUE
 LTLIBOBJS
 LIBOBJS
+HOST_CACHEATTR
+HOST_LSP
 DSP_CACHEATTR
 DSP_COMM_BASE
 DSP_LSP
@@ -644,6 +646,8 @@ BUILD_HOST_FALSE
 BUILD_HOST_TRUE
 USE_THREADS_FALSE
 USE_THREADS_TRUE
+HOST_OS_ELF_FALSE
+HOST_OS_ELF_TRUE
 HOST_OS_LINUX_FALSE
 HOST_OS_LINUX_TRUE
 THREADS_LDFLAGS
@@ -783,6 +787,8 @@ CPP
 DSP_LSP
 DSP_COMM_BASE
 DSP_CACHEATTR
+HOST_LSP
+HOST_CACHEATTR
 DTC'
 
 
@@ -1452,6 +1458,9 @@ Some influential environment variables:
               DSP communication base address for standalone example firmware
   DSP_CACHEATTR
               default DSP memmap cacheattr for example firmware
+  HOST_LSP    use specific Xtensa LSP for example standalone ELF host
+  HOST_CACHEATTR
+              default standalone ELF host memmap cacheattr
   DTC         Device Tree Compiler to use
 
 Use these variables to override the choices made by `configure' or to help
@@ -4657,6 +4666,14 @@ else
   HOST_OS_LINUX_FALSE=
 fi
 
+ if test x$HOST_OS = xelf; then
+  HOST_OS_ELF_TRUE=
+  HOST_OS_ELF_FALSE='#'
+else
+  HOST_OS_ELF_TRUE='#'
+  HOST_OS_ELF_FALSE=
+fi
+
 
  if test x$use_threads = xtrue; then
   USE_THREADS_TRUE=
@@ -5056,6 +5073,14 @@ DSP_CACHEATTR="${DSP_CACHEATTR:-0x44441141}"
 
 
 
+HOST_LSP="${DSP_LSP:-\$(srcdir)/MW-MP/P6_1/xtensa-elf/lib/sim-stacklocal}"
+
+
+
+HOST_CACHEATTR="${HOST_CACHEATTR:-0x22222222}"
+
+
+
 
 
 { $as_echo "$as_me:${as_lineno-$LINENO}:
@@ -5256,6 +5281,10 @@ Usually this means the macro was only invoked conditionally." "$LINENO" 5
 fi
 if test -z "${HOST_OS_LINUX_TRUE}" && test -z "${HOST_OS_LINUX_FALSE}"; then
   as_fn_error $? "conditional \"HOST_OS_LINUX\" was never defined.
+Usually this means the macro was only invoked conditionally." "$LINENO" 5
+fi
+if test -z "${HOST_OS_ELF_TRUE}" && test -z "${HOST_OS_ELF_FALSE}"; then
+  as_fn_error $? "conditional \"HOST_OS_ELF\" was never defined.
 Usually this means the macro was only invoked conditionally." "$LINENO" 5
 fi
 if test -z "${USE_THREADS_TRUE}" && test -z "${USE_THREADS_FALSE}"; then

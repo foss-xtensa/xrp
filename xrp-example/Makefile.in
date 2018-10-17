@@ -172,7 +172,7 @@ xrp_host_standalone_DEPENDENCIES =  \
 	../xrp-host/libxrp-host-standalone.a $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
 xrp_host_standalone_LINK = $(CCLD) $(xrp_host_standalone_CFLAGS) \
-	$(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o $@
+	$(CFLAGS) $(xrp_host_standalone_LDFLAGS) $(LDFLAGS) -o $@
 AM_V_P = $(am__v_P_@AM_V@)
 am__v_P_ = $(am__v_P_@AM_DEFAULT_V@)
 am__v_P_0 = false
@@ -270,6 +270,8 @@ ECHO_T = @ECHO_T@
 EGREP = @EGREP@
 EXEEXT = @EXEEXT@
 GREP = @GREP@
+HOST_CACHEATTR = @HOST_CACHEATTR@
+HOST_LSP = @HOST_LSP@
 HOST_OS = @HOST_OS@
 HW_PORT = @HW_PORT@
 INSTALL = @INSTALL@
@@ -385,6 +387,10 @@ xrp_host_standalone_SOURCES = host_main.c xrp_dtb.s
 xrp_host_standalone_CFLAGS = $(AM_CFLAGS) $(THREAD_CFLAGS)
 xrp_host_standalone_LDADD = ../xrp-host/libxrp-host-standalone.a \
 	$(THREADS_LDFLAGS) $(LIBFDT_LDFLAGS) -lfdt $(am__append_6)
+@HOST_OS_ELF_TRUE@xrp_host_standalone_LDFLAGS = $(AM_LDFLAGS) \
+@HOST_OS_ELF_TRUE@			      -mlsp=$(HOST_LSP) \
+@HOST_OS_ELF_TRUE@			      -Wl,--defsym,_memmap_cacheattr_reset=$(HOST_CACHEATTR)
+
 xrp_host_hosted_SOURCES = host_main.c
 xrp_host_hosted_CFLAGS = $(AM_CFLAGS) $(THREAD_CFLAGS)
 xrp_host_hosted_LDADD = ../xrp-host/libxrp-host-hosted.a $(THREADS_LDFLAGS)
