@@ -21,150 +21,24 @@
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <libfdt.h>
 #include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
-
-typedef uint8_t __u8;
-typedef uint32_t __u32;
-typedef uint64_t __u64;
-
-#include "xrp_host_common.h"
-#include "xrp_host_impl.h"
-#include "xrp_private_alloc.h"
+#include "xrp_alloc.h"
 #include "xrp_host.h"
-
-extern char dt_blob_start[];
-
-struct xrp_shmem {
-	phys_addr_t start;
-	phys_addr_t size;
-	const char *name;
-	void *ptr;
-};
-
-static struct xrp_shmem *xrp_shmem;
-static int xrp_shmem_count;
-static phys_addr_t xrp_exit_loc;
-
-/* Helpers */
-
-static uint32_t getprop_u32(const void *value, int offset)
-{
-	fdt32_t v;
-
-	memcpy(&v, value + offset, sizeof(v));
-	return fdt32_to_cpu(v);
-}
-
-static inline void xrp_comm_write32(volatile void *addr, __u32 v)
-{
-	*(volatile __u32 *)addr = v;
-}
-
-static struct xrp_shmem *find_shmem_by_phys(phys_addr_t addr)
-{
-	int i;
-
-	for (i = 0; i < xrp_shmem_count; ++i) {
-		if (addr >= xrp_shmem[i].start &&
-		    addr - xrp_shmem[i].start < xrp_shmem[i].size)
-			return xrp_shmem + i;
-	}
-	return NULL;
-}
-
-static struct xrp_shmem *find_shmem_by_virt(const void *p)
-{
-	int i;
-
-	for (i = 0; i < xrp_shmem_count; ++i) {
-		size_t d = (const char *)p - (const char *)xrp_shmem[i].ptr;
-
-		if (p >= xrp_shmem[i].ptr &&
-		    d < xrp_shmem[i].size)
-			return xrp_shmem + i;
-	}
-	return NULL;
-}
 
 void *p2v(phys_addr_t addr)
 {
-	struct xrp_shmem *shmem = find_shmem_by_phys(addr);
-
-	if (shmem) {
-		return shmem->ptr + addr - shmem->start;
-	} else {
-		return NULL;
-	}
+	return (void *)addr;
 }
 
 phys_addr_t v2p(const void *p)
 {
-	struct xrp_shmem *shmem = find_shmem_by_virt(p);
-
-	if (shmem) {
-		return shmem->start +
-			(const char *)p - (const char *)shmem->ptr;
-	} else {
-		return 0;
-	}
+	return (phys_addr_t)p;
 }
 
 void xrp_initialize_shmem(void)
 {
-	void *fdt = &dt_blob_start;
-	const void *reg;
-	const void *names;
-	int reg_len, names_len;
-	int offset, reg_offset = 0, name_offset = 0;
-	int i;
-
-	offset = fdt_node_offset_by_compatible(fdt,
-					       -1, "cdns,sim-shmem");
-	if (offset < 0) {
-		printf("%s: cdns,sim-shmem device not found\n", __func__);
-		return;
-	}
-	reg = fdt_getprop(fdt, offset, "reg", &reg_len);
-	if (!reg) {
-		printf("%s: fdt_getprop \"reg\": %s\n",
-		       __func__, fdt_strerror(reg_len));
-		return;
-	}
-	names = fdt_getprop(fdt, offset, "reg-names", &names_len);
-	if (!names) {
-		printf("%s: fdt_getprop \"reg-names\": %s\n",
-		       __func__, fdt_strerror(names_len));
-		return;
-	}
-	xrp_shmem_count = reg_len / 8;
-	xrp_shmem = malloc(xrp_shmem_count * sizeof(struct xrp_shmem));
-
-	for (i = 0; i < xrp_shmem_count; ++i) {
-		const char *name = names + name_offset;
-
-		xrp_shmem[i] = (struct xrp_shmem){
-			.start = getprop_u32(reg, reg_offset),
-			.size = getprop_u32(reg, reg_offset + 4),
-			.name = name,
-		};
-		reg_offset += 8;
-		name_offset += strlen(names + name_offset) + 1;
-		xrp_shmem[i].ptr = (void *)xrp_shmem[i].start;
-	}
-	reg = fdt_getprop(fdt, offset, "exit-loc", &reg_len);
-	if (!reg) {
-		printf("%s: fdt_getprop \"exit-loc\": %s\n",
-		       __func__, fdt_strerror(reg_len));
-		return;
-	}
-	xrp_exit_loc = getprop_u32(reg, 0);
 }
 
 void xrp_exit(void)
 {
-	void *exit_loc = p2v(xrp_exit_loc);
-	xrp_comm_write32(exit_loc, 0xff);
 }
