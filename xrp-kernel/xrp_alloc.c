@@ -70,17 +70,17 @@ static void kfree(void *p)
 
 static void mutex_init(struct mutex *mutex)
 {
-	(void)mutex;
+	xrp_mutex_init(&mutex->o);
 }
 
 static void mutex_lock(struct mutex *mutex)
 {
-	(void)mutex;
+	xrp_mutex_lock(&mutex->o);
 }
 
 static void mutex_unlock(struct mutex *mutex)
 {
-	(void)mutex;
+	xrp_mutex_unlock(&mutex->o);
 }
 
 static void atomic_set(atomic_t *p, uint32_t v)

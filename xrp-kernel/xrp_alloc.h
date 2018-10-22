@@ -30,12 +30,15 @@
 #ifndef __KERNEL__
 
 #include <stdint.h>
+#include <xrp_atomic.h>
+#include <xrp_thread_impl.h>
 
 typedef uint32_t u32;
 typedef uint32_t phys_addr_t;
-typedef uint32_t atomic_t;
+typedef _Atomic uint32_t atomic_t;
 
 struct mutex {
+	xrp_mutex o;
 };
 
 static inline void atomic_inc(atomic_t *v)
