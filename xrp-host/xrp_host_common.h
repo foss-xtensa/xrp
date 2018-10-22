@@ -25,13 +25,9 @@
 #define _XRP_HOST_COMMON_H
 
 #include <stdlib.h>
+#include "xrp_atomic.h"
 #include "xrp_thread_impl.h"
 #include "xrp_host_impl.h"
-
-#if !defined(HAVE_ATOMIC) || defined(__STDC_NO_ATOMICS__)
-#warning The compiler does not support atomics, reference counting may not be thread safe
-#define _Atomic
-#endif
 
 struct xrp_refcounted {
 	_Atomic unsigned long count;
