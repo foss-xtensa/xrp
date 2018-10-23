@@ -181,14 +181,15 @@ ETAGS = etags
 CTAGS = ctags
 CSCOPE = cscope
 DIST_SUBDIRS = xrp-common xrp-dsp xrp-host xrp-example
-am__DIST_COMMON = $(srcdir)/Makefile.in $(top_srcdir)/autoconf/compile \
+am__DIST_COMMON = $(srcdir)/Makefile.in $(top_srcdir)/autoconf/ar-lib \
+	$(top_srcdir)/autoconf/compile \
 	$(top_srcdir)/autoconf/config.guess \
 	$(top_srcdir)/autoconf/config.sub \
 	$(top_srcdir)/autoconf/install-sh \
 	$(top_srcdir)/autoconf/missing $(top_srcdir)/doc/Makefile.in \
-	$(top_srcdir)/doc/xrp.conf.in README autoconf/compile \
-	autoconf/config.guess autoconf/config.sub autoconf/depcomp \
-	autoconf/install-sh autoconf/missing
+	$(top_srcdir)/doc/xrp.conf.in README autoconf/ar-lib \
+	autoconf/compile autoconf/config.guess autoconf/config.sub \
+	autoconf/depcomp autoconf/install-sh autoconf/missing
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
 distdir = $(PACKAGE)-$(VERSION)
 top_distdir = $(distdir)
@@ -234,6 +235,7 @@ distcleancheck_listfiles = find . -type f -print
 ACLOCAL = @ACLOCAL@
 AMTAR = @AMTAR@
 AM_DEFAULT_VERBOSITY = @AM_DEFAULT_VERBOSITY@
+AR = @AR@
 AUTOCONF = @AUTOCONF@
 AUTOHEADER = @AUTOHEADER@
 AUTOMAKE = @AUTOMAKE@
@@ -298,6 +300,7 @@ abs_builddir = @abs_builddir@
 abs_srcdir = @abs_srcdir@
 abs_top_builddir = @abs_top_builddir@
 abs_top_srcdir = @abs_top_srcdir@
+ac_ct_AR = @ac_ct_AR@
 ac_ct_CC = @ac_ct_CC@
 am__include = @am__include@
 am__leading_dot = @am__leading_dot@
