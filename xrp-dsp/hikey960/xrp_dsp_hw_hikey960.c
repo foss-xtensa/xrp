@@ -176,6 +176,8 @@ void xrp_hw_init(void)
 	panic->rb.write = 0;
 	panic->rb.size = 0x1000 - sizeof(struct xrp_hw_hikey960_panic);
 
+#ifdef HAVE_OPENCOOKIE
 	stdout = xrp_make_rb_file((void *)&panic->rb);
 	stderr = xrp_make_rb_file((void *)&panic->rb);
+#endif
 }
