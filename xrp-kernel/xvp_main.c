@@ -772,6 +772,8 @@ static unsigned xvp_get_region_vma_count(unsigned long virt,
 	unsigned i;
 	struct mm_struct *mm = current->mm;
 
+	if (virt + size < virt)
+		return 0;
 	if (vma->vm_start > virt)
 		return 0;
 	if (vma->vm_start <= virt &&
