@@ -524,9 +524,9 @@ static long xvp_pfn_virt_to_phys(struct xvp_file *xvp_file,
 				 phys_addr_t *paddr,
 				 struct xrp_alien_mapping *mapping)
 {
-	int i;
 	int ret;
-	int nr_pages = PFN_UP(vaddr + size) - PFN_DOWN(vaddr);
+	unsigned long i;
+	unsigned long nr_pages = PFN_UP(vaddr + size) - PFN_DOWN(vaddr);
 	unsigned long pfn;
 	const struct xrp_address_map_entry *address_map;
 
@@ -579,10 +579,15 @@ static long xvp_gup_virt_to_phys(struct xvp_file *xvp_file,
 {
 	int ret;
 	int i;
-	int nr_pages = PFN_UP(vaddr + size) - PFN_DOWN(vaddr);
-	struct page **page = kmalloc(nr_pages * sizeof(void *), GFP_KERNEL);
+	int nr_pages;
+	struct page **page;
 	const struct xrp_address_map_entry *address_map;
 
+	if (PFN_UP(vaddr + size) - PFN_DOWN(vaddr) > INT_MAX)
+		return -EINVAL;
+
+	nr_pages = PFN_UP(vaddr + size) - PFN_DOWN(vaddr);
+	page = kmalloc(nr_pages * sizeof(void *), GFP_KERNEL);
 	if (!page)
 		return -ENOMEM;
 
