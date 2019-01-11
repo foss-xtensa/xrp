@@ -1497,9 +1497,8 @@ static long xrp_ioctl_submit_sync(struct file *filp,
 				ret = xvp_complete_cmd_poll(xvp,
 							    xrp_cmd_complete);
 			}
-#ifdef DEBUG
+
 			xrp_panic_check(xvp);
-#endif
 
 			/* copy back inline data */
 			if (ret == 0) {
