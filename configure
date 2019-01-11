@@ -5193,13 +5193,6 @@ fi
 
 fi
 
-ac_fn_c_check_func "$LINENO" "fopencookie" "ac_cv_func_fopencookie"
-if test "x$ac_cv_func_fopencookie" = xyes; then :
-  $as_echo "#define HAVE_OPENCOOKIE 1" >>confdefs.h
-
-fi
-
-
 HW_PORT=simple
 # Check whether --enable-port was given.
 if test "${enable_port+set}" = set; then :
