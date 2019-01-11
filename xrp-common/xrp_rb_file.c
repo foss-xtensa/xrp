@@ -21,75 +21,51 @@
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#define _GNU_SOURCE
-#include <stdio.h>
 #include <string.h>
-#include <unistd.h>
 #include "xrp_rb_file.h"
 
-#ifdef HAVE_OPENCOOKIE
-
-static ssize_t rb_write(void *cookie, const char *buf, size_t size)
+static size_t xrp_rb_write_some(void *cookie, const void *buf, size_t size)
 {
 	volatile struct xrp_ring_buffer *rb = cookie;
 	uint32_t read = rb->read;
 	uint32_t write = rb->write;
-	size_t total;
 	size_t tail;
 
-	tail = rb->size - write;
 	if (read > write) {
-		total = read - 1 - write;
-		tail = total;
-	} else if (read == write) {
-		total = rb->size - 1;
+		tail = read - 1 - write;
+	} else if (read) {
+		tail = rb->size - write;
 	} else {
-		total = rb->size - 1 - write + read;
-		if (total < tail)
-			tail = total;
+		tail = rb->size - 1 - write;
 	}
 
 	if (size < tail)
 		tail = size;
 
 	memcpy((char *)rb->data + write, buf, tail);
-	buf += tail;
+
 	write += tail;
 	if (write == rb->size)
 		write = 0;
-	size -= tail;
-	total -= tail;
-	if (size && total) {
-		if (size < total)
-			total = size;
-		memcpy((char *)rb->data, buf, total);
-		write += total;
-	} else {
-		total = 0;
-	}
 	rb->write = write;
-	return tail + total;
+
+	return tail;
 }
 
-FILE *xrp_make_rb_file(struct xrp_ring_buffer *rb)
+size_t xrp_rb_write(void *cookie, const void *buf, size_t size)
 {
-	static cookie_io_functions_t rb_ops = {
-		.write = rb_write,
-	};
-	FILE *f = fopencookie(rb, "w", rb_ops);
+	size_t write_total = 0;
+	const char *p = buf;
 
-	if (f)
-		setvbuf(f, NULL, _IONBF, 0);
+	while (size) {
+		size_t write = xrp_rb_write_some(cookie, p, size);
 
-	return f;
+		if (write == 0)
+			break;
+
+		p += write;
+		size -= write;
+		write_total += write;
+	}
+	return write_total;
 }
-
-#else
-
-FILE *xrp_make_rb_file(struct xrp_ring_buffer *rb)
-{
-	(void *)rb;
-	return NULL;
-}
-
-#endif

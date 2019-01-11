@@ -24,10 +24,10 @@
 #ifndef XRP_RB_FILE_H
 #define XRP_RB_FILE_H
 
-#include <stdio.h>
+#include <stddef.h>
 #include <xrp_types.h>
 #include <xrp_ring_buffer.h>
 
-FILE *xrp_make_rb_file(struct xrp_ring_buffer *rb);
+size_t xrp_rb_write(void *cookie, const void *buf, size_t size);
 
 #endif

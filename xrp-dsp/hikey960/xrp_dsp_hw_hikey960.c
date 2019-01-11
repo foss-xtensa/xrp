@@ -168,6 +168,18 @@ void xrp_hw_panic(void)
 	panic->ccount = get_ccount();
 }
 
+void outbyte(int c)
+{
+	char b = (unsigned char)c;
+
+	xrp_rb_write((void *)&panic->rb, &b, 1);
+}
+
+int inbyte(void)
+{
+	return -1;
+}
+
 void xrp_hw_init(void)
 {
 	panic->panic = 0;
@@ -175,9 +187,4 @@ void xrp_hw_init(void)
 	panic->rb.read = 0;
 	panic->rb.write = 0;
 	panic->rb.size = 0x1000 - sizeof(struct xrp_hw_hikey960_panic);
-
-#ifdef HAVE_OPENCOOKIE
-	stdout = xrp_make_rb_file((void *)&panic->rb);
-	stderr = xrp_make_rb_file((void *)&panic->rb);
-#endif
 }
