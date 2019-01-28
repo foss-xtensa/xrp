@@ -31,6 +31,9 @@
 #ifdef HAVE_THREADS_XOS
 #include <xtensa/xos.h>
 #endif
+#ifdef __xtensa__
+#include <xtensa/hal.h>
+#endif
 
 /* Test data transfer from and to in/out buffers */
 static void f1(int devid)
@@ -426,6 +429,15 @@ enum {
 
 	CMD_N,
 };
+
+#ifdef __xtensa__
+int _xt_atomic_compare_exchange_4(unsigned int *_ptr,
+				  unsigned int _exp,
+				  unsigned int _val)
+{
+	return xthal_compare_and_set((int32_t *)_ptr, _exp, _val);
+}
+#endif
 
 int main(int argc, char **argv)
 {
