@@ -30,6 +30,8 @@
 #ifndef XRP_DSP_HW_H
 #define XRP_DSP_HW_H
 
+#define __weak __attribute__((weak))
+
 /*!
  * \brief Initialize HW-specific DSP code
  *
@@ -58,7 +60,7 @@ void xrp_hw_wait_device_irq(void);
  * Format of this data is specific to the HW port and both DSP and kernel
  * driver must agree about it.
  */
-void xrp_hw_set_sync_data(void *p);
+void xrp_hw_set_sync_data(void *p) __weak;
 
 /*!
  * \brief Indicate panic to the host
