@@ -178,6 +178,7 @@ AS_IF([test x$build_host = xtrue],
 AS_IF([test x$build_host = xtrue -a x$build_standalone = xtrue],
       [
       AC_CHECK_HEADERS([valgrind/memcheck.h])
+      AC_CHECK_HEADERS([xtensa/hal.h])
       ])
 
 AS_IF([test x$build_host = xtrue -a x$build_standalone = xtrue -a x$build_example = xtrue],

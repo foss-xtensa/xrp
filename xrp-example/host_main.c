@@ -31,7 +31,7 @@
 #ifdef HAVE_THREADS_XOS
 #include <xtensa/xos.h>
 #endif
-#ifdef __xtensa__
+#ifdef HAVE_XTENSA_HAL_H
 #include <xtensa/hal.h>
 #endif
 
@@ -430,7 +430,7 @@ enum {
 	CMD_N,
 };
 
-#ifdef __xtensa__
+#ifdef HAVE_XTENSA_HAL_H
 int _xt_atomic_compare_exchange_4(unsigned int *_ptr,
 				  unsigned int _exp,
 				  unsigned int _val)
