@@ -5,6 +5,8 @@ Required properties:
 - reg: location of DSP shared memory area.
 
 Optional properties:
+- queue-priority: cells indicating priorities of DSP hardware queues. If
+  missing then single default queue is configured.
 - firmware-name: string identifying firmware name. If missing the driver
   doesn't load the firmware.
 

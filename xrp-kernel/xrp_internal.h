@@ -43,6 +43,7 @@ struct xrp_comm {
 	struct mutex lock;
 	void __iomem *comm;
 	struct completion completion;
+	u32 priority;
 };
 
 struct xvp {
@@ -52,8 +53,11 @@ struct xvp {
 	struct miscdevice miscdev;
 	const struct xrp_hw_ops *hw_ops;
 	void *hw_arg;
+	unsigned n_queues;
 
-	struct xrp_comm queue[1];
+	u32 *queue_priority;
+	struct xrp_comm *queue;
+	struct xrp_comm **queue_ordered;
 	void __iomem *comm;
 	phys_addr_t pmem;
 	phys_addr_t comm_phys;

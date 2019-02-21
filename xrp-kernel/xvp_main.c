@@ -53,6 +53,7 @@
 #include <linux/property.h>
 #include <linux/sched.h>
 #include <linux/slab.h>
+#include <linux/sort.h>
 #include <asm/mman.h>
 #include <asm/uaccess.h>
 #include "xrp_cma_alloc.h"
@@ -228,6 +229,18 @@ static inline void __iomem *xrp_comm_put_tlv(void __iomem **addr,
 	return tlv->value;
 }
 
+static inline void __iomem *xrp_comm_get_tlv(void __iomem **addr,
+					     uint32_t *type,
+					     uint32_t *length)
+{
+	struct xrp_dsp_tlv __iomem *tlv = *addr;
+
+	*type = xrp_comm_read32(&tlv->type);
+	*length = xrp_comm_read32(&tlv->length);
+	*addr = tlv->value + ((*length + 3) / 4);
+	return tlv->value;
+}
+
 static inline void xrp_comm_write(volatile void __iomem *addr, const void *p,
 				  size_t sz)
 {
@@ -339,7 +352,58 @@ static void xrp_sync_v2(struct xvp *xvp,
 	xrp_comm_write(xrp_comm_put_tlv(&addr,
 					XRP_DSP_SYNC_TYPE_HW_SPEC_DATA, sz),
 		       hw_sync_data, sz);
+	if (xvp->n_queues > 1) {
+		struct xrp_dsp_sync_v2 __iomem *queue_sync;
+		unsigned i;
+
+		xrp_comm_write(xrp_comm_put_tlv(&addr,
+						XRP_DSP_SYNC_TYPE_HW_QUEUES,
+						xvp->n_queues * sizeof(u32)),
+			       xvp->queue_priority,
+			       xvp->n_queues * sizeof(u32));
+		for (i = 1; i < xvp->n_queues; ++i) {
+			queue_sync = xvp->queue[i].comm;
+			xrp_comm_write32(&queue_sync->sync,
+					 XRP_DSP_SYNC_IDLE);
+		}
+	}
 	xrp_comm_put_tlv(&addr, XRP_DSP_SYNC_TYPE_LAST, 0);
+}
+
+static int xrp_sync_complete_v2(struct xvp *xvp, size_t sz)
+{
+	struct xrp_dsp_sync_v2 __iomem *shared_sync = xvp->comm;
+	void __iomem *addr = shared_sync->hw_sync_data;
+	u32 type, len;
+
+	xrp_comm_get_tlv(&addr, &type, &len);
+	if (len != sz) {
+		dev_err(xvp->dev,
+			"HW spec data size modified by the DSP\n");
+		return -EINVAL;
+	}
+	if (!(type & XRP_DSP_SYNC_TYPE_ACCEPT))
+		dev_info(xvp->dev,
+			 "HW spec data not recognized by the DSP\n");
+
+	if (xvp->n_queues > 1) {
+		void __iomem *p = xrp_comm_get_tlv(&addr, &type, &len);
+
+		if (len != xvp->n_queues * sizeof(u32)) {
+			dev_err(xvp->dev,
+				"Queue priority size modified by the DSP\n");
+			return -EINVAL;
+		}
+		if (type & XRP_DSP_SYNC_TYPE_ACCEPT) {
+			xrp_comm_read(p, xvp->queue_priority,
+				      xvp->n_queues * sizeof(u32));
+		} else {
+			dev_info(xvp->dev,
+				 "Queue priority data not recognized by the DSP\n");
+			xvp->n_queues = 1;
+		}
+	}
+	return 0;
 }
 
 static int xrp_synchronize(struct xvp *xvp)
@@ -370,6 +434,11 @@ static int xrp_synchronize(struct xvp *xvp)
 
 	switch (v) {
 	case XRP_DSP_SYNC_DSP_READY_V1:
+		if (xvp->n_queues > 1) {
+			dev_info(xvp->dev,
+				 "Queue priority data not recognized by the DSP\n");
+			xvp->n_queues = 1;
+		}
 		xrp_comm_write(&shared_sync->hw_sync_data, hw_sync_data, sz);
 		break;
 	case XRP_DSP_SYNC_DSP_READY_V2:
@@ -401,6 +470,12 @@ static int xrp_synchronize(struct xvp *xvp)
 		dev_err(xvp->dev,
 			"DSP haven't confirmed initialization data reception\n");
 		goto err;
+	}
+
+	if (v == XRP_DSP_SYNC_DSP_READY_V2) {
+		ret = xrp_sync_complete_v2(xvp, sz);
+		if (ret < 0)
+			goto err;
 	}
 
 	xrp_send_device_irq(xvp);
@@ -439,14 +514,20 @@ static bool xrp_cmd_complete(struct xrp_comm *xvp)
 
 irqreturn_t xrp_irq_handler(int irq, struct xvp *xvp)
 {
+	unsigned i, n = 0;
+
+	dev_dbg(xvp->dev, "%s\n", __func__);
 	if (!xvp->comm)
 		return IRQ_NONE;
 
-	if (xrp_cmd_complete(xvp->queue)) {
-		complete(&xvp->queue[0].completion);
-		return IRQ_HANDLED;
+	for (i = 0; i < xvp->n_queues; ++i) {
+		if (xrp_cmd_complete(xvp->queue + i)) {
+			dev_dbg(xvp->dev, "  completing queue %d\n", i);
+			complete(&xvp->queue[i].completion);
+			++n;
+		}
 	}
-	return IRQ_NONE;
+	return n ? IRQ_HANDLED : IRQ_NONE;
 }
 EXPORT_SYMBOL(xrp_irq_handler);
 
@@ -1492,6 +1573,8 @@ static long xrp_complete_hw_request(struct xrp_dsp_cmd __iomem *cmd,
 	if (rq->n_buffers <= XRP_DSP_CMD_INLINE_BUFFER_COUNT)
 		xrp_comm_read(&cmd->buffer_data, rq->dsp_buffer,
 			      rq->n_buffers * sizeof(struct xrp_dsp_buffer));
+	xrp_comm_write32(&cmd->flags, 0);
+
 	return (flags & XRP_DSP_CMD_FLAG_RESPONSE_DELIVERY_FAIL) ? -ENXIO : 0;
 }
 
@@ -1500,7 +1583,7 @@ static long xrp_ioctl_submit_sync(struct file *filp,
 {
 	struct xvp_file *xvp_file = filp->private_data;
 	struct xvp *xvp = xvp_file->xvp;
-	struct xrp_comm *queue;
+	struct xrp_comm *queue = xvp->queue;
 	struct xrp_request xrp_rq, *rq = &xrp_rq;
 	long ret = 0;
 	bool went_off = false;
@@ -1514,7 +1597,16 @@ static long xrp_ioctl_submit_sync(struct file *filp,
 		return -EINVAL;
 	}
 
-	queue = xvp->queue;
+	if (xvp->n_queues > 1) {
+		unsigned n = (rq->ioctl_queue.flags & XRP_QUEUE_FLAG_PRIO) >>
+			XRP_QUEUE_FLAG_PRIO_SHIFT;
+
+		if (n >= xvp->n_queues)
+			n = xvp->n_queues - 1;
+		queue = xvp->queue_ordered[n];
+		dev_dbg(xvp->dev, "%s: priority: %d -> %d\n",
+			__func__, n, queue->priority);
+	}
 
 	ret = xrp_map_request(filp, rq, current->mm);
 	if (ret < 0)
@@ -1877,6 +1969,18 @@ static int xrp_init_regs_cma(struct platform_device *pdev, struct xvp *xvp)
 	return xrp_init_cma_pool(&xvp->pool, xvp->dev);
 }
 
+static int compare_queue_priority(const void *a, const void *b)
+{
+	const void * const *ppa = a;
+	const void * const *ppb = b;
+	const struct xrp_comm *pa = *ppa, *pb = *ppb;
+
+	if (pa->priority == pb->priority)
+		return 0;
+	else
+		return pa->priority < pb->priority ? -1 : 1;
+}
+
 static long xrp_init_common(struct platform_device *pdev,
 			    enum xrp_init_flags init_flags,
 			    const struct xrp_hw_ops *hw_ops, void *hw_arg,
@@ -1887,6 +1991,7 @@ static long xrp_init_common(struct platform_device *pdev,
 	char nodename[sizeof("xvp") + 3 * sizeof(int)];
 	struct xvp *xvp;
 	int nodeid;
+	unsigned i;
 
 	xvp = devm_kzalloc(&pdev->dev, sizeof(*xvp), GFP_KERNEL);
 	if (!xvp) {
@@ -1912,9 +2017,56 @@ static long xrp_init_common(struct platform_device *pdev,
 	if (ret < 0)
 		goto err_free_pool;
 
-	mutex_init(&xvp->queue[0].lock);
-	xvp->queue[0].comm = xvp->comm;
-	init_completion(&xvp->queue[0].completion);
+	ret = device_property_read_u32_array(xvp->dev, "queue-priority",
+					     NULL, 0);
+	if (ret > 0) {
+		xvp->n_queues = ret;
+		xvp->queue_priority = devm_kmalloc(&pdev->dev,
+						   ret * sizeof(u32),
+						   GFP_KERNEL);
+		if (xvp->queue_priority == NULL)
+			goto err_free_pool;
+		ret = device_property_read_u32_array(xvp->dev,
+						     "queue-priority",
+						     xvp->queue_priority,
+						     xvp->n_queues);
+		if (ret < 0)
+			goto err_free_pool;
+		dev_dbg(xvp->dev,
+			"multiqueue (%d) configuration, queue priorities:\n",
+			xvp->n_queues);
+		for (i = 0; i < xvp->n_queues; ++i)
+			dev_dbg(xvp->dev, "  %d\n", xvp->queue_priority[i]);
+	} else {
+		xvp->n_queues = 1;
+	}
+	xvp->queue = devm_kmalloc(&pdev->dev,
+				  xvp->n_queues * sizeof(*xvp->queue),
+				  GFP_KERNEL);
+	xvp->queue_ordered = devm_kmalloc(&pdev->dev,
+					  xvp->n_queues * sizeof(*xvp->queue_ordered),
+					  GFP_KERNEL);
+	if (xvp->queue == NULL ||
+	    xvp->queue_ordered == NULL)
+		goto err_free_pool;
+
+	for (i = 0; i < xvp->n_queues; ++i) {
+		mutex_init(&xvp->queue[i].lock);
+		xvp->queue[i].comm = xvp->comm + XRP_DSP_CMD_STRIDE * i;
+		init_completion(&xvp->queue[i].completion);
+		if (xvp->queue_priority)
+			xvp->queue[i].priority = xvp->queue_priority[i];
+		xvp->queue_ordered[i] = xvp->queue + i;
+	}
+	sort(xvp->queue_ordered, xvp->n_queues, sizeof(*xvp->queue_ordered),
+	     compare_queue_priority, NULL);
+	if (xvp->n_queues > 1) {
+		dev_dbg(xvp->dev, "SW -> HW queue priority mapping:\n");
+		for (i = 0; i < xvp->n_queues; ++i) {
+			dev_dbg(xvp->dev, "  %d -> %d\n",
+				i, xvp->queue_ordered[i]->priority);
+		}
+	}
 
 	ret = device_property_read_string(xvp->dev, "firmware-name",
 					  &xvp->firmware_name);

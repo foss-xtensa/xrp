@@ -7,6 +7,8 @@ Required properties:
 - memory-region: phandle, refers to a child node inside reserved-memory node.
 
 Optional properties:
+- queue-priority: cells indicating priorities of DSP hardware queues. If
+  missing then single default queue is configured.
 - firmware-name: string identifying firmware name. If missing the driver
   doesn't load the firmware.
 
@@ -44,6 +46,7 @@ Example:
 		#size-cells = <1>;
 		compatible = "cdns,xrp,cma";
 		memory-region = <&xrp_reserved>;
+		queue-priority = <0 1 2>;
 		firmware-name = "xrp0.elf";
 		ranges = <0x00000000 0x00000000 0x10000000
 			  0x3ffc0000 0xc0000000 0x00020000

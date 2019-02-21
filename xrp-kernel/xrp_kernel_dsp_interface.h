@@ -49,6 +49,7 @@ enum {
 
 	XRP_DSP_SYNC_TYPE_LAST = 0,
 	XRP_DSP_SYNC_TYPE_HW_SPEC_DATA = 1,
+	XRP_DSP_SYNC_TYPE_HW_QUEUES = 2,
 };
 
 struct xrp_dsp_tlv {
@@ -93,6 +94,7 @@ enum {
 #define XRP_DSP_CMD_INLINE_DATA_SIZE 16
 #define XRP_DSP_CMD_INLINE_BUFFER_COUNT 1
 #define XRP_DSP_CMD_NAMESPACE_ID_SIZE 16
+#define XRP_DSP_CMD_STRIDE 128
 
 struct xrp_dsp_cmd {
 	__u32 flags;

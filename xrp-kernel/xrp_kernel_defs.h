@@ -55,8 +55,12 @@ struct xrp_ioctl_buffer {
 
 enum {
 	XRP_QUEUE_FLAG_NSID = 0x4,
+	XRP_QUEUE_FLAG_PRIO = 0xff00,
+	XRP_QUEUE_FLAG_PRIO_SHIFT = 8,
 
-	XRP_QUEUE_VALID_FLAGS = 0x4,
+	XRP_QUEUE_VALID_FLAGS =
+		XRP_QUEUE_FLAG_NSID |
+		XRP_QUEUE_FLAG_PRIO,
 };
 
 struct xrp_ioctl_queue {
