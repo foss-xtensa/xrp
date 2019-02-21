@@ -31,6 +31,7 @@
 #include "xrp_debug.h"
 #include "xrp_dsp_hw.h"
 #include "xrp_dsp_sync.h"
+#include "xrp_dsp_user.h"
 #include "xrp_ns.h"
 #include "xrp_types.h"
 #include "xrp_kernel_dsp_interface.h"
@@ -70,6 +71,10 @@ struct xrp_buffer_group {
 	struct xrp_buffer *buffer;
 };
 
+static size_t dsp_hw_queue_entry_size = XRP_DSP_CMD_STRIDE;
+static struct xrp_device dsp_device0;
+static int n_dsp_devices;
+static struct xrp_device **dsp_device;
 
 void xrp_device_enable_cache(struct xrp_device *device, int enable)
 {
@@ -111,12 +116,14 @@ static void release_refcounted(struct xrp_refcounted *ref)
 
 struct xrp_device *xrp_open_device(int idx, enum xrp_status *status)
 {
-	static struct xrp_device device;
-
 	if (idx == 0) {
-		device.dsp_cmd = xrp_dsp_comm_base;
+		dsp_device0.dsp_cmd = xrp_dsp_comm_base;
 		set_status(status, XRP_STATUS_SUCCESS);
-		return &device;
+		return &dsp_device0;
+	} else if (idx < n_dsp_devices) {
+		xrp_retain_device(dsp_device[idx]);
+		set_status(status, XRP_STATUS_SUCCESS);
+		return dsp_device[idx];
 	} else {
 		set_status(status, XRP_STATUS_FAILURE);
 		return NULL;
@@ -289,6 +296,48 @@ out:
 
 /* DSP side request handling */
 
+static int update_hw_queues(uint32_t queue_priority[], int n)
+{
+	if (xrp_user_create_queues) {
+		struct xrp_device **new_device = malloc(n * sizeof(void *));
+		struct xrp_device **old_device = dsp_device;
+		int n_old = n_dsp_devices;
+		int i;
+
+		if (!new_device) {
+			pr_debug("%s: device array allocation failed\n",
+				 __func__);
+			return 0;
+		}
+		for (i = 1; i < n; ++i) {
+			new_device[i] = calloc(1, sizeof(struct xrp_device));
+			if (!new_device[i]) {
+				pr_debug("%s: device allocation failed\n",
+					 __func__);
+				while (--i)
+					xrp_release_device(new_device[i]);
+				free(new_device);
+
+				return 0;
+			}
+			new_device[i]->dsp_cmd = xrp_dsp_comm_base +
+				i * dsp_hw_queue_entry_size;
+			xrp_retain_device(new_device[i]);
+		}
+		dsp_device = new_device;
+		n_dsp_devices = n;
+
+		for (i = 1; i < n_old; ++i)
+			xrp_release_device(old_device[i]);
+		free(old_device);
+
+		return xrp_user_create_queues(n, queue_priority) ==
+			XRP_STATUS_SUCCESS;
+	} else {
+		return 0;
+	}
+}
+
 static void process_sync_data(struct xrp_device *device,
 			      struct xrp_dsp_tlv *data)
 {
@@ -312,6 +361,12 @@ static void process_sync_data(struct xrp_device *device,
 			if (xrp_hw_set_sync_data)
 				xrp_hw_set_sync_data(data->value);
 			data->type |= XRP_DSP_SYNC_TYPE_ACCEPT;
+			break;
+
+		case XRP_DSP_SYNC_TYPE_HW_QUEUES:
+			if (update_hw_queues(data->value,
+					     data->length / 4))
+				data->type |= XRP_DSP_SYNC_TYPE_ACCEPT;
 			break;
 
 		default:
