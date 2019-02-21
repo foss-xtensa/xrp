@@ -2,7 +2,7 @@
  * Data structures and constants for generic XRP interface between
  * linux and DSP
  *
- * Copyright (c) 2015 - 2017 Cadence Design Systems, Inc.
+ * Copyright (c) 2015 - 2019 Cadence Design Systems, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -39,12 +39,33 @@ enum {
 	XRP_DSP_SYNC_HOST_TO_DSP = 0x1,
 	XRP_DSP_SYNC_DSP_TO_HOST = 0x3,
 	XRP_DSP_SYNC_START = 0x101,
-	XRP_DSP_SYNC_DSP_READY = 0x203,
+	XRP_DSP_SYNC_DSP_READY_V1 = 0x203,
+	XRP_DSP_SYNC_DSP_READY_V2 = 0x303,
 };
 
-struct xrp_dsp_sync {
+enum {
+	XRP_DSP_SYNC_TYPE_ACCEPT = 0x80000000,
+	XRP_DSP_SYNC_TYPE_MASK = 0x00ffffff,
+
+	XRP_DSP_SYNC_TYPE_LAST = 0,
+	XRP_DSP_SYNC_TYPE_HW_SPEC_DATA = 1,
+};
+
+struct xrp_dsp_tlv {
+	__u32 type;
+	__u32 length;
+	__u32 value[0];
+};
+
+struct xrp_dsp_sync_v1 {
 	__u32 sync;
 	__u32 hw_sync_data[0];
+};
+
+struct xrp_dsp_sync_v2 {
+	__u32 sync;
+	__u32 reserved[3];
+	struct xrp_dsp_tlv hw_sync_data[0];
 };
 
 enum {

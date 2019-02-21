@@ -117,6 +117,16 @@ static inline __u32 xrp_comm_read32(const volatile void *addr)
 	return *(volatile __u32 *)addr;
 }
 
+static void *xrp_put_tlv(void **addr, uint32_t type, uint32_t length)
+{
+	struct xrp_dsp_tlv *tlv = *addr;
+
+	xrp_comm_write32(&tlv->type, type);
+	xrp_comm_write32(&tlv->length, length);
+	*addr = tlv->value + ((length + 3) / 4);
+	return tlv->value;
+}
+
 static inline void xrp_send_device_irq(struct xrp_device_description *desc)
 {
 	void *device_irq = p2v(desc->io_base + desc->device_irq_host_offset);
@@ -150,20 +160,31 @@ static void synchronize(struct xrp_device_description *desc)
 		[XRP_IRQ_EDGE_SW] = XRP_DSP_SYNC_IRQ_MODE_EDGE,
 	};
 
-	struct xrp_dsp_sync *shared_sync = desc->comm_ptr;
-	struct xrp_hw_simple_sync_data *hw_sync =
-		(struct xrp_hw_simple_sync_data *)&shared_sync->hw_sync_data;
+	struct xrp_dsp_sync_v1 *shared_sync = desc->comm_ptr;
+	void *addr = NULL;
+	struct xrp_hw_simple_sync_data *hw_sync = NULL;
+	__u32 v, v1;
 
 	xrp_comm_write32(&shared_sync->sync, XRP_DSP_SYNC_START);
 	mb();
 	xrp_send_device_irq(desc);
 	do {
-		__u32 v = xrp_comm_read32(&shared_sync->sync);
-		if (v == XRP_DSP_SYNC_DSP_READY)
+		v = xrp_comm_read32(&shared_sync->sync);
+		if (v == XRP_DSP_SYNC_DSP_READY_V1 ||
+		    v == XRP_DSP_SYNC_DSP_READY_V2)
 			break;
 		schedule();
 	} while (1);
 
+	if (v == XRP_DSP_SYNC_DSP_READY_V1) {
+		hw_sync = (struct xrp_hw_simple_sync_data *)&shared_sync->hw_sync_data;
+	} else if (v == XRP_DSP_SYNC_DSP_READY_V2) {
+		struct xrp_dsp_sync_v2 *shared_sync = desc->comm_ptr;
+
+		addr = shared_sync->hw_sync_data;
+		hw_sync = xrp_put_tlv(&addr, XRP_DSP_SYNC_TYPE_HW_SPEC_DATA,
+				      sizeof(struct xrp_hw_simple_sync_data));
+	}
 	xrp_comm_write32(&hw_sync->device_mmio_base,
 			 desc->io_base);
 	xrp_comm_write32(&hw_sync->host_irq_mode,
@@ -180,13 +201,17 @@ static void synchronize(struct xrp_device_description *desc)
 			 desc->device_irq[1]);
 	xrp_comm_write32(&hw_sync->device_irq,
 			 desc->device_irq[2]);
+
+	if (v == XRP_DSP_SYNC_DSP_READY_V2)
+		xrp_put_tlv(&addr, XRP_DSP_SYNC_TYPE_LAST, 0);
+
 	mb();
 	xrp_comm_write32(&shared_sync->sync, XRP_DSP_SYNC_HOST_TO_DSP);
-	mb();
 
 	do {
-		__u32 v = xrp_comm_read32(&shared_sync->sync);
-		if (v == XRP_DSP_SYNC_DSP_TO_HOST)
+		mb();
+		v1 = xrp_comm_read32(&shared_sync->sync);
+		if (v1 == XRP_DSP_SYNC_DSP_TO_HOST)
 			break;
 		schedule();
 	} while (1);

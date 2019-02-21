@@ -41,6 +41,7 @@ void *xrp_dsp_comm_base = &xrp_dsp_comm_base_magic;
 static int manage_cache;
 
 #define MAX_STACK_BUFFERS 16
+#define MAX_TLV_LENGTH 0x10000
 
 /* DSP side XRP API implementation */
 
@@ -288,8 +289,43 @@ out:
 
 /* DSP side request handling */
 
-static void do_handshake(struct xrp_dsp_sync *shared_sync)
+static void process_sync_data(struct xrp_device *device,
+			      struct xrp_dsp_tlv *data)
 {
+	(void)device;
+
+	for (;; data = (void *)(data->value + ((data->length + 3) / 4))) {
+		dcache_region_invalidate(data, sizeof(*data));
+
+		if (data->length >= MAX_TLV_LENGTH) {
+			pr_debug("%s: suspicious length, data = %p, length = %d\n",
+				 __func__, data, (unsigned)data->length);
+			break;
+		}
+		dcache_region_invalidate(data->value, data->length);
+
+		switch (data->type & XRP_DSP_SYNC_TYPE_MASK) {
+		case XRP_DSP_SYNC_TYPE_LAST:
+			return;
+
+		case XRP_DSP_SYNC_TYPE_HW_SPEC_DATA:
+			if (xrp_hw_set_sync_data)
+				xrp_hw_set_sync_data(data->value);
+			data->type |= XRP_DSP_SYNC_TYPE_ACCEPT;
+			break;
+
+		default:
+			pr_debug("%s, unrecognized TLV: type = 0x%08x, length = %d\n",
+				 __func__, data->type, data->length);
+			continue;
+		}
+		dcache_region_writeback(data, sizeof(data) + data->length);
+	}
+}
+
+static void do_handshake(struct xrp_device *device)
+{
+	struct xrp_dsp_sync_v2 *shared_sync = device->dsp_cmd;
 	uint32_t v;
 
 	pr_debug("%s, shared_sync = %p\n", __func__, shared_sync);
@@ -299,7 +335,7 @@ static void do_handshake(struct xrp_dsp_sync *shared_sync)
 					 sizeof(shared_sync->sync));
 	}
 
-	xrp_s32ri(XRP_DSP_SYNC_DSP_READY, &shared_sync->sync);
+	xrp_s32ri(XRP_DSP_SYNC_DSP_READY_V2, &shared_sync->sync);
 	dcache_region_writeback(&shared_sync->sync,
 				sizeof(shared_sync->sync));
 
@@ -309,12 +345,11 @@ static void do_handshake(struct xrp_dsp_sync *shared_sync)
 		v = xrp_l32ai(&shared_sync->sync);
 		if (v == XRP_DSP_SYNC_HOST_TO_DSP)
 			break;
-		if (v != XRP_DSP_SYNC_DSP_READY)
+		if (v != XRP_DSP_SYNC_DSP_READY_V2)
 			return;
 	}
 
-	if (xrp_hw_set_sync_data)
-		xrp_hw_set_sync_data(shared_sync->hw_sync_data);
+	process_sync_data(device, shared_sync->hw_sync_data);
 
 	xrp_s32ri(XRP_DSP_SYNC_DSP_TO_HOST, &shared_sync->sync);
 	dcache_region_writeback(&shared_sync->sync,
@@ -568,7 +603,7 @@ enum xrp_status xrp_device_dispatch(struct xrp_device *device)
 		return XRP_STATUS_PENDING;
 
 	if (flags == XRP_DSP_SYNC_START) {
-		do_handshake(device->dsp_cmd);
+		do_handshake(device);
 		status = XRP_STATUS_SUCCESS;
 	} else {
 		status = process_command(device, flags);

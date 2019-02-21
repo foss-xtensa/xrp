@@ -216,6 +216,18 @@ static inline u32 xrp_comm_read32(volatile void __iomem *addr)
 	return __raw_readl(addr);
 }
 
+static inline void __iomem *xrp_comm_put_tlv(void __iomem **addr,
+					     uint32_t type,
+					     uint32_t length)
+{
+	struct xrp_dsp_tlv __iomem *tlv = *addr;
+
+	xrp_comm_write32(&tlv->type, type);
+	xrp_comm_write32(&tlv->length, length);
+	*addr = tlv->value + ((length + 3) / 4);
+	return tlv->value;
+}
+
 static inline void xrp_comm_write(volatile void __iomem *addr, const void *p,
 				  size_t sz)
 {
@@ -318,14 +330,26 @@ static bool xrp_is_known_file(struct file *filp)
 	return ret;
 }
 
+static void xrp_sync_v2(struct xvp *xvp,
+			void *hw_sync_data, size_t sz)
+{
+	struct xrp_dsp_sync_v2 __iomem *shared_sync = xvp->comm;
+	void __iomem *addr = shared_sync->hw_sync_data;
+
+	xrp_comm_write(xrp_comm_put_tlv(&addr,
+					XRP_DSP_SYNC_TYPE_HW_SPEC_DATA, sz),
+		       hw_sync_data, sz);
+	xrp_comm_put_tlv(&addr, XRP_DSP_SYNC_TYPE_LAST, 0);
+}
+
 static int xrp_synchronize(struct xvp *xvp)
 {
 	size_t sz;
 	void *hw_sync_data;
 	unsigned long deadline = jiffies + firmware_command_timeout * HZ;
-	struct xrp_dsp_sync __iomem *shared_sync = xvp->comm;
+	struct xrp_dsp_sync_v1 __iomem *shared_sync = xvp->comm;
 	int ret;
-	u32 v;
+	u32 v, v1;
 
 	hw_sync_data = xvp->hw_ops->get_hw_sync_data(xvp->hw_arg, &sz);
 	if (!hw_sync_data) {
@@ -337,33 +361,40 @@ static int xrp_synchronize(struct xvp *xvp)
 	mb();
 	do {
 		v = xrp_comm_read32(&shared_sync->sync);
-		if (v == XRP_DSP_SYNC_DSP_READY)
+		if (v == XRP_DSP_SYNC_DSP_READY_V1 ||
+		    v == XRP_DSP_SYNC_DSP_READY_V2)
 			break;
 		if (xrp_panic_check(xvp))
 			goto err;
 		schedule();
 	} while (time_before(jiffies, deadline));
 
-	if (v != XRP_DSP_SYNC_DSP_READY) {
+	switch (v) {
+	case XRP_DSP_SYNC_DSP_READY_V1:
+		xrp_comm_write(&shared_sync->hw_sync_data, hw_sync_data, sz);
+		break;
+	case XRP_DSP_SYNC_DSP_READY_V2:
+		xrp_sync_v2(xvp, hw_sync_data, sz);
+		break;
+	default:
 		dev_err(xvp->dev, "DSP is not ready for synchronization\n");
 		goto err;
 	}
 
-	xrp_comm_write(&shared_sync->hw_sync_data, hw_sync_data, sz);
 	mb();
 	xrp_comm_write32(&shared_sync->sync, XRP_DSP_SYNC_HOST_TO_DSP);
-	mb();
 
 	do {
-		v = xrp_comm_read32(&shared_sync->sync);
-		if (v == XRP_DSP_SYNC_DSP_TO_HOST)
+		mb();
+		v1 = xrp_comm_read32(&shared_sync->sync);
+		if (v1 == XRP_DSP_SYNC_DSP_TO_HOST)
 			break;
 		if (xrp_panic_check(xvp))
 			goto err;
 		schedule();
 	} while (time_before(jiffies, deadline));
 
-	if (v != XRP_DSP_SYNC_DSP_TO_HOST) {
+	if (v1 != XRP_DSP_SYNC_DSP_TO_HOST) {
 		dev_err(xvp->dev,
 			"DSP haven't confirmed initialization data reception\n");
 		goto err;
@@ -1691,7 +1722,7 @@ static inline void xrp_release_dsp(struct xvp *xvp)
 static int xrp_boot_firmware(struct xvp *xvp)
 {
 	int ret;
-	struct xrp_dsp_sync __iomem *shared_sync = xvp->comm;
+	struct xrp_dsp_sync_v1 __iomem *shared_sync = xvp->comm;
 
 	xrp_halt_dsp(xvp);
 	xrp_reset_dsp(xvp);
