@@ -321,6 +321,14 @@ struct xrp_queue *xrp_create_ns_queue(struct xrp_device *device,
 				      const void *nsid,
 				      enum xrp_status *status)
 {
+	return xrp_create_nsp_queue(device, nsid, 0, status);
+}
+
+struct xrp_queue *xrp_create_nsp_queue(struct xrp_device *device,
+				       const void *nsid,
+				       int priority,
+				       enum xrp_status *status)
+{
 	struct xrp_queue *queue;
 
 	xrp_retain_device(device);
@@ -337,6 +345,7 @@ struct xrp_queue *xrp_create_ns_queue(struct xrp_device *device,
 		queue->use_nsid = 1;
 		memcpy(queue->nsid, nsid, XRP_NAMESPACE_ID_SIZE);
 	}
+	queue->priority = priority;
 
 	xrp_impl_create_queue(queue, status);
 

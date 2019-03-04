@@ -69,6 +69,7 @@ struct xrp_queue {
 	struct xrp_refcounted ref;
 	struct xrp_device *device;
 	int use_nsid;
+	int priority;
 	char nsid[XRP_NAMESPACE_ID_SIZE];
 	struct xrp_queue_impl impl;
 };

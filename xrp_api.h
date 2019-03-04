@@ -300,6 +300,18 @@ struct xrp_queue *xrp_create_ns_queue(struct xrp_device *device,
 				      enum xrp_status *status);
 
 /*!
+ * Create queue to the specified namespace of the device with specific
+ * priority.
+ * Queue is an ordered device communication channel. Queue is reference
+ * counted and is created with reference count of 1.
+ * \param[out] status: operation status
+ */
+struct xrp_queue *xrp_create_nsp_queue(struct xrp_device *device,
+				       const void *nsid,
+				       int priority,
+				       enum xrp_status *status);
+
+/*!
  * Increment queue reference count.
  */
 void xrp_retain_queue(struct xrp_queue *queue);
