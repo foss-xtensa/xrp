@@ -5038,6 +5038,18 @@ else
 $as_echo "no" >&6; }
 fi
 rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+      for ac_header in xtensa/hal.h
+do :
+  ac_fn_c_check_header_mongrel "$LINENO" "xtensa/hal.h" "ac_cv_header_xtensa_hal_h" "$ac_includes_default"
+if test "x$ac_cv_header_xtensa_hal_h" = xyes; then :
+  cat >>confdefs.h <<_ACEOF
+#define HAVE_XTENSA_HAL_H 1
+_ACEOF
+
+fi
+
+done
+
 
 fi
 
@@ -5049,18 +5061,6 @@ do :
 if test "x$ac_cv_header_valgrind_memcheck_h" = xyes; then :
   cat >>confdefs.h <<_ACEOF
 #define HAVE_VALGRIND_MEMCHECK_H 1
-_ACEOF
-
-fi
-
-done
-
-      for ac_header in xtensa/hal.h
-do :
-  ac_fn_c_check_header_mongrel "$LINENO" "xtensa/hal.h" "ac_cv_header_xtensa_hal_h" "$ac_includes_default"
-if test "x$ac_cv_header_xtensa_hal_h" = xyes; then :
-  cat >>confdefs.h <<_ACEOF
-#define HAVE_XTENSA_HAL_H 1
 _ACEOF
 
 fi
