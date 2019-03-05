@@ -233,6 +233,7 @@ AS_IF([test x$build_dsp = xtrue],
       ])
 
 AC_CONFIG_FILES([xrp-dsp/simple/Makefile])
+AC_CONFIG_FILES([xrp-dsp/simple-xos/Makefile])
 AC_CONFIG_FILES([xrp-dsp/hikey960/Makefile])
 
 AC_SUBST(DSP_LSP, ["${DSP_LSP:-\$(srcdir)/MW-MP/P6_0/xtensa-elf/lib/sim-stacklocal}"])
