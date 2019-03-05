@@ -133,7 +133,9 @@ static void _xrp_run_command(struct xrp_queue *queue,
 		size_t n_buffers = buffer_group ? buffer_group->n_buffers : 0;
 		struct xrp_ioctl_buffer ioctl_buffer[n_buffers];/* TODO */
 		struct xrp_ioctl_queue ioctl_queue = {
-			.flags = (queue->use_nsid ? XRP_QUEUE_FLAG_NSID : 0),
+			.flags = (queue->use_nsid ? XRP_QUEUE_FLAG_NSID : 0) |
+				((queue->priority << XRP_QUEUE_FLAG_PRIO_SHIFT) &
+				 XRP_QUEUE_FLAG_PRIO),
 			.in_data_size = in_data_size,
 			.out_data_size = out_data_size,
 			.buffer_size = n_buffers *
