@@ -53,7 +53,6 @@ struct xrp_refcounted {
 struct xrp_device {
 	struct xrp_refcounted ref;
 	void *dsp_cmd;
-	struct xrp_cmd_ns_map ns_map;
 };
 
 struct xrp_buffer {
@@ -71,6 +70,7 @@ struct xrp_buffer_group {
 	struct xrp_buffer *buffer;
 };
 
+static struct xrp_cmd_ns_map ns_map;
 static size_t dsp_hw_queue_entry_size = XRP_DSP_CMD_STRIDE;
 static struct xrp_device dsp_device0;
 static int n_dsp_devices;
@@ -495,7 +495,7 @@ static enum xrp_status process_command(struct xrp_device *device,
 	size_t i;
 
 	if (dsp_cmd->flags & XRP_DSP_CMD_FLAG_REQUEST_NSID) {
-		struct xrp_cmd_ns *cmd_ns = xrp_find_cmd_ns(&device->ns_map,
+		struct xrp_cmd_ns *cmd_ns = xrp_find_cmd_ns(&ns_map,
 							    dsp_cmd->nsid);
 		if (xrp_cmd_ns_match(dsp_cmd->nsid, cmd_ns)) {
 			command_handler = cmd_ns->handler;
@@ -618,7 +618,8 @@ void xrp_device_register_namespace(struct xrp_device *device,
 				   void *handler_context,
 				   enum xrp_status *status)
 {
-	if (xrp_register_namespace(&device->ns_map,
+	(void)device;
+	if (xrp_register_namespace(&ns_map,
 				   nsid, handler, handler_context))
 		set_status(status, XRP_STATUS_SUCCESS);
 	else
@@ -629,7 +630,8 @@ void xrp_device_unregister_namespace(struct xrp_device *device,
 				     const void *nsid,
 				     enum xrp_status *status)
 {
-	if (xrp_unregister_namespace(&device->ns_map, nsid))
+	(void)device;
+	if (xrp_unregister_namespace(&ns_map, nsid))
 		set_status(status, XRP_STATUS_SUCCESS);
 	else
 		set_status(status, XRP_STATUS_FAILURE);
