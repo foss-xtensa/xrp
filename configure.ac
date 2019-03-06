@@ -200,6 +200,7 @@ AS_IF([test x$build_host = xtrue -a x$build_standalone = xtrue -a x$build_exampl
 		   AC_MSG_FAILURE([No usable libfdt is found]))
       AC_CHECK_FUNCS([fdt_getprop fdt_strerror],,
 		     AC_MSG_FAILURE([No usable libfdt is found]))
+      AC_CHECK_FUNCS([nanosleep])
       CPPFLAGS="$saved_CPPFLAGS"
       LDFLAGS="$saved_LDFLAGS"
       LIBS="$saved_LIBS"

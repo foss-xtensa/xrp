@@ -104,6 +104,8 @@ static enum xrp_status example_v2_handler(void *handler_context,
 					  struct xrp_buffer_group *buffer_group)
 {
 	const struct example_v2_cmd *cmd = in_data;
+	struct example_v2_rsp *rsp = out_data;
+	static volatile int c;
 
 	(void)handler_context;
 	(void)out_data;
@@ -118,6 +120,24 @@ static enum xrp_status example_v2_handler(void *handler_context,
 		return XRP_STATUS_SUCCESS;
 	case EXAMPLE_V2_CMD_FAIL:
 		return XRP_STATUS_FAILURE;
+	case EXAMPLE_V2_CMD_LONG:
+		c = 1;
+#if HAVE_THREADS_XOS
+		pr_debug("EXAMPLE_V2_CMD_LONG: enter\n");
+		while (c == 1)
+			;
+		pr_debug("EXAMPLE_V2_CMD_LONG: exit\n");
+		c = 0;
+#endif
+		return XRP_STATUS_SUCCESS;
+	case EXAMPLE_V2_CMD_SHORT:
+		rsp->v = c;
+#if HAVE_THREADS_XOS
+		pr_debug("EXAMPLE_V2_CMD_SHORT\n");
+		if (c)
+			c = 2;
+#endif
+		return XRP_STATUS_SUCCESS;
 	default:
 		return XRP_STATUS_FAILURE;
 	}

@@ -26,6 +26,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#ifdef HAVE_NANOSLEEP
+#include <time.h>
+#endif
 #include "xrp_api.h"
 #include "example_namespace.h"
 #ifdef HAVE_THREADS_XOS
@@ -424,6 +427,71 @@ static void f7(int devid)
 	xrp_release_device(device);
 }
 
+/* Test priority queues */
+static void f8(int devid)
+{
+	enum xrp_status status = -1;
+	struct xrp_device *device;
+	struct xrp_queue *queue0, *queue1;
+	struct example_v2_cmd cmd = {
+		.cmd = EXAMPLE_V2_CMD_LONG,
+	};
+	struct example_v2_rsp rsp;
+	struct xrp_event *event;
+
+	device = xrp_open_device(devid, &status);
+	assert(status == XRP_STATUS_SUCCESS);
+	status = -1;
+	queue0 = xrp_create_nsp_queue(device, XRP_EXAMPLE_V2_NSID, 0, &status);
+	assert(status == XRP_STATUS_SUCCESS);
+	status = -1;
+	queue1 = xrp_create_nsp_queue(device, XRP_EXAMPLE_V2_NSID, 1, &status);
+	assert(status == XRP_STATUS_SUCCESS);
+	status = -1;
+
+	xrp_enqueue_command(queue0,
+			    &cmd, sizeof(cmd),
+			    NULL, 0,
+			    NULL, &event, &status);
+	assert(status == XRP_STATUS_SUCCESS);
+	status = -1;
+
+	cmd.cmd = EXAMPLE_V2_CMD_SHORT;
+
+	do {
+#ifdef HAVE_NANOSLEEP
+		struct timespec req;
+
+		req.tv_sec = 0;
+		req.tv_nsec = 100000000;
+		/*
+		 * This delay is here for the case of standalone host
+		 * that runs much faster than the simulated DSP. It
+		 * can send high priority requests so fast that it takes
+		 * the low priority thread a very long time to get to a
+		 * point where it's recognized by the high priority test
+		 * function.
+		 */
+		nanosleep(&req, NULL);
+#endif
+		xrp_run_command_sync(queue1,
+				     &cmd, sizeof(cmd),
+				     &rsp, sizeof(rsp),
+				     NULL, &status);
+		assert(status == XRP_STATUS_SUCCESS);
+		status = -1;
+	} while (rsp.v != 1);
+
+	xrp_wait(event, &status);
+	assert(status == XRP_STATUS_SUCCESS);
+	status = -1;
+
+	xrp_release_event(event);
+	xrp_release_queue(queue0);
+	xrp_release_queue(queue1);
+	xrp_release_device(device);
+}
+
 enum {
 	CMD_TEST,
 
@@ -496,6 +564,11 @@ int main(int argc, char **argv)
 			}
 			if (tests & 0x40) {
 				f7(devid);
+				printf("=======================================================\n");
+			}
+			if (tests & 0x80) {
+				f8(devid);
+				printf("=======================================================\n");
 			}
 		}
 		break;

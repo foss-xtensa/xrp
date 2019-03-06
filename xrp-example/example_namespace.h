@@ -37,6 +37,8 @@
 enum {
 	EXAMPLE_V2_CMD_OK,
 	EXAMPLE_V2_CMD_FAIL,
+	EXAMPLE_V2_CMD_LONG,
+	EXAMPLE_V2_CMD_SHORT,
 };
 
 struct example_v2_cmd {
@@ -44,6 +46,7 @@ struct example_v2_cmd {
 };
 
 struct example_v2_rsp {
+	uint32_t v;
 };
 
 #endif
