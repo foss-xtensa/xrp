@@ -27,8 +27,12 @@
 #include <string.h>
 #include <xtensa/corebits.h>
 #include <xtensa/xtruntime.h>
+#if HAVE_THREADS_XOS
+#include <xtensa/xos.h>
+#endif
 #include "xrp_api.h"
 #include "xrp_dsp_hw.h"
+#include "xrp_dsp_user.h"
 
 static void hang(void) __attribute__((noreturn));
 static void hang(void)
@@ -43,6 +47,15 @@ void abort(void)
 	hang();
 }
 
+
+#if HAVE_THREADS_XOS
+static void xos_exception(XosExcFrame *frame)
+{
+	fprintf(stderr, "%s: EXCCAUSE = %ld, EXCVADDR = 0x%08lx, PS = 0x%08lx, EPC1 = 0x%08lx\n",
+		__func__, frame->exccause, frame->excvaddr, frame->ps, frame->pc);
+	hang();
+}
+#else
 static void exception(void)
 {
 	unsigned long exccause, excvaddr, ps, epc1;
@@ -58,6 +71,7 @@ static void exception(void)
 		__func__, exccause, excvaddr, ps, epc1);
 	hang();
 }
+#endif
 
 static void register_exception_handlers(void)
 {
@@ -85,13 +99,29 @@ static void register_exception_handlers(void)
 	unsigned i;
 
 	for (i = 0; i < sizeof(cause) / sizeof(cause[0]); ++i) {
+#if HAVE_THREADS_XOS
+		xos_register_exception_handler(cause[i], xos_exception);
+#else
 		_xtos_set_exception_handler(cause[i], exception);
+#endif
 	}
 }
+
 
 int main(void)
 {
 	enum xrp_status status;
+#if HAVE_THREADS_XOS
+	static uint32_t main_priority[] = {0};
+
+	xrp_hw_init();
+	status = xrp_user_create_queues(1, main_priority);
+	if (status != XRP_STATUS_SUCCESS) {
+		fprintf(stderr, "Initial xrp_user_create_queue failed\n");
+		abort();
+	}
+	xos_start(0);
+#else
 	struct xrp_device *device;
 
 	register_exception_handlers();
@@ -107,5 +137,6 @@ int main(void)
 		if (status == XRP_STATUS_PENDING)
 			xrp_hw_wait_device_irq();
 	}
+#endif
 	return 0;
 }

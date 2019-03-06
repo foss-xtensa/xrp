@@ -63,7 +63,8 @@ xrp_dsp_standalone_LDFLAGS = $(dsp_ldflags) \
 			     -Wl,--defsym,xrp_dsp_comm_base_magic=$(DSP_COMM_BASE)
 xrp_dsp_standalone_LDADD = ../xrp-dsp/libxrp-dsp.a \
 			   ../xrp-dsp/$(HW_PORT)/libxrp-dsp-hw-$(HW_PORT).a \
-			   ../xrp-common/libxrp-common.a
+			   ../xrp-common/libxrp-common.a \
+			   $(THREADS_LDFLAGS)
 
 xrp_dsp_hosted_SOURCES = dsp_main.c dsp_test.c
 xrp_dsp_hosted_CPPFLAGS = $(dsp_cppflags)
@@ -71,7 +72,8 @@ xrp_dsp_hosted_LDFLAGS = $(dsp_ldflags) \
 			 -Wl,--defsym,xrp_dsp_comm_base_magic=0x20161006
 xrp_dsp_hosted_LDADD = ../xrp-dsp/libxrp-dsp.a \
 		       ../xrp-dsp/$(HW_PORT)/libxrp-dsp-hw-$(HW_PORT).a \
-		       ../xrp-common/libxrp-common.a
+		       ../xrp-common/libxrp-common.a \
+		       $(THREADS_LDFLAGS)
 
 xrp_host_standalone_SOURCES = host_main.c xrp_dtb.s
 xrp_host_standalone_CFLAGS = $(AM_CFLAGS) $(THREAD_CFLAGS)
