@@ -164,15 +164,22 @@ AC_SUBST(LIBFDT_LDFLAGS)
 AS_IF([test x$build_host = xtrue],
       [
       AC_MSG_CHECKING([for working _Atomic support])
-      AC_COMPILE_IFELSE([
-			AC_LANG_PROGRAM([[struct { _Atomic int i; _Atomic enum {A, B} e; } s;]],
-					[[++s.i; s.e = A;]])
-			],
-			[
-			AC_DEFINE([HAVE_ATOMIC])
-			AC_MSG_RESULT([yes])
-			],
-			[AC_MSG_RESULT([no])])
+      AC_LINK_IFELSE([
+		     AC_LANG_PROGRAM([[struct { _Atomic int i; _Atomic enum {A, B} e; } s;
+				       int _xt_atomic_compare_exchange_4(unsigned int *_ptr,
+									 unsigned int _exp,
+									 unsigned int _val)
+				       {
+					       (void)_ptr; (void)_exp; (void)_val;
+					       return 0;
+				       }]],
+				     [[++s.i; s.e = A;]])
+		     ],
+		     [
+		     AC_DEFINE([HAVE_ATOMIC])
+		     AC_MSG_RESULT([yes])
+		     ],
+		     [AC_MSG_RESULT([no])])
       AC_CHECK_HEADERS([xtensa/hal.h])
       ])
 
