@@ -785,6 +785,7 @@ INPUT                  = \
     @srcdir@/xrp_user_guide.dox \
     @srcdir@/../xrp_api.h \
     @srcdir@/../xrp-dsp/xrp_dsp_hw.h \
+    @srcdir@/../xrp-dsp/xrp_dsp_user.h \
     @srcdir@/../xrp-kernel/xrp_hw.h
 
 

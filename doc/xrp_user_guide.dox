@@ -489,8 +489,13 @@ are used on Xtensa ELF host. It is captured in the symbol
 with `-Wl,--defsym,xrp_xos_thread_stack_size=...` option in `LDFLAGS` at
 `configure` or build time.
 
-\page operation XRP Operation
-\idxentry{Operation}
+\page features Features
+
+XRP implementations provide basic functionality and a number of optional
+features for the end users.
+
+\section features_operation XRP Operation
+\idxentry{Features!Operation}
 
 The DSP payload implements the main function. To start using XRP it must open the
 XRP device. After that it may register handlers for one or more namespaces and
@@ -608,6 +613,59 @@ A LUA script running in the XTSC polls hardcoded shared memory locations
 designated as software IRQ registers and initiates internal write to the real
 MMIO IRQ register when such location is written to.
 It is not possible to use IRQ for communication from the DSP to the host.
+
+\section features_multiqueue Multiqueue feature
+\idxentry{Features!Multiqueue}
+
+An XRP device may provide an option to configure more than one hardware queue
+with associated priority. Processing of a request on a queue with higher
+priority preempts processing of requests on all lower priority queues.
+
+XRP API provides a function that creates software queue with specific priority:
+xrp_create_nsp_queue(). Software queue priorities range from 0 to N - 1, where
+N is a number of hardware queues. Hardware queue priorities don't have
+predefined range, but higher number must mean higher priority. Mapping between
+software queue priority and hardware queue priority is done as follows:
+configured hardware queues are sorted in non-descending priority order.
+Software priorities are assigned sequentially to the sorted array of hardware
+queues. For example, if the following hardware queue priorities are configured
+for a device: <7 5 8>, then there are 3 software priorities: 0 goes to the
+queue 1 (hardware priority 5), 1 goes to the queue 0 (hardware priority 7), 2
+goes to the queue 2 (hardware priority 8). If a software priority higher than
+the number of configured hardware queues is requested, it is mapped to the
+highest priority hardware queue.
+
+Number and priorities of the hardware queues are specified in `queue-priority`
+property of the XRP device node in the device tree. Generic XRP kernel driver
+passes this information to the firmware in synchronization step. When firmware
+does not recognize the request or cannot support requested priorities XRP
+falls back to single hardware queue.
+
+Firmware developer controls how prioritization is done by implementing the
+function xrp_user_create_queues() that is called at synchronization time and
+must organize processing for requested queue priorities, or report that it
+cannot be done. Repeated calls to xrp_user_create_queues() must adjust the
+list of active hardware queues and their priorities.
+The function xrp_open_device() can be called with device indices corresponding
+to the hardware queue indices to open XRP devices for additional hardware
+queues. Device polling and message dispatching is done by the usual
+xrp_device_poll() and xrp_device_dispatch() functions.
+
+An example implementation of this feature provided in simple-xos port uses XOS
+threads and thread priorities to organize request processing. Handler for the
+first hardware queue is explicitly created by the example's main() function.
+The initial priority of the initial hardware queue thread is chosen by the
+main() function. It must be chosen properly with respect to other threads
+spawned by the main() function because the initial hardware queue thread will
+serve the queue in polling mode until the synchronization with the host is
+complete, calling xos_thread_yield() between the polls. After the
+synchronization all hardware queue thread priorities will be adjusted as
+requested by the host.
+Size of the stack allocated for additional threads can be controlled through
+the symbol `xrp_user_queue_stack_size` that may be defined with the linker
+option `-Wl,--defsym,xrp_user_queue_stack_size=...`
+Simple-xos port also requires use of the device in IRQ mode, polling mode
+is not supported.
 
 \page porting Porting XRP to a New Hardware Platform
 \idxentry{Porting}
