@@ -361,8 +361,7 @@ static int xrp_synchronize(struct xvp *xvp)
 	mb();
 	do {
 		v = xrp_comm_read32(&shared_sync->sync);
-		if (v == XRP_DSP_SYNC_DSP_READY_V1 ||
-		    v == XRP_DSP_SYNC_DSP_READY_V2)
+		if (v != XRP_DSP_SYNC_START)
 			break;
 		if (xrp_panic_check(xvp))
 			goto err;
@@ -376,8 +375,12 @@ static int xrp_synchronize(struct xvp *xvp)
 	case XRP_DSP_SYNC_DSP_READY_V2:
 		xrp_sync_v2(xvp, hw_sync_data, sz);
 		break;
-	default:
+	case XRP_DSP_SYNC_START:
 		dev_err(xvp->dev, "DSP is not ready for synchronization\n");
+		goto err;
+	default:
+		dev_err(xvp->dev,
+			"DSP response to XRP_DSP_SYNC_START is not recognized\n");
 		goto err;
 	}
 
