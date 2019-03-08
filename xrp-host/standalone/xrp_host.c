@@ -151,7 +151,7 @@ static inline void xrp_send_device_irq(struct xrp_device_description *desc)
 	}
 }
 
-static void synchronize(struct xrp_device_description *desc)
+static int synchronize(struct xrp_device_description *desc)
 {
 	static const int irq_mode[] = {
 		[XRP_IRQ_NONE] = XRP_DSP_SYNC_IRQ_MODE_NONE,
@@ -170,8 +170,7 @@ static void synchronize(struct xrp_device_description *desc)
 	xrp_send_device_irq(desc);
 	do {
 		v = xrp_comm_read32(&shared_sync->sync);
-		if (v == XRP_DSP_SYNC_DSP_READY_V1 ||
-		    v == XRP_DSP_SYNC_DSP_READY_V2)
+		if (v != XRP_DSP_SYNC_START)
 			break;
 		schedule();
 	} while (1);
@@ -184,6 +183,11 @@ static void synchronize(struct xrp_device_description *desc)
 		addr = shared_sync->hw_sync_data;
 		hw_sync = xrp_put_tlv(&addr, XRP_DSP_SYNC_TYPE_HW_SPEC_DATA,
 				      sizeof(struct xrp_hw_simple_sync_data));
+	} else {
+		printf("%s: DSP response to XRP_DSP_SYNC_START is not recognized\n",
+		       __func__);
+		xrp_comm_write32(&shared_sync->sync, XRP_DSP_SYNC_IDLE);
+		return 0;
 	}
 	xrp_comm_write32(&hw_sync->device_mmio_base,
 			 desc->io_base);
@@ -232,6 +236,7 @@ static void synchronize(struct xrp_device_description *desc)
 	xrp_comm_write32(&shared_sync->sync, XRP_DSP_SYNC_IDLE);
 
 	desc->sync = 1;
+	return 1;
 }
 
 struct of_node_match {
@@ -439,8 +444,11 @@ struct xrp_device *xrp_open_device(int idx, enum xrp_status *status)
 		set_status(status, XRP_STATUS_FAILURE);
 		return NULL;
 	}
-	if (!xrp_device_description[idx].sync)
-		synchronize(xrp_device_description + idx);
+	if (!xrp_device_description[idx].sync &&
+	    !synchronize(xrp_device_description + idx)) {
+		set_status(status, XRP_STATUS_FAILURE);
+		return NULL;
+	}
 
 	device = alloc_refcounted(sizeof(*device));
 	if (!device) {
