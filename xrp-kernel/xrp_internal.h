@@ -29,6 +29,7 @@
 #ifndef XRP_INTERNAL_H
 #define XRP_INTERNAL_H
 
+#include <linux/completion.h>
 #include <linux/miscdevice.h>
 #include <linux/mutex.h>
 #include "xrp_address_map.h"
@@ -38,6 +39,12 @@ struct firmware;
 struct xrp_hw_ops;
 struct xrp_allocation_pool;
 
+struct xrp_comm {
+	struct mutex lock;
+	void __iomem *comm;
+	struct completion completion;
+};
+
 struct xvp {
 	struct device *dev;
 	const char *firmware_name;
@@ -46,6 +53,7 @@ struct xvp {
 	const struct xrp_hw_ops *hw_ops;
 	void *hw_arg;
 
+	struct xrp_comm queue[1];
 	void __iomem *comm;
 	phys_addr_t pmem;
 	phys_addr_t comm_phys;
@@ -54,10 +62,8 @@ struct xvp {
 	struct xrp_address_map address_map;
 
 	bool host_irq_mode;
-	struct completion completion;
 
 	struct xrp_allocation_pool *pool;
-	struct mutex comm_lock;
 	bool off;
 	int nodeid;
 };

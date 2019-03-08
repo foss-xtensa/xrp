@@ -406,8 +406,10 @@ static int xrp_synchronize(struct xvp *xvp)
 	xrp_send_device_irq(xvp);
 
 	if (xvp->host_irq_mode) {
-		int res = wait_for_completion_timeout(&xvp->completion,
+		int res = wait_for_completion_timeout(&xvp->queue[0].completion,
 						      firmware_command_timeout * HZ);
+
+		ret = -ENODEV;
 		if (xrp_panic_check(xvp))
 			goto err;
 		if (res == 0) {
@@ -423,7 +425,7 @@ err:
 	return ret;
 }
 
-static bool xrp_cmd_complete(struct xvp *xvp)
+static bool xrp_cmd_complete(struct xrp_comm *xvp)
 {
 	struct xrp_dsp_cmd __iomem *cmd = xvp->comm;
 	u32 flags = xrp_comm_read32(&cmd->flags);
@@ -437,12 +439,14 @@ static bool xrp_cmd_complete(struct xvp *xvp)
 
 irqreturn_t xrp_irq_handler(int irq, struct xvp *xvp)
 {
-	if (!xvp->comm || !xrp_cmd_complete(xvp))
+	if (!xvp->comm)
 		return IRQ_NONE;
 
-	complete(&xvp->completion);
-
-	return IRQ_HANDLED;
+	if (xrp_cmd_complete(xvp->queue)) {
+		complete(&xvp->queue[0].completion);
+		return IRQ_HANDLED;
+	}
+	return IRQ_NONE;
 }
 EXPORT_SYMBOL(xrp_irq_handler);
 
@@ -1171,20 +1175,19 @@ static long xrp_ioctl_free(struct file *filp,
 	return -EINVAL;
 }
 
-static long xvp_complete_cmd_irq(struct xvp *xvp,
-				 struct completion *completion,
-				 bool (*cmd_complete)(struct xvp *p))
+static long xvp_complete_cmd_irq(struct xvp *xvp, struct xrp_comm *comm,
+				 bool (*cmd_complete)(struct xrp_comm *p))
 {
 	long timeout = firmware_command_timeout * HZ;
 
-	if (cmd_complete(xvp))
+	if (cmd_complete(comm))
 		return 0;
 	if (xrp_panic_check(xvp))
 		return -EBUSY;
 	do {
-		timeout = wait_for_completion_interruptible_timeout(completion,
+		timeout = wait_for_completion_interruptible_timeout(&comm->completion,
 								    timeout);
-		if (cmd_complete(xvp))
+		if (cmd_complete(comm))
 			return 0;
 		if (xrp_panic_check(xvp))
 			return -EBUSY;
@@ -1195,13 +1198,13 @@ static long xvp_complete_cmd_irq(struct xvp *xvp,
 	return timeout;
 }
 
-static long xvp_complete_cmd_poll(struct xvp *xvp,
-				  bool (*cmd_complete)(struct xvp *p))
+static long xvp_complete_cmd_poll(struct xvp *xvp, struct xrp_comm *comm,
+				  bool (*cmd_complete)(struct xrp_comm *p))
 {
 	unsigned long deadline = jiffies + firmware_command_timeout * HZ;
 
 	do {
-		if (cmd_complete(xvp))
+		if (cmd_complete(comm))
 			return 0;
 		if (xrp_panic_check(xvp))
 			return -EBUSY;
@@ -1465,8 +1468,9 @@ static void xrp_fill_hw_request(struct xrp_dsp_cmd __iomem *cmd,
 	{
 		struct xrp_dsp_cmd dsp_cmd;
 		xrp_comm_read(cmd, &dsp_cmd, sizeof(dsp_cmd));
-		pr_debug("%s: cmd for DSP: %*ph\n",
-			 __func__, (int)sizeof(dsp_cmd), &dsp_cmd);
+		pr_debug("%s: cmd for DSP: %p: %*ph\n",
+			 __func__, cmd,
+			 (int)sizeof(dsp_cmd), &dsp_cmd);
 	}
 #endif
 
@@ -1496,6 +1500,7 @@ static long xrp_ioctl_submit_sync(struct file *filp,
 {
 	struct xvp_file *xvp_file = filp->private_data;
 	struct xvp *xvp = xvp_file->xvp;
+	struct xrp_comm *queue;
 	struct xrp_request xrp_rq, *rq = &xrp_rq;
 	long ret = 0;
 	bool went_off = false;
@@ -1509,26 +1514,27 @@ static long xrp_ioctl_submit_sync(struct file *filp,
 		return -EINVAL;
 	}
 
+	queue = xvp->queue;
+
 	ret = xrp_map_request(filp, rq, current->mm);
 	if (ret < 0)
 		return ret;
 
 	if (loopback < LOOPBACK_NOIO) {
-		mutex_lock(&xvp->comm_lock);
+		mutex_lock(&queue->lock);
 
 		if (xvp->off) {
 			ret = -ENODEV;
 		} else {
-			xrp_fill_hw_request(xvp->comm, rq, &xvp->address_map);
+			xrp_fill_hw_request(queue->comm, rq, &xvp->address_map);
 
 			xrp_send_device_irq(xvp);
 
 			if (xvp->host_irq_mode) {
-				ret = xvp_complete_cmd_irq(xvp,
-							   &xvp->completion,
+				ret = xvp_complete_cmd_irq(xvp, queue,
 							   xrp_cmd_complete);
 			} else {
-				ret = xvp_complete_cmd_poll(xvp,
+				ret = xvp_complete_cmd_poll(xvp, queue,
 							    xrp_cmd_complete);
 			}
 
@@ -1536,7 +1542,7 @@ static long xrp_ioctl_submit_sync(struct file *filp,
 
 			/* copy back inline data */
 			if (ret == 0) {
-				ret = xrp_complete_hw_request(xvp->comm, rq);
+				ret = xrp_complete_hw_request(queue->comm, rq);
 			} else if (ret == -EBUSY && firmware_reboot) {
 				int rc;
 
@@ -1550,7 +1556,7 @@ static long xrp_ioctl_submit_sync(struct file *filp,
 				}
 			}
 		}
-		mutex_unlock(&xvp->comm_lock);
+		mutex_unlock(&queue->lock);
 	}
 
 	if (ret == 0)
@@ -1787,7 +1793,7 @@ int xrp_runtime_resume(struct device *dev)
 	struct xvp *xvp = dev_get_drvdata(dev);
 	int ret = 0;
 
-	mutex_lock(&xvp->comm_lock);
+	mutex_lock(&xvp->queue[0].lock);
 	if (xvp->off)
 		goto out;
 	ret = xvp_enable_dsp(xvp);
@@ -1801,7 +1807,7 @@ int xrp_runtime_resume(struct device *dev)
 		xvp_disable_dsp(xvp);
 
 out:
-	mutex_unlock(&xvp->comm_lock);
+	mutex_unlock(&xvp->queue[0].lock);
 
 	return ret;
 }
@@ -1894,8 +1900,6 @@ static long xrp_init_common(struct platform_device *pdev,
 	if (init_flags & XRP_INIT_USE_HOST_IRQ)
 		xvp->host_irq_mode = true;
 	platform_set_drvdata(pdev, xvp);
-	mutex_init(&xvp->comm_lock);
-	init_completion(&xvp->completion);
 
 	ret = xrp_init_regs(pdev, xvp);
 	if (ret < 0)
@@ -1907,6 +1911,10 @@ static long xrp_init_common(struct platform_device *pdev,
 	ret = xrp_init_address_map(xvp->dev, &xvp->address_map);
 	if (ret < 0)
 		goto err_free_pool;
+
+	mutex_init(&xvp->queue[0].lock);
+	xvp->queue[0].comm = xvp->comm;
+	init_completion(&xvp->queue[0].completion);
 
 	ret = device_property_read_string(xvp->dev, "firmware-name",
 					  &xvp->firmware_name);
