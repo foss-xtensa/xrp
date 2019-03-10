@@ -27,6 +27,7 @@
  */
 
 #include <linux/version.h>
+#include <linux/atomic.h>
 #include <linux/acpi.h>
 #include <linux/completion.h>
 #include <linux/delay.h>
@@ -1613,7 +1614,14 @@ static long xrp_ioctl_submit_sync(struct file *filp,
 		return ret;
 
 	if (loopback < LOOPBACK_NOIO) {
+		int reboot_cycle;
+retry:
 		mutex_lock(&queue->lock);
+		reboot_cycle = atomic_read(&xvp->reboot_cycle);
+		if (reboot_cycle != atomic_read(&xvp->reboot_cycle_complete)) {
+			mutex_unlock(&queue->lock);
+			goto retry;
+		}
 
 		if (xvp->off) {
 			ret = -ENODEV;
@@ -1635,13 +1643,24 @@ static long xrp_ioctl_submit_sync(struct file *filp,
 			/* copy back inline data */
 			if (ret == 0) {
 				ret = xrp_complete_hw_request(queue->comm, rq);
-			} else if (ret == -EBUSY && firmware_reboot) {
+			} else if (ret == -EBUSY && firmware_reboot &&
+				   atomic_inc_return(&xvp->reboot_cycle) ==
+				   reboot_cycle + 1) {
 				int rc;
+				unsigned i;
 
 				dev_dbg(xvp->dev,
 					"%s: restarting firmware...\n",
 					 __func__);
+				for (i = 0; i < xvp->n_queues; ++i)
+					if (xvp->queue + i != queue)
+						mutex_lock(&xvp->queue[i].lock);
 				rc = xrp_boot_firmware(xvp);
+				atomic_set(&xvp->reboot_cycle_complete,
+					   atomic_read(&xvp->reboot_cycle));
+				for (i = 0; i < xvp->n_queues; ++i)
+					if (xvp->queue + i != queue)
+						mutex_unlock(&xvp->queue[i].lock);
 				if (rc < 0) {
 					ret = rc;
 					went_off = xvp->off;
@@ -1883,9 +1902,12 @@ EXPORT_SYMBOL(xrp_runtime_suspend);
 int xrp_runtime_resume(struct device *dev)
 {
 	struct xvp *xvp = dev_get_drvdata(dev);
+	unsigned i;
 	int ret = 0;
 
-	mutex_lock(&xvp->queue[0].lock);
+	for (i = 0; i < xvp->n_queues; ++i)
+		mutex_lock(&xvp->queue[i].lock);
+
 	if (xvp->off)
 		goto out;
 	ret = xvp_enable_dsp(xvp);
@@ -1899,7 +1921,8 @@ int xrp_runtime_resume(struct device *dev)
 		xvp_disable_dsp(xvp);
 
 out:
-	mutex_unlock(&xvp->queue[0].lock);
+	for (i = 0; i < xvp->n_queues; ++i)
+		mutex_unlock(&xvp->queue[i].lock);
 
 	return ret;
 }

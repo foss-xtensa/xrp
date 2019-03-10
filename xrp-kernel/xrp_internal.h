@@ -32,6 +32,7 @@
 #include <linux/completion.h>
 #include <linux/miscdevice.h>
 #include <linux/mutex.h>
+#include <linux/types.h>
 #include "xrp_address_map.h"
 
 struct device;
@@ -62,6 +63,8 @@ struct xvp {
 	phys_addr_t pmem;
 	phys_addr_t comm_phys;
 	phys_addr_t shared_size;
+	atomic_t reboot_cycle;
+	atomic_t reboot_cycle_complete;
 
 	struct xrp_address_map address_map;
 
