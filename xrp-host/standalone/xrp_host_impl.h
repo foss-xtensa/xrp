@@ -32,7 +32,6 @@ struct xrp_device_description;
 
 struct xrp_device_impl {
 	struct xrp_device_description *description;
-	struct xrp_request_queue queue;
 };
 
 struct xrp_buffer_impl {
@@ -40,6 +39,7 @@ struct xrp_buffer_impl {
 };
 
 struct xrp_queue_impl {
+	struct xrp_request_queue queue;
 };
 
 void xrp_impl_release_device(struct xrp_device *device);

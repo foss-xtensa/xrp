@@ -58,6 +58,12 @@ enum {
 
 extern char dt_blob_start[];
 
+struct xrp_comm {
+	void *comm_ptr;
+	xrp_mutex hw_mutex;
+	uint32_t priority;
+};
+
 struct xrp_device_description {
 	phys_addr_t io_base;
 	phys_addr_t comm_base;
@@ -66,10 +72,13 @@ struct xrp_device_description {
 	void *comm_ptr;
 	void *shared_ptr;
 
+	unsigned n_queues;
+	struct xrp_comm *queue;
+	struct xrp_comm **queue_ordered;
+
 	uint32_t device_irq_mode;
 	uint32_t device_irq[3];
 	uint32_t device_irq_host_offset;
-	xrp_mutex hw_mutex;
 	struct xrp_allocation_pool *shared_pool;
 	int sync;
 };
@@ -80,6 +89,7 @@ static int xrp_device_count;
 struct xrp_request {
 	struct xrp_queue_item q;
 	struct xrp_dsp_cmd dsp_cmd;
+	unsigned priority;
 
 	size_t n_buffers;
 	size_t in_data_size;
@@ -124,6 +134,16 @@ static void *xrp_put_tlv(void **addr, uint32_t type, uint32_t length)
 	xrp_comm_write32(&tlv->type, type);
 	xrp_comm_write32(&tlv->length, length);
 	*addr = tlv->value + ((length + 3) / 4);
+	return tlv->value;
+}
+
+static void *xrp_get_tlv(void **addr, uint32_t *type, uint32_t *length)
+{
+	struct xrp_dsp_tlv *tlv = *addr;
+
+	*type = xrp_comm_read32(&tlv->type);
+	*length = xrp_comm_read32(&tlv->length);
+	*addr = tlv->value + ((*length + 3) / 4);
 	return tlv->value;
 }
 
@@ -176,6 +196,7 @@ static int synchronize(struct xrp_device_description *desc)
 	} while (1);
 
 	if (v == XRP_DSP_SYNC_DSP_READY_V1) {
+		desc->n_queues = 1;
 		hw_sync = (struct xrp_hw_simple_sync_data *)&shared_sync->hw_sync_data;
 	} else if (v == XRP_DSP_SYNC_DSP_READY_V2) {
 		struct xrp_dsp_sync_v2 *shared_sync = desc->comm_ptr;
@@ -183,6 +204,26 @@ static int synchronize(struct xrp_device_description *desc)
 		addr = shared_sync->hw_sync_data;
 		hw_sync = xrp_put_tlv(&addr, XRP_DSP_SYNC_TYPE_HW_SPEC_DATA,
 				      sizeof(struct xrp_hw_simple_sync_data));
+
+		if (desc->n_queues > 1) {
+			unsigned i;
+			uint32_t *priority =
+				xrp_put_tlv(&addr, XRP_DSP_SYNC_TYPE_HW_QUEUES,
+					    desc->n_queues * 4);
+
+			for (i = 0; i < desc->n_queues; ++i) {
+				xrp_comm_write32(priority + i,
+						 desc->queue[i].priority);
+				if (i) {
+					struct xrp_dsp_sync_v1 *queue_sync =
+						desc->queue[i].comm_ptr;
+					xrp_comm_write32(&queue_sync->sync,
+							 XRP_DSP_SYNC_IDLE);
+				}
+			}
+		}
+
+		xrp_put_tlv(&addr, XRP_DSP_SYNC_TYPE_LAST, 0);
 	} else {
 		printf("%s: DSP response to XRP_DSP_SYNC_START is not recognized\n",
 		       __func__);
@@ -206,9 +247,6 @@ static int synchronize(struct xrp_device_description *desc)
 	xrp_comm_write32(&hw_sync->device_irq,
 			 desc->device_irq[2]);
 
-	if (v == XRP_DSP_SYNC_DSP_READY_V2)
-		xrp_put_tlv(&addr, XRP_DSP_SYNC_TYPE_LAST, 0);
-
 	mb();
 	xrp_comm_write32(&shared_sync->sync, XRP_DSP_SYNC_HOST_TO_DSP);
 
@@ -219,6 +257,36 @@ static int synchronize(struct xrp_device_description *desc)
 			break;
 		schedule();
 	} while (1);
+
+	if (v == XRP_DSP_SYNC_DSP_READY_V2) {
+		struct xrp_dsp_sync_v2 *shared_sync = desc->comm_ptr;
+		uint32_t type, len;
+
+		addr = shared_sync->hw_sync_data;
+		xrp_get_tlv(&addr, &type, &len);
+		if (!(type & XRP_DSP_SYNC_TYPE_ACCEPT))
+			printf("%s: HW spec data not recognized by the DSP\n",
+			       __func__);
+		if (len != sizeof(struct xrp_hw_simple_sync_data)) {
+			printf("HW spec data size modified by the DSP\n");
+			exit(1);
+		}
+
+		if (desc->n_queues > 1) {
+			xrp_get_tlv(&addr, &type, &len);
+
+			if (len != desc->n_queues * 4) {
+				 printf("%s: Queue priority size modified by the DSP\n",
+					__func__);
+				 exit(1);
+			}
+			if (!(type & XRP_DSP_SYNC_TYPE_ACCEPT)) {
+				printf("%s: Queue priority data not recognized by the DSP\n",
+				       __func__);
+				desc->n_queues = 1;
+			}
+		}
+	}
 
 	xrp_send_device_irq(desc);
 
@@ -245,8 +313,26 @@ struct of_node_match {
 		    struct xrp_device_description *description);
 };
 
-static int init_cdns_xrp_common(struct xrp_device_description *description)
+static int compare_queue_priority(const void *a, const void *b)
 {
+	const void * const *ppa = a;
+	const void * const *ppb = b;
+	const struct xrp_comm *pa = *ppa, *pb = *ppb;
+
+	if (pa->priority == pb->priority)
+		return 0;
+	else
+		return pa->priority < pb->priority ? -1 : 1;
+}
+
+static int init_cdns_xrp_common(void *fdt, int offset,
+				struct xrp_device_description *description)
+{
+	uint32_t *priority = NULL;
+	const void *p;
+	unsigned i;
+	int len;
+
 	description->comm_ptr = p2v(description->comm_base);
 	if (!description->comm_ptr) {
 		printf("%s: shmem not found for comm area @0x%08x\n",
@@ -263,6 +349,36 @@ static int init_cdns_xrp_common(struct xrp_device_description *description)
 	xrp_init_private_pool(&description->shared_pool,
 			      description->shared_base,
 			      description->shared_size);
+
+	description->n_queues = 1;
+
+	p = fdt_getprop(fdt, offset, "queue-priority", &len);
+	if (p) {
+		if (len == 0 || len % 4) {
+			printf("%s: queue-priority property has bad length (%d), ignoring\n",
+			       __func__, len);
+		} else {
+			priority = malloc(len);
+			description->n_queues = len / 4;
+			for (i = 0; i < description->n_queues; ++i)
+				priority[i] = getprop_u32(p, i * 4);
+		}
+	}
+	description->queue = malloc(sizeof(*description->queue) *
+				    description->n_queues);
+	description->queue_ordered = malloc(sizeof(void *) *
+					    description->n_queues);
+	for (i = 0; i < description->n_queues; ++i) {
+		xrp_mutex_init(&description->queue[i].hw_mutex);
+		description->queue[i].comm_ptr =
+			description->comm_ptr + XRP_DSP_CMD_STRIDE * i;
+		if (priority)
+			description->queue[i].priority = priority[i];
+		description->queue_ordered[i] = description->queue + i;
+	}
+	qsort(description->queue_ordered, description->n_queues,
+	      sizeof(void *), compare_queue_priority);
+	free(priority);
 	return 1;
 }
 
@@ -289,8 +405,7 @@ static int init_cdns_xrp(void *fdt, int offset,
 		.shared_base = getprop_u32(reg, 16),
 		.shared_size = getprop_u32(reg, 20),
 	};
-	xrp_mutex_init(&description->hw_mutex);
-	return init_cdns_xrp_common(description);
+	return init_cdns_xrp_common(fdt, offset, description);
 }
 
 static int init_cdns_xrp_v1(void *fdt, int offset,
@@ -316,8 +431,7 @@ static int init_cdns_xrp_v1(void *fdt, int offset,
 		.shared_size = getprop_u32(reg, 4) - 4096,
 		.io_base = getprop_u32(reg, 8),
 	};
-	xrp_mutex_init(&description->hw_mutex);
-	return init_cdns_xrp_common(description);
+	return init_cdns_xrp_common(fdt, offset, description);
 }
 
 static int init_cdns_xrp_hw_simple_common(void *fdt, int offset,
@@ -456,14 +570,13 @@ struct xrp_device *xrp_open_device(int idx, enum xrp_status *status)
 		return NULL;
 	}
 	device->impl.description = xrp_device_description + idx;
-	xrp_queue_init(&device->impl.queue, device, xrp_request_process);
 	set_status(status, XRP_STATUS_SUCCESS);
 	return device;
 }
 
 void xrp_impl_release_device(struct xrp_device *device)
 {
-	xrp_queue_destroy(&device->impl.queue);
+	(void)device;
 }
 
 
@@ -498,13 +611,13 @@ void xrp_impl_release_device_buffer(struct xrp_buffer *buffer)
 void xrp_impl_create_queue(struct xrp_queue *queue,
 			   enum xrp_status *status)
 {
-	(void)queue;
+	xrp_queue_init(&queue->impl.queue, queue->device, xrp_request_process);
 	set_status(status, XRP_STATUS_SUCCESS);
 }
 
 void xrp_impl_release_queue(struct xrp_queue *queue)
 {
-	(void)queue;
+	xrp_queue_destroy(&queue->impl.queue);
 }
 
 /* Communication API */
@@ -512,16 +625,24 @@ void xrp_impl_release_queue(struct xrp_queue *queue)
 static void _xrp_run_command(struct xrp_device *device,
 			     struct xrp_request *rq)
 {
-	struct xrp_dsp_cmd *dsp_cmd = device->impl.description->comm_ptr;
+	struct xrp_device_description *desc = device->impl.description;
+	struct xrp_comm *queue = desc->queue;
+	struct xrp_dsp_cmd *dsp_cmd;
 	size_t i;
 
-	xrp_mutex_lock(&device->impl.description->hw_mutex);
+	if (desc->n_queues > 1) {
+		if (rq->priority >= desc->n_queues)
+			rq->priority = desc->n_queues - 1;
+		queue = desc->queue_ordered[rq->priority];
+	}
+	dsp_cmd = queue->comm_ptr;
+	xrp_mutex_lock(&queue->hw_mutex);
 	memcpy(dsp_cmd, &rq->dsp_cmd, sizeof(rq->dsp_cmd));
 	barrier();
 	xrp_comm_write32(&dsp_cmd->flags,
 			 rq->dsp_cmd.flags | XRP_DSP_CMD_FLAG_REQUEST_VALID);
 	barrier();
-	xrp_send_device_irq(device->impl.description);
+	xrp_send_device_irq(desc);
 	do {
 		barrier();
 	} while ((xrp_comm_read32(&dsp_cmd->flags) &
@@ -533,7 +654,8 @@ static void _xrp_run_command(struct xrp_device *device,
 	memcpy(&rq->dsp_cmd, dsp_cmd, sizeof(rq->dsp_cmd));
 	VALGRIND_MAKE_MEM_DEFINED(rq->out_data_ptr, rq->out_data_size);
 	memcpy(rq->out_data, rq->out_data_ptr, rq->out_data_size);
-	xrp_mutex_unlock(&device->impl.description->hw_mutex);
+	xrp_comm_write32(&dsp_cmd->flags, 0);
+	xrp_mutex_unlock(&queue->hw_mutex);
 
 	if (rq->in_data_size > XRP_DSP_CMD_INLINE_DATA_SIZE) {
 		xrp_free(rq->in_data_allocation);
@@ -604,6 +726,7 @@ void xrp_enqueue_command(struct xrp_queue *queue,
 	struct xrp_dsp_cmd *dsp_cmd = &rq->dsp_cmd;
 	void *in_data_ptr;
 
+	rq->priority = queue->priority;
 	rq->in_data_size = in_data_size;
 	rq->out_data = out_data;
 	rq->out_data_size = out_data_size;
@@ -712,5 +835,5 @@ void xrp_enqueue_command(struct xrp_queue *queue,
 		memcpy(dsp_cmd->nsid, queue->nsid, sizeof(dsp_cmd->nsid));
 	}
 	set_status(status, XRP_STATUS_SUCCESS);
-	xrp_queue_push(&device->impl.queue, &rq->q);
+	xrp_queue_push(&queue->impl.queue, &rq->q);
 }
