@@ -1,5 +1,5 @@
 #define WAIT_ARG        100
-#define INTR_SHMEM      0xf0000100
+#define INTR_SHMEM      0xf7fff000
 #define INTR_SHMEM_NAME "SharedRAM_L"
 #define DSP_INTR_OFFSET {0x0, 0x4}
 #define DSP_MMIO        {0xfd001000, 0xfd002000}
