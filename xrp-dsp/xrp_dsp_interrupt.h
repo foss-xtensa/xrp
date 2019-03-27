@@ -27,11 +27,22 @@
 #include <xtensa/config/core.h>
 #if XCHAL_HAVE_INTERRUPTS
 #include <xtensa/tie/xt_interrupt.h>
+#include <xtensa/xtruntime.h>
 
 #ifdef HAVE_XTOS_SET_INTERRUPT_HANDLER
-#define xrp_set_interrupt_handler xtos_set_interrupt_handler
+static inline int32_t xrp_set_interrupt_handler(uint32_t intnum,
+						void (*fn)(void))
+{
+	return xtos_set_interrupt_handler(intnum, (void (*)(void *))fn,
+					  NULL, NULL);
+}
 #else
-#define xrp_set_interrupt_handler _xtos_set_interrupt_handler
+static inline int32_t xrp_set_interrupt_handler(uint32_t intnum,
+						void (*fn)(void))
+{
+	_xtos_set_interrupt_handler(intnum, fn);
+	return 0;
+}
 #endif
 
 #endif
