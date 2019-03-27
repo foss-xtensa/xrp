@@ -52,7 +52,9 @@ void abort(void)
 static void xos_exception(XosExcFrame *frame)
 {
 	fprintf(stderr, "%s: EXCCAUSE = %ld, EXCVADDR = 0x%08lx, PS = 0x%08lx, EPC1 = 0x%08lx\n",
-		__func__, frame->exccause, frame->excvaddr, frame->ps, frame->pc);
+		__func__,
+		(unsigned long)frame->exccause, (unsigned long)frame->excvaddr,
+		(unsigned long)frame->ps, (unsigned long)frame->pc);
 	hang();
 }
 #else
@@ -114,6 +116,7 @@ int main(void)
 #if HAVE_THREADS_XOS
 	static uint32_t main_priority[] = {0};
 
+	register_exception_handlers();
 	xrp_hw_init();
 	status = xrp_user_create_queues(1, main_priority);
 	if (status != XRP_STATUS_SUCCESS) {
