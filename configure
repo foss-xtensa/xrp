@@ -5234,10 +5234,16 @@ if test x$build_dsp = xtrue; then :
       # xtos_set_interrupt_handler is not available in all XTOS versions,
       # but is preferred to _xtos_set_interrupt_handler when it's present.
       #
-      ac_fn_c_check_func "$LINENO" "xtos_set_interrupt_handler" "ac_cv_func_xtos_set_interrupt_handler"
+      for ac_func in xtos_set_interrupt_handler
+do :
+  ac_fn_c_check_func "$LINENO" "xtos_set_interrupt_handler" "ac_cv_func_xtos_set_interrupt_handler"
 if test "x$ac_cv_func_xtos_set_interrupt_handler" = xyes; then :
+  cat >>confdefs.h <<_ACEOF
+#define HAVE_XTOS_SET_INTERRUPT_HANDLER 1
+_ACEOF
 
 fi
+done
 
 
 fi
