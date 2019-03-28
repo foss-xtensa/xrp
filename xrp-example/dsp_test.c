@@ -122,17 +122,17 @@ static enum xrp_status example_v2_handler(void *handler_context,
 		return XRP_STATUS_FAILURE;
 	case EXAMPLE_V2_CMD_LONG:
 		c = 1;
-#if HAVE_THREADS_XOS
+#if HAVE_THREADS
 		pr_debug("EXAMPLE_V2_CMD_LONG: enter\n");
-		while (c == 1)
-			;
+		while (c == 1) {
+		}
 		pr_debug("EXAMPLE_V2_CMD_LONG: exit\n");
 		c = 0;
 #endif
 		return XRP_STATUS_SUCCESS;
 	case EXAMPLE_V2_CMD_SHORT:
 		rsp->v = c;
-#if HAVE_THREADS_XOS
+#if HAVE_THREADS
 		pr_debug("EXAMPLE_V2_CMD_SHORT\n");
 		if (c)
 			c = 2;

@@ -55,7 +55,9 @@ linux*)
 	AS_IF([test "x${use_threads}" = xtrue],
 	      [THREADS_IMPL=pthread
 	       THREADS_CFLAGS=-pthread
-	       THREADS_LDFLAGS=-pthread])
+	       THREADS_LDFLAGS=-pthread
+	       AC_DEFINE(HAVE_THREADS_POSIX)
+	       AC_DEFINE(HAVE_THREADS)])
 	;;
 elf)
 	HOST_OS=elf
@@ -68,7 +70,8 @@ elf)
 		     [AC_MSG_ERROR([*** threads are not supported])])
 	       THREADS_IMPL=xos
 	       THREADS_LDFLAGS=-lxos
-	       AC_DEFINE(HAVE_THREADS_XOS)])
+	       AC_DEFINE(HAVE_THREADS_XOS)
+	       AC_DEFINE(HAVE_THREADS)])
 	;;
 esac
 AC_SUBST(HOST_OS)
