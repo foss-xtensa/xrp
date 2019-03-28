@@ -38,7 +38,8 @@ struct xrp_event_impl {
 	xrp_cond cond;
 };
 
-void xrp_queue_init(struct xrp_request_queue *queue, void *context,
+void xrp_queue_init(struct xrp_request_queue *queue, int priority,
+		    void *context,
 		    void (*fn)(struct xrp_queue_item *rq, void *context));
 void xrp_queue_destroy(struct xrp_request_queue *queue);
 void xrp_queue_push(struct xrp_request_queue *queue,

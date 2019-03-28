@@ -197,7 +197,8 @@ static void xrp_request_process(struct xrp_queue_item *q,
 void xrp_impl_create_queue(struct xrp_queue *queue,
 			   enum xrp_status *status)
 {
-	xrp_queue_init(&queue->impl.queue, queue, xrp_request_process);
+	xrp_queue_init(&queue->impl.queue, queue->priority,
+		       queue, xrp_request_process);
 	set_status(status, XRP_STATUS_SUCCESS);
 }
 

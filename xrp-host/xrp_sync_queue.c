@@ -25,9 +25,11 @@
 #include "xrp_host_common.h"
 #include "xrp_sync_queue.h"
 
-void xrp_queue_init(struct xrp_request_queue *queue, void *context,
+void xrp_queue_init(struct xrp_request_queue *queue, int priority,
+		    void *context,
 		    void (*fn)(struct xrp_queue_item *rq, void *context))
 {
+	(void)priority;
 	queue->context = context;
 	queue->fn = fn;
 }

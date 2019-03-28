@@ -611,7 +611,8 @@ void xrp_impl_release_device_buffer(struct xrp_buffer *buffer)
 void xrp_impl_create_queue(struct xrp_queue *queue,
 			   enum xrp_status *status)
 {
-	xrp_queue_init(&queue->impl.queue, queue->device, xrp_request_process);
+	xrp_queue_init(&queue->impl.queue, queue->priority,
+		       queue->device, xrp_request_process);
 	set_status(status, XRP_STATUS_SUCCESS);
 }
 

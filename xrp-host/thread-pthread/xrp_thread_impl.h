@@ -86,10 +86,11 @@ static inline void xrp_cond_destroy(xrp_cond *p)
 	pthread_cond_destroy(&p->cond);
 }
 
-static inline int xrp_thread_create(xrp_thread *thread,
+static inline int xrp_thread_create(xrp_thread *thread, int priority,
 				    void *(*thread_func)(void *),
 				    void *p)
 {
+	(void)priority;
 	return pthread_create(thread, NULL, thread_func, p) == 0;
 }
 

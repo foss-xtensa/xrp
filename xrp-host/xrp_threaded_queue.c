@@ -71,13 +71,14 @@ static void *xrp_queue_thread(void *p)
 	return NULL;
 }
 
-void xrp_queue_init(struct xrp_request_queue *queue, void *context,
+void xrp_queue_init(struct xrp_request_queue *queue, int priority,
+		    void *context,
 		    void (*fn)(struct xrp_queue_item *rq, void *context))
 {
 	xrp_cond_init(&queue->request_queue_cond);
 	queue->context = context;
 	queue->fn = fn;
-	xrp_thread_create(&queue->thread, xrp_queue_thread, queue);
+	xrp_thread_create(&queue->thread, priority, xrp_queue_thread, queue);
 }
 
 void xrp_queue_destroy(struct xrp_request_queue *queue)
