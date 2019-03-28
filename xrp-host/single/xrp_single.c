@@ -33,8 +33,6 @@
 
 struct xrp_device_description {
 	struct xrp_cmd_ns_map ns_map;
-	struct xrp_request_queue queue;
-	int init;
 };
 
 static struct xrp_device_description xrp_device_description[1];
@@ -70,12 +68,6 @@ struct xrp_device *xrp_open_device(int idx, enum xrp_status *status)
 		return NULL;
 	}
 	device->impl.description = xrp_device_description + idx;
-	if (!xrp_device_description[idx].init) {
-		xrp_queue_init(&xrp_device_description[idx].queue,
-			       NULL,
-			       xrp_request_process);
-		xrp_device_description[idx].init = 1;
-	}
 	set_status(status, XRP_STATUS_SUCCESS);
 	return device;
 }
@@ -207,13 +199,14 @@ static void xrp_request_process(struct xrp_queue_item *q,
 void xrp_impl_create_queue(struct xrp_queue *queue,
 			   enum xrp_status *status)
 {
-	(void)queue;
+	xrp_queue_init(&queue->impl.queue, NULL,
+		       xrp_request_process);
 	set_status(status, XRP_STATUS_SUCCESS);
 }
 
 void xrp_impl_release_queue(struct xrp_queue *queue)
 {
-	(void)queue;
+	xrp_queue_destroy(&queue->impl.queue);
 }
 
 /* Communication API */
@@ -273,7 +266,7 @@ void xrp_enqueue_command(struct xrp_queue *queue,
 	}
 
 	set_status(status, XRP_STATUS_SUCCESS);
-	xrp_queue_push(&queue->device->impl.description->queue, &rq->q);
+	xrp_queue_push(&queue->impl.queue, &rq->q);
 }
 
 /* Namespace DSP side API. */
