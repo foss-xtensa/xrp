@@ -4405,6 +4405,10 @@ linux*)
   THREADS_IMPL=pthread
 	       THREADS_CFLAGS=-pthread
 	       THREADS_LDFLAGS=-pthread
+	       $as_echo "#define HAVE_THREADS_POSIX 1" >>confdefs.h
+
+	       $as_echo "#define HAVE_THREADS 1" >>confdefs.h
+
 fi
 	;;
 elf)
@@ -4822,6 +4826,8 @@ fi
 	       THREADS_IMPL=xos
 	       THREADS_LDFLAGS=-lxos
 	       $as_echo "#define HAVE_THREADS_XOS 1" >>confdefs.h
+
+	       $as_echo "#define HAVE_THREADS 1" >>confdefs.h
 
 fi
 	;;
