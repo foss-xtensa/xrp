@@ -1011,11 +1011,14 @@ parts of the XRP are built and how:
 
 - Switch `--enable-port` seclects hardware port for building. Hardware port
   is a hardware-specific DSP library, hardware-specific kernel driver and DSP
-  side build flags. In this release there are two ports bundled with the XRP
-  code called `simple` and `hikey960`.
+  side build flags. In this release there are three ports bundled with the XRP
+  code called `simple`, `simple-xos` and `hikey960`.
 
   - `simple` is for the simple XTSC models with MMIO regions for each DSP
     with mandatory reset and runstall registers and optional IRQ register.
+  - `simple-xos` is a variant of `simple` port that internally uses XOS and
+    supports the multiqueue feature. It has the same hardware requirements
+    as the `simple` port.
   - `hikey960` is for the HiFi3 DSP in the HiKey960 platform.
 
 - Switch `--with-libfdt` may be used to specify a path to the libfdt headers
