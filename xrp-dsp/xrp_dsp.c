@@ -642,7 +642,7 @@ enum xrp_status xrp_device_poll(struct xrp_device *device)
 	uint32_t flags;
 
 	dcache_region_invalidate(device->dsp_cmd,
-				 sizeof(*device->dsp_cmd));
+				 sizeof(struct xrp_dsp_cmd));
 	if (xrp_request_valid(device->dsp_cmd, &flags))
 		return XRP_STATUS_SUCCESS;
 	else
@@ -655,7 +655,7 @@ enum xrp_status xrp_device_dispatch(struct xrp_device *device)
 	enum xrp_status status;
 
 	dcache_region_invalidate(device->dsp_cmd,
-				 sizeof(*device->dsp_cmd));
+				 sizeof(struct xrp_dsp_cmd));
 	if (!xrp_request_valid(device->dsp_cmd, &flags))
 		return XRP_STATUS_PENDING;
 
