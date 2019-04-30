@@ -146,6 +146,15 @@ AC_ARG_ENABLE(example,
 	      [build_example=false])
 AM_CONDITIONAL([BUILD_EXAMPLE], [test x$build_example = xtrue])
 
+AC_ARG_ENABLE(external,
+	      [AS_HELP_STRING([--enable-external],
+			      [build example using external libraries [no]])],
+	      [AS_IF([test "x${enableval}" = xno],
+		     [build_external=false],
+		     [build_external=true])],
+	      [build_external=false])
+AM_CONDITIONAL([BUILD_EXTERNAL], [test x$build_external = xtrue])
+
 AC_ARG_WITH([libfdt],
 	    AS_HELP_STRING([--with-libfdt], [Prefix of libfdt headers/library]),
 	    [case "${withval}" in
