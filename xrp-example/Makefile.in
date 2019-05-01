@@ -142,35 +142,55 @@ am_xrp_dsp_hosted_OBJECTS = xrp_dsp_hosted-dsp_main.$(OBJEXT) \
 	xrp_dsp_hosted-dsp_test.$(OBJEXT)
 xrp_dsp_hosted_OBJECTS = $(am_xrp_dsp_hosted_OBJECTS)
 am__DEPENDENCIES_1 =
-xrp_dsp_hosted_DEPENDENCIES = ../xrp-dsp/libxrp-dsp.a \
-	../xrp-dsp/$(HW_PORT)/libxrp-dsp-hw-$(HW_PORT).a \
-	../xrp-common/libxrp-common.a $(am__DEPENDENCIES_1)
+@BUILD_EXTERNAL_FALSE@xrp_dsp_hosted_DEPENDENCIES =  \
+@BUILD_EXTERNAL_FALSE@	../xrp-dsp/libxrp-dsp.a \
+@BUILD_EXTERNAL_FALSE@	../xrp-dsp/$(HW_PORT)/libxrp-dsp-hw-$(HW_PORT).a \
+@BUILD_EXTERNAL_FALSE@	../xrp-common/libxrp-common.a \
+@BUILD_EXTERNAL_FALSE@	$(am__DEPENDENCIES_1)
+@BUILD_EXTERNAL_TRUE@xrp_dsp_hosted_DEPENDENCIES =  \
+@BUILD_EXTERNAL_TRUE@	$(am__DEPENDENCIES_1)
 xrp_dsp_hosted_LINK = $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
 	$(xrp_dsp_hosted_LDFLAGS) $(LDFLAGS) -o $@
 am_xrp_dsp_standalone_OBJECTS = xrp_dsp_standalone-dsp_main.$(OBJEXT) \
 	xrp_dsp_standalone-dsp_test.$(OBJEXT)
 xrp_dsp_standalone_OBJECTS = $(am_xrp_dsp_standalone_OBJECTS)
-xrp_dsp_standalone_DEPENDENCIES = ../xrp-dsp/libxrp-dsp.a \
-	../xrp-dsp/$(HW_PORT)/libxrp-dsp-hw-$(HW_PORT).a \
-	../xrp-common/libxrp-common.a $(am__DEPENDENCIES_1)
+@BUILD_EXTERNAL_FALSE@xrp_dsp_standalone_DEPENDENCIES =  \
+@BUILD_EXTERNAL_FALSE@	../xrp-dsp/libxrp-dsp.a \
+@BUILD_EXTERNAL_FALSE@	../xrp-dsp/$(HW_PORT)/libxrp-dsp-hw-$(HW_PORT).a \
+@BUILD_EXTERNAL_FALSE@	../xrp-common/libxrp-common.a \
+@BUILD_EXTERNAL_FALSE@	$(am__DEPENDENCIES_1)
+@BUILD_EXTERNAL_TRUE@xrp_dsp_standalone_DEPENDENCIES =  \
+@BUILD_EXTERNAL_TRUE@	$(am__DEPENDENCIES_1)
 xrp_dsp_standalone_LINK = $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
 	$(xrp_dsp_standalone_LDFLAGS) $(LDFLAGS) -o $@
 am_xrp_host_hosted_OBJECTS = xrp_host_hosted-host_main.$(OBJEXT)
 xrp_host_hosted_OBJECTS = $(am_xrp_host_hosted_OBJECTS)
-xrp_host_hosted_DEPENDENCIES = ../xrp-host/libxrp-host-hosted.a \
-	$(am__DEPENDENCIES_1)
+@BUILD_EXTERNAL_FALSE@xrp_host_hosted_DEPENDENCIES =  \
+@BUILD_EXTERNAL_FALSE@	../xrp-host/libxrp-host-hosted.a \
+@BUILD_EXTERNAL_FALSE@	$(am__DEPENDENCIES_1)
+@BUILD_EXTERNAL_TRUE@xrp_host_hosted_DEPENDENCIES =  \
+@BUILD_EXTERNAL_TRUE@	$(am__DEPENDENCIES_1)
 xrp_host_hosted_LINK = $(CCLD) $(xrp_host_hosted_CFLAGS) $(CFLAGS) \
 	$(AM_LDFLAGS) $(LDFLAGS) -o $@
 am_xrp_host_single_OBJECTS = host_main.$(OBJEXT) dsp_test.$(OBJEXT)
 xrp_host_single_OBJECTS = $(am_xrp_host_single_OBJECTS)
-xrp_host_single_DEPENDENCIES = ../xrp-host/libxrp-host-single.a \
-	$(am__DEPENDENCIES_1)
+@BUILD_EXTERNAL_FALSE@xrp_host_single_DEPENDENCIES =  \
+@BUILD_EXTERNAL_FALSE@	../xrp-host/libxrp-host-single.a \
+@BUILD_EXTERNAL_FALSE@	$(am__DEPENDENCIES_1)
+@BUILD_EXTERNAL_TRUE@xrp_host_single_DEPENDENCIES =  \
+@BUILD_EXTERNAL_TRUE@	$(am__DEPENDENCIES_1)
 am_xrp_host_standalone_OBJECTS =  \
 	xrp_host_standalone-host_main.$(OBJEXT) xrp_dtb.$(OBJEXT)
 xrp_host_standalone_OBJECTS = $(am_xrp_host_standalone_OBJECTS)
-xrp_host_standalone_DEPENDENCIES =  \
-	../xrp-host/libxrp-host-standalone.a $(am__DEPENDENCIES_1) \
-	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
+@BUILD_EXTERNAL_FALSE@xrp_host_standalone_DEPENDENCIES =  \
+@BUILD_EXTERNAL_FALSE@	../xrp-host/libxrp-host-standalone.a \
+@BUILD_EXTERNAL_FALSE@	$(am__DEPENDENCIES_1) \
+@BUILD_EXTERNAL_FALSE@	$(am__DEPENDENCIES_1) \
+@BUILD_EXTERNAL_FALSE@	$(am__DEPENDENCIES_1)
+@BUILD_EXTERNAL_TRUE@xrp_host_standalone_DEPENDENCIES =  \
+@BUILD_EXTERNAL_TRUE@	$(am__DEPENDENCIES_1) \
+@BUILD_EXTERNAL_TRUE@	$(am__DEPENDENCIES_1) \
+@BUILD_EXTERNAL_TRUE@	$(am__DEPENDENCIES_1)
 xrp_host_standalone_LINK = $(CCLD) $(xrp_host_standalone_CFLAGS) \
 	$(CFLAGS) $(xrp_host_standalone_LDFLAGS) $(LDFLAGS) -o $@
 AM_V_P = $(am__v_P_@AM_V@)
@@ -358,11 +378,13 @@ target_alias = @target_alias@
 top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
-AM_CPPFLAGS = -I$(srcdir)/.. -I$(srcdir)/../xrp-common
+@BUILD_EXTERNAL_FALSE@AM_CPPFLAGS = -I$(srcdir)/.. -I$(srcdir)/../xrp-common
+@BUILD_EXTERNAL_TRUE@AM_CPPFLAGS = -I$(srcdir)/../xrp-common
 AM_CFLAGS = -W -Wall
 @BUILD_HOST_TRUE@@BUILD_STANDALONE_TRUE@BUILT_SOURCES = xrp.dtb
 @BUILD_HOST_TRUE@@BUILD_STANDALONE_TRUE@CLEANFILES = xrp.dtb
-dsp_cppflags = $(AM_CPPFLAGS) -I$(srcdir)/../xrp-dsp
+@BUILD_EXTERNAL_FALSE@dsp_cppflags = $(AM_CPPFLAGS) -I$(srcdir)/../xrp-dsp
+@BUILD_EXTERNAL_TRUE@dsp_cppflags = $(AM_CPPFLAGS)
 dsp_ldflags = $(AM_LDFLAGS) \
 	      -mlsp=$(DSP_LSP) \
 	      -Wl,--defsym,_memmap_cacheattr_reset=$(DSP_CACHEATTR)
@@ -372,34 +394,51 @@ xrp_dsp_standalone_CPPFLAGS = $(dsp_cppflags)
 xrp_dsp_standalone_LDFLAGS = $(dsp_ldflags) \
 			     -Wl,--defsym,xrp_dsp_comm_base_magic=$(DSP_COMM_BASE)
 
-xrp_dsp_standalone_LDADD = ../xrp-dsp/libxrp-dsp.a \
-			   ../xrp-dsp/$(HW_PORT)/libxrp-dsp-hw-$(HW_PORT).a \
-			   ../xrp-common/libxrp-common.a \
-			   $(THREADS_LDFLAGS)
+@BUILD_EXTERNAL_FALSE@xrp_dsp_standalone_LDADD = ../xrp-dsp/libxrp-dsp.a \
+@BUILD_EXTERNAL_FALSE@			   ../xrp-dsp/$(HW_PORT)/libxrp-dsp-hw-$(HW_PORT).a \
+@BUILD_EXTERNAL_FALSE@			   ../xrp-common/libxrp-common.a \
+@BUILD_EXTERNAL_FALSE@			   $(THREADS_LDFLAGS)
+
+@BUILD_EXTERNAL_TRUE@xrp_dsp_standalone_LDADD = -lxrp-dsp \
+@BUILD_EXTERNAL_TRUE@			   -lxrp-dsp-hw-$(HW_PORT) \
+@BUILD_EXTERNAL_TRUE@			   -lxrp-common \
+@BUILD_EXTERNAL_TRUE@			   $(THREADS_LDFLAGS)
 
 xrp_dsp_hosted_SOURCES = dsp_main.c dsp_test.c
 xrp_dsp_hosted_CPPFLAGS = $(dsp_cppflags)
 xrp_dsp_hosted_LDFLAGS = $(dsp_ldflags) \
 			 -Wl,--defsym,xrp_dsp_comm_base_magic=0x20161006
 
-xrp_dsp_hosted_LDADD = ../xrp-dsp/libxrp-dsp.a \
-		       ../xrp-dsp/$(HW_PORT)/libxrp-dsp-hw-$(HW_PORT).a \
-		       ../xrp-common/libxrp-common.a \
-		       $(THREADS_LDFLAGS)
+@BUILD_EXTERNAL_FALSE@xrp_dsp_hosted_LDADD = ../xrp-dsp/libxrp-dsp.a \
+@BUILD_EXTERNAL_FALSE@		       ../xrp-dsp/$(HW_PORT)/libxrp-dsp-hw-$(HW_PORT).a \
+@BUILD_EXTERNAL_FALSE@		       ../xrp-common/libxrp-common.a \
+@BUILD_EXTERNAL_FALSE@		       $(THREADS_LDFLAGS)
+
+@BUILD_EXTERNAL_TRUE@xrp_dsp_hosted_LDADD = -lxrp-dsp \
+@BUILD_EXTERNAL_TRUE@		       -lxrp-dsp-hw-$(HW_PORT) \
+@BUILD_EXTERNAL_TRUE@		       -lxrp-common \
+@BUILD_EXTERNAL_TRUE@		       $(THREADS_LDFLAGS)
 
 xrp_host_standalone_SOURCES = host_main.c xrp_dtb.s
 xrp_host_standalone_CFLAGS = $(AM_CFLAGS) $(THREAD_CFLAGS)
-xrp_host_standalone_LDADD = ../xrp-host/libxrp-host-standalone.a \
-	$(THREADS_LDFLAGS) $(LIBFDT_LDFLAGS) -lfdt $(am__append_6)
+@BUILD_EXTERNAL_FALSE@xrp_host_standalone_LDADD =  \
+@BUILD_EXTERNAL_FALSE@	../xrp-host/libxrp-host-standalone.a \
+@BUILD_EXTERNAL_FALSE@	$(THREADS_LDFLAGS) $(LIBFDT_LDFLAGS) \
+@BUILD_EXTERNAL_FALSE@	-lfdt $(am__append_6)
+@BUILD_EXTERNAL_TRUE@xrp_host_standalone_LDADD =  \
+@BUILD_EXTERNAL_TRUE@	-lxrp-host-standalone $(THREADS_LDFLAGS) \
+@BUILD_EXTERNAL_TRUE@	$(LIBFDT_LDFLAGS) -lfdt $(am__append_6)
 @HOST_OS_ELF_TRUE@xrp_host_standalone_LDFLAGS = $(AM_LDFLAGS) \
 @HOST_OS_ELF_TRUE@			      -mlsp=$(HOST_LSP) \
 @HOST_OS_ELF_TRUE@			      -Wl,--defsym,_memmap_cacheattr_reset=$(HOST_CACHEATTR)
 
 xrp_host_hosted_SOURCES = host_main.c
 xrp_host_hosted_CFLAGS = $(AM_CFLAGS) $(THREAD_CFLAGS)
-xrp_host_hosted_LDADD = ../xrp-host/libxrp-host-hosted.a $(THREADS_LDFLAGS)
+@BUILD_EXTERNAL_FALSE@xrp_host_hosted_LDADD = ../xrp-host/libxrp-host-hosted.a $(THREADS_LDFLAGS)
+@BUILD_EXTERNAL_TRUE@xrp_host_hosted_LDADD = -lxrp-host-hosted $(THREADS_LDFLAGS)
 xrp_host_single_SOURCES = host_main.c dsp_test.c
-xrp_host_single_LDADD = ../xrp-host/libxrp-host-single.a $(THREADS_LDFLAGS)
+@BUILD_EXTERNAL_FALSE@xrp_host_single_LDADD = ../xrp-host/libxrp-host-single.a $(THREADS_LDFLAGS)
+@BUILD_EXTERNAL_TRUE@xrp_host_single_LDADD = -lxrp-host-single $(THREADS_LDFLAGS)
 all: $(BUILT_SOURCES)
 	$(MAKE) $(AM_MAKEFLAGS) all-am
 

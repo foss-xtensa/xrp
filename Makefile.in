@@ -110,9 +110,10 @@ PRE_UNINSTALL = :
 POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
-@BUILD_DSP_TRUE@am__append_1 = xrp-dsp
-@BUILD_HOST_TRUE@am__append_2 = xrp-host
-@BUILD_EXAMPLE_TRUE@am__append_3 = xrp-example
+@BUILD_EXTERNAL_FALSE@am__append_1 = xrp-common
+@BUILD_DSP_TRUE@@BUILD_EXTERNAL_FALSE@am__append_2 = xrp-dsp
+@BUILD_EXTERNAL_FALSE@@BUILD_HOST_TRUE@am__append_3 = xrp-host
+@BUILD_EXAMPLE_TRUE@am__append_4 = xrp-example
 subdir = .
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/configure.ac
@@ -348,7 +349,8 @@ target_alias = @target_alias@
 top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
-SUBDIRS = xrp-common $(am__append_1) $(am__append_2) $(am__append_3)
+SUBDIRS = $(am__append_1) $(am__append_2) $(am__append_3) \
+	$(am__append_4)
 all: all-recursive
 
 .SUFFIXES:

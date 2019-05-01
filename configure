@@ -629,9 +629,13 @@ DSP_CACHEATTR
 DSP_COMM_BASE
 DSP_LSP
 HW_PORT
+BUILD_ALL_SIMPLE_FALSE
+BUILD_ALL_SIMPLE_TRUE
 DTC
 LIBFDT_LDFLAGS
 LIBFDT_CPPFLAGS
+BUILD_EXTERNAL_FALSE
+BUILD_EXTERNAL_TRUE
 BUILD_EXAMPLE_FALSE
 BUILD_EXAMPLE_TRUE
 BUILD_SINGLE_FALSE
@@ -772,7 +776,9 @@ enable_standalone
 enable_hosted
 enable_single
 enable_example
+enable_external
 with_libfdt
+enable_all_simple_ports
 enable_port
 '
       ac_precious_vars='build_alias
@@ -1437,6 +1443,9 @@ Optional Features:
   --enable-hosted         build hosted library/example [detect]
   --enable-single         build single library/example [yes]
   --enable-example        build example application [no]
+  --enable-external       build example using external libraries [no]
+  --enable-all-simple-ports
+                          build all simple ports [no]
   --enable-port[=ARG]     enable port ARG [simple]
 
 Optional Packages:
@@ -4994,6 +5003,26 @@ else
 fi
 
 
+# Check whether --enable-external was given.
+if test "${enable_external+set}" = set; then :
+  enableval=$enable_external; if test "x${enableval}" = xno; then :
+  build_external=false
+else
+  build_external=true
+fi
+else
+  build_external=false
+fi
+
+ if test x$build_external = xtrue; then
+  BUILD_EXTERNAL_TRUE=
+  BUILD_EXTERNAL_FALSE='#'
+else
+  BUILD_EXTERNAL_TRUE='#'
+  BUILD_EXTERNAL_FALSE=
+fi
+
+
 
 # Check whether --with-libfdt was given.
 if test "${with_libfdt+set}" = set; then :
@@ -5229,6 +5258,26 @@ See \`config.log' for more details" "$LINENO" 5; }
 fi
 
 fi
+
+# Check whether --enable-all-simple-ports was given.
+if test "${enable_all_simple_ports+set}" = set; then :
+  enableval=$enable_all_simple_ports; if test "x${enableval}" = xno; then :
+  build_all_simple=false
+else
+  build_all_simple=true
+fi
+else
+  build_all_simple=false
+fi
+
+ if test x$build_all_simple = xtrue; then
+  BUILD_ALL_SIMPLE_TRUE=
+  BUILD_ALL_SIMPLE_FALSE='#'
+else
+  BUILD_ALL_SIMPLE_TRUE='#'
+  BUILD_ALL_SIMPLE_FALSE=
+fi
+
 
 HW_PORT=simple
 # Check whether --enable-port was given.
@@ -5524,6 +5573,14 @@ Usually this means the macro was only invoked conditionally." "$LINENO" 5
 fi
 if test -z "${BUILD_EXAMPLE_TRUE}" && test -z "${BUILD_EXAMPLE_FALSE}"; then
   as_fn_error $? "conditional \"BUILD_EXAMPLE\" was never defined.
+Usually this means the macro was only invoked conditionally." "$LINENO" 5
+fi
+if test -z "${BUILD_EXTERNAL_TRUE}" && test -z "${BUILD_EXTERNAL_FALSE}"; then
+  as_fn_error $? "conditional \"BUILD_EXTERNAL\" was never defined.
+Usually this means the macro was only invoked conditionally." "$LINENO" 5
+fi
+if test -z "${BUILD_ALL_SIMPLE_TRUE}" && test -z "${BUILD_ALL_SIMPLE_FALSE}"; then
+  as_fn_error $? "conditional \"BUILD_ALL_SIMPLE\" was never defined.
 Usually this means the macro was only invoked conditionally." "$LINENO" 5
 fi
 
