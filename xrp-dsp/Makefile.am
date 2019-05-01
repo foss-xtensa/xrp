@@ -22,6 +22,9 @@
 #
 
 SUBDIRS = $(HW_PORT)
+if BUILD_ALL_SIMPLE
+SUBDIRS += simple simple-xos
+endif
 
 AM_CPPFLAGS = -I$(srcdir)/.. \
 	      -I$(srcdir)/../xrp-common \

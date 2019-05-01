@@ -221,6 +221,15 @@ AS_IF([test x$build_host = xtrue -a x$build_standalone = xtrue -a x$build_exampl
 	    [AC_MSG_FAILURE([No usable dtc is found])])
       ])
 
+AC_ARG_ENABLE(all-simple-ports,
+	      [AS_HELP_STRING([--enable-all-simple-ports],
+			      [build all simple ports [no]])],
+	      [AS_IF([test "x${enableval}" = xno],
+		     [build_all_simple=false],
+		     [build_all_simple=true])],
+	      [build_all_simple=false])
+AM_CONDITIONAL([BUILD_ALL_SIMPLE], [test x$build_all_simple = xtrue])
+
 HW_PORT=simple
 AC_ARG_ENABLE(port,
 	      [AS_HELP_STRING([--enable-port[[=ARG]]],
