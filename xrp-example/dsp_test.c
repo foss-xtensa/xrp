@@ -175,7 +175,7 @@ static enum xrp_status test_ns(struct xrp_device *device)
 	return XRP_STATUS_SUCCESS;
 }
 
-void __attribute__((constructor)) dsp_test_register(void)
+void dsp_test_register(void)
 {
 	enum xrp_status status;
 	struct xrp_device *device;

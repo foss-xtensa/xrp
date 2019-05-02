@@ -109,6 +109,7 @@ static void register_exception_handlers(void)
 	}
 }
 
+void dsp_test_register(void);
 
 int main(void)
 {
@@ -123,12 +124,14 @@ int main(void)
 		fprintf(stderr, "Initial xrp_user_create_queue failed\n");
 		abort();
 	}
+	dsp_test_register();
 	xos_start(0);
 #else
 	struct xrp_device *device;
 
 	register_exception_handlers();
 	xrp_hw_init();
+	dsp_test_register();
 	device = xrp_open_device(0, &status);
 	if (status != XRP_STATUS_SUCCESS) {
 		fprintf(stderr, "xrp_open_device failed\n");
