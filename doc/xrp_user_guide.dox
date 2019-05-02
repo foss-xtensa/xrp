@@ -978,17 +978,19 @@ parts of the XRP are built and how:
 \end{table}
 \endlatexonly
 
-| Switch              | Description                        | Default  |
-| ------------------- | ---------------------------------- | -------- |
-| --enable-threads    | Enable thread support.             | `detect` |
-| --enable-host       | Build host XRP components.         | `yes`    |
-| --enable-dsp        | Build DSP XRP components.          | `detect` |
-| --enable-standalone | Build standalone library/example.  | `yes`    |
-| --enable-hosted     | Build hosted library/example.      | `detect` |
-| --enable-single     | Build single library/example.      | `yes`    |
-| --enable-example    | Build example application.         | `no`     |
-| --enable-port[=ARG] | Enable port ARG.                   | `simple` |
-| --with-libfdt       | Prefix of libfdt headers/library.  |          |
+| Switch                    | Description                             | Default  |
+| ------------------------- | --------------------------------------- | -------- |
+| --enable-threads          | Enable thread support.                  | `detect` |
+| --enable-host             | Build host XRP components.              | `yes`    |
+| --enable-dsp              | Build DSP XRP components.               | `detect` |
+| --enable-standalone       | Build standalone library/example.       | `yes`    |
+| --enable-hosted           | Build hosted library/example.           | `detect` |
+| --enable-single           | Build single library/example.           | `yes`    |
+| --enable-example          | Build example application.              | `no`     |
+| --enable-external         | Build example using external libraries. | `no`     |
+| --enable-port[=ARG]       | Enable port ARG.                        | `simple` |
+| --enable-all-simple-ports | Build all simple* ports.                | `no`     |
+| --with-libfdt             | Prefix of libfdt headers/library.       |          |
 
 - Switch `--enable-threads` (detect by default) enables or disables use of
   thread library for asynchronous processing. Without thread support
@@ -1009,6 +1011,10 @@ parts of the XRP are built and how:
   and example DSP firmware, when `--enable-host` and `--enable-dsp` are
   enabled respectively.
 
+- Switch `--enable-external` makes example use system headers and libraries
+  instead of building them from the bundled source. It may be used to build
+  example with XRP headers and libraries supplied with the Xtensa tools.
+
 - Switch `--enable-port` seclects hardware port for building. Hardware port
   is a hardware-specific DSP library, hardware-specific kernel driver and DSP
   side build flags. In this release there are three ports bundled with the XRP
@@ -1020,6 +1026,10 @@ parts of the XRP are built and how:
     supports the multiqueue feature. It has the same hardware requirements
     as the `simple` port.
   - `hikey960` is for the HiFi3 DSP in the HiKey960 platform.
+
+- Switch `--enable-all-simple-ports` selects `simple` and `simple-xos` ports
+  in addition to any port enabled with `--enable-port` switch when building
+  DSP libraries. This is used for building XRP as a part of Xtensa tools.
 
 - Switch `--with-libfdt` may be used to specify a path to the libfdt headers
   and archive when it is installed in a non-standard location.
