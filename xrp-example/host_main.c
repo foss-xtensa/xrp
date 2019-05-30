@@ -492,6 +492,83 @@ static void f8(int devid)
 	xrp_release_device(device);
 }
 
+/* Test xrp_wait_any */
+static void f9(int devid)
+{
+#define N_Q 10
+#define N_CMD 100
+	enum xrp_status status = -1;
+	unsigned i, j;
+	struct xrp_device *device;
+	struct xrp_queue *queue[N_Q];
+	struct xrp_event *event[N_Q];
+	struct example_v2_cmd cmd = {
+		.cmd = EXAMPLE_V2_CMD_OK,
+	};
+	int count[N_Q] = {0};
+
+	device = xrp_open_device(devid, &status);
+	assert(status == XRP_STATUS_SUCCESS);
+	status = -1;
+	for (i = 0; i < N_Q; ++i) {
+		queue[i] = xrp_create_ns_queue(device, XRP_EXAMPLE_V2_NSID,
+					       &status);
+		assert(status == XRP_STATUS_SUCCESS);
+		status = -1;
+	}
+
+	for (i = 0; i < N_Q; ++i) {
+		xrp_enqueue_command(queue[i],
+				    &cmd, sizeof(cmd),
+				    NULL, 0,
+				    NULL, &event[i], &status);
+		assert(status == XRP_STATUS_SUCCESS);
+		status = -1;
+	}
+
+	for (i = 0; i < N_CMD;) {
+		xrp_wait_any(event, N_Q, &status);
+
+		assert(status == XRP_STATUS_SUCCESS);
+		status = -1;
+
+		for (j = 0; j < N_Q && i < N_CMD; ++j) {
+			xrp_event_status(event[j], &status);
+			if (status != XRP_STATUS_PENDING) {
+				++count[j];
+
+				assert(status == XRP_STATUS_SUCCESS);
+				status = -1;
+
+				xrp_release_event(event[j]);
+				xrp_enqueue_command(queue[j],
+						    &cmd, sizeof(cmd),
+						    NULL, 0,
+						    NULL, &event[j], &status);
+				assert(status == XRP_STATUS_SUCCESS);
+				status = -1;
+				++i;
+			}
+		}
+	}
+
+	for (i = 0; i < N_Q; ++i) {
+		xrp_wait(event[i], &status);
+		assert(status == XRP_STATUS_SUCCESS);
+		status = -1;
+
+		xrp_release_event(event[i]);
+		fprintf(stderr, "count[%d] = %d\n", i, count[i]);
+	}
+
+	for (i = 0; i < N_Q; ++i) {
+		xrp_release_queue(queue[i]);
+	}
+	xrp_release_device(device);
+#undef N_Q
+#undef N_CMD
+}
+
 enum {
 	CMD_TEST,
 
@@ -568,6 +645,10 @@ int main(int argc, char **argv)
 			}
 			if (tests & 0x80) {
 				f8(devid);
+				printf("=======================================================\n");
+			}
+			if (tests & 0x100) {
+				f9(devid);
 				printf("=======================================================\n");
 			}
 		}
