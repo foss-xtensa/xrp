@@ -449,6 +449,23 @@ void xrp_enqueue_command(struct xrp_queue *queue,
 void xrp_wait(struct xrp_event *event, enum xrp_status *status);
 
 /*!
+ * Wait for any event in the group.
+ * Waiting for a group with already signaled event completes immediately.
+ * Successful completion of this function does not alter the event state,
+ * i.e. signaled events remain signaled.
+ * status is the result of waiting, not the result of the command execution.
+ * Use xrp_event_status() with individual events to get the corresponding
+ * command execution status.
+ *
+ * \param[in] event: an array of pointers to events to wait for
+ * \param[i] n_events: number of events in the events array
+ * \param[out] status: operation status
+ * \return index of a completed event in the event array
+ */
+size_t xrp_wait_any(struct xrp_event **event, size_t n_events,
+		    enum xrp_status *status);
+
+/*!
  * @}
  */
 

@@ -22,6 +22,7 @@
  */
 
 #include <stdio.h>
+#include "xrp_debug.h"
 #include "xrp_host_common.h"
 #include "xrp_threaded_queue.h"
 
@@ -113,14 +114,19 @@ void xrp_queue_push(struct xrp_request_queue *queue,
 	xrp_cond_unlock(&queue->request_queue_cond);
 }
 
+static void xrp_impl_event_init(struct xrp_event *event)
+{
+	xrp_cond_init(&event->impl.cond);
+	event->status = XRP_STATUS_PENDING;
+}
+
 struct xrp_event *xrp_event_create(void)
 {
 	struct xrp_event *event = alloc_refcounted(sizeof(*event));
 
 	if (!event)
 		return NULL;
-	xrp_cond_init(&event->impl.cond);
-	event->status = XRP_STATUS_PENDING;
+	xrp_impl_event_init(event);
 	return event;
 }
 
@@ -133,11 +139,93 @@ void xrp_wait(struct xrp_event *event, enum xrp_status *status)
 	set_status(status, XRP_STATUS_SUCCESS);
 }
 
+size_t xrp_wait_any(struct xrp_event **event, size_t n_events,
+		    enum xrp_status *status)
+{
+	size_t i, rv;
+	struct xrp_event group;
+	struct xrp_event_link *link;
+
+	if (!n_events) {
+		set_status(status, XRP_STATUS_FAILURE);
+		return 0;
+	}
+
+	link = calloc(n_events, sizeof(struct xrp_event_link));
+
+	xrp_impl_event_init(&group);
+
+	for (i = 0; i < n_events; ++i) {
+		xrp_cond_lock(&event[i]->impl.cond);
+		if (event[i]->status == XRP_STATUS_PENDING) {
+			link[i].group = event[i]->group;
+			link[i].next = event[i]->link;
+
+			if (event[i]->link)
+				event[i]->link->prev = link + i;
+
+			event[i]->group = &group;
+			event[i]->link = link + i;
+		} else {
+			xrp_cond_unlock(&event[i]->impl.cond);
+			break;
+		}
+		xrp_cond_unlock(&event[i]->impl.cond);
+	}
+
+	rv = i;
+
+	if (i == n_events)
+		xrp_wait(&group, NULL);
+	else
+		n_events = i;
+
+	for (i = 0; i < n_events; ++i) {
+		xrp_cond_lock(&event[i]->impl.cond);
+		if (event[i]->group == &group) {
+			event[i]->group = link[i].group;
+			event[i]->link = link[i].next;
+		}
+		if (link[i].next) {
+			link[i].next->prev = link[i].prev;
+		}
+		if (link[i].prev) {
+			if (link[i].prev->group == &group) {
+				link[i].prev->group = link[i].group;
+				link[i].prev->next = link[i].next;
+			} else {
+				pr_debug("%s: inconsistent link state\n");
+			}
+		}
+		if (event[i]->status != XRP_STATUS_PENDING)
+			rv = i;
+		xrp_cond_unlock(&event[i]->impl.cond);
+	}
+	xrp_impl_release_event(&group);
+	free(link);
+	set_status(status, XRP_STATUS_SUCCESS);
+	return rv;
+}
+
 void xrp_impl_broadcast_event(struct xrp_event *event, enum xrp_status status)
 {
+	struct xrp_event *group;
+	struct xrp_event_link *link;
+
 	xrp_cond_lock(&event->impl.cond);
 	event->status = status;
 	xrp_cond_broadcast(&event->impl.cond);
+
+	group = event->group;
+	link = event->link;
+	while (link) {
+		xrp_cond_lock(&group->impl.cond);
+		group->status = status;
+		xrp_cond_broadcast(&group->impl.cond);
+		xrp_cond_unlock(&group->impl.cond);
+		group = link->group;
+		link = link->next;
+	}
 	xrp_cond_unlock(&event->impl.cond);
 }
 

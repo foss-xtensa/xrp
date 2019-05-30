@@ -63,6 +63,16 @@ void xrp_wait(struct xrp_event *event, enum xrp_status *status)
 		set_status(status, XRP_STATUS_SUCCESS);
 }
 
+size_t xrp_wait_any(struct xrp_event **event, size_t n_events,
+		    enum xrp_status *status)
+{
+	if (n_events && event[0]->status != XRP_STATUS_PENDING)
+		set_status(status, XRP_STATUS_SUCCESS);
+	else
+		set_status(status, XRP_STATUS_FAILURE);
+	return 0;
+}
+
 void xrp_impl_broadcast_event(struct xrp_event *event, enum xrp_status status)
 {
 	event->status = status;

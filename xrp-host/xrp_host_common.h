@@ -74,11 +74,18 @@ struct xrp_queue {
 	struct xrp_queue_impl impl;
 };
 
+struct xrp_event_link {
+	struct xrp_event *group;
+	struct xrp_event_link *next, *prev;
+};
+
 struct xrp_event {
 	struct xrp_refcounted ref;
 	struct xrp_queue *queue;
 	_Atomic enum xrp_status status;
 	struct xrp_event_impl impl;
+	struct xrp_event *group;
+	struct xrp_event_link *link;
 };
 
 /* Helpers */
