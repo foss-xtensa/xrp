@@ -133,6 +133,14 @@ void xrp_wait(struct xrp_event *event, enum xrp_status *status)
 	set_status(status, XRP_STATUS_SUCCESS);
 }
 
+void xrp_impl_broadcast_event(struct xrp_event *event, enum xrp_status status)
+{
+	xrp_cond_lock(&event->impl.cond);
+	event->status = status;
+	xrp_cond_broadcast(&event->impl.cond);
+	xrp_cond_unlock(&event->impl.cond);
+}
+
 void xrp_impl_release_event(struct xrp_event *event)
 {
 	xrp_cond_destroy(&event->impl.cond);

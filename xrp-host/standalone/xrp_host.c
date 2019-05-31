@@ -693,15 +693,11 @@ static void _xrp_run_command(struct xrp_device *device,
 	}
 
 	if (rq->event) {
-		struct xrp_event *event = rq->event;
-		xrp_cond_lock(&event->impl.cond);
 		if (rq->dsp_cmd.flags & XRP_DSP_CMD_FLAG_RESPONSE_DELIVERY_FAIL)
-			event->status = XRP_STATUS_FAILURE;
+			xrp_impl_broadcast_event(rq->event, XRP_STATUS_FAILURE);
 		else
-			event->status = XRP_STATUS_SUCCESS;
-		xrp_cond_broadcast(&event->impl.cond);
-		xrp_cond_unlock(&event->impl.cond);
-		xrp_release_event(event);
+			xrp_impl_broadcast_event(rq->event, XRP_STATUS_SUCCESS);
+		xrp_release_event(rq->event);
 	}
 	free(rq->user_buffer_allocation);
 	free(rq);

@@ -63,6 +63,11 @@ void xrp_wait(struct xrp_event *event, enum xrp_status *status)
 		set_status(status, XRP_STATUS_SUCCESS);
 }
 
+void xrp_impl_broadcast_event(struct xrp_event *event, enum xrp_status status)
+{
+	event->status = status;
+}
+
 void xrp_impl_release_event(struct xrp_event *event)
 {
 	(void)event;

@@ -183,12 +183,8 @@ static void xrp_request_process(struct xrp_queue_item *q,
 		xrp_release_buffer_group(rq->buffer_group);
 
 	if (rq->event) {
-		struct xrp_event *event = rq->event;
-		xrp_cond_lock(&event->impl.cond);
-		event->status = status;
-		xrp_cond_broadcast(&event->impl.cond);
-		xrp_cond_unlock(&event->impl.cond);
-		xrp_release_event(event);
+		xrp_impl_broadcast_event(rq->event, status);
+		xrp_release_event(rq->event);
 	}
 	free(rq->in_data);
 	free(rq);

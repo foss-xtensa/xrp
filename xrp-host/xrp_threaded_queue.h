@@ -56,6 +56,7 @@ void xrp_queue_push(struct xrp_request_queue *queue,
 		    struct xrp_queue_item *rq);
 
 struct xrp_event *xrp_event_create(void);
+void xrp_impl_broadcast_event(struct xrp_event *event, enum xrp_status status);
 void xrp_impl_release_event(struct xrp_event *event);
 
 #endif
