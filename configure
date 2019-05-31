@@ -5297,15 +5297,16 @@ esac
 
 if test x$build_dsp = xtrue; then :
 
-      # xtos_set_interrupt_handler is not available in all XTOS versions,
-      # but is preferred to _xtos_set_interrupt_handler when it's present.
+      # xtos_* functions are not available in all XTOS versions,
+      # but are preferred to _xtos_* functions when present.
       #
-      for ac_func in xtos_set_interrupt_handler
+      for ac_func in xtos_set_interrupt_handler xtos_interrupt_enable xtos_interrupt_disable
 do :
-  ac_fn_c_check_func "$LINENO" "xtos_set_interrupt_handler" "ac_cv_func_xtos_set_interrupt_handler"
-if test "x$ac_cv_func_xtos_set_interrupt_handler" = xyes; then :
+  as_ac_var=`$as_echo "ac_cv_func_$ac_func" | $as_tr_sh`
+ac_fn_c_check_func "$LINENO" "$ac_func" "$as_ac_var"
+if eval test \"x\$"$as_ac_var"\" = x"yes"; then :
   cat >>confdefs.h <<_ACEOF
-#define HAVE_XTOS_SET_INTERRUPT_HANDLER 1
+#define `$as_echo "HAVE_$ac_func" | $as_tr_cpp` 1
 _ACEOF
 
 fi
