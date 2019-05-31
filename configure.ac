@@ -248,10 +248,10 @@ esac
 
 AS_IF([test x$build_dsp = xtrue],
       [
-      # xtos_set_interrupt_handler is not available in all XTOS versions,
-      # but is preferred to _xtos_set_interrupt_handler when it's present.
+      # xtos_* functions are not available in all XTOS versions,
+      # but are preferred to _xtos_* functions when present.
       #
-      AC_CHECK_FUNCS([xtos_set_interrupt_handler])
+      AC_CHECK_FUNCS([xtos_set_interrupt_handler xtos_interrupt_enable xtos_interrupt_disable])
       ])
 
 AC_CONFIG_FILES([xrp-dsp/simple/Makefile])
