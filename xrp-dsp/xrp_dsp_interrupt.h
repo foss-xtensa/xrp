@@ -45,6 +45,30 @@ static inline int32_t xrp_set_interrupt_handler(uint32_t intnum,
 }
 #endif
 
+#ifdef HAVE_XTOS_INTERRUPT_ENABLE
+static inline void xrp_interrupt_enable(uint32_t intnum)
+{
+	xtos_interrupt_enable(intnum);
+}
+#else
+static inline void xrp_interrupt_enable(uint32_t intnum)
+{
+	_xtos_interrupt_enable(intnum);
+}
+#endif
+
+#ifdef HAVE_XTOS_INTERRUPT_DISABLE
+static inline void xrp_interrupt_disable(uint32_t intnum)
+{
+	xtos_interrupt_enable(intnum);
+}
+#else
+static inline void xrp_interrupt_disable(uint32_t intnum)
+{
+	_xtos_interrupt_enable(intnum);
+}
+#endif
+
 #endif
 
 #endif

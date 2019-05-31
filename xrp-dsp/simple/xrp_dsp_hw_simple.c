@@ -91,9 +91,9 @@ void xrp_hw_wait_device_irq(void)
 #else
 	intstate = XTOS_SET_INTLEVEL(XCHAL_NUM_INTLEVELS - 1);
 #endif
-	_xtos_interrupt_enable(device_irq);
+	xrp_interrupt_enable(device_irq);
 	XT_WAITI(0);
-	_xtos_interrupt_disable(device_irq);
+	xrp_interrupt_disable(device_irq);
 #if XCHAL_HAVE_XEA3
 	xthal_restore_interrupts(intstate);
 #else
@@ -142,7 +142,7 @@ void xrp_hw_set_sync_data(void *p)
 		xthal_interrupt_sens_set(device_irq,
 					 device_irq_mode == XRP_IRQ_LEVEL);
 #endif
-		_xtos_interrupt_disable(device_irq);
+		xrp_interrupt_disable(device_irq);
 		xrp_set_interrupt_handler(device_irq, xrp_irq_handler);
 #endif
 	}
