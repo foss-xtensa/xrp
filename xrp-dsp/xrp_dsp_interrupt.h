@@ -60,12 +60,12 @@ static inline void xrp_interrupt_enable(uint32_t intnum)
 #ifdef HAVE_XTOS_INTERRUPT_DISABLE
 static inline void xrp_interrupt_disable(uint32_t intnum)
 {
-	xtos_interrupt_enable(intnum);
+	xtos_interrupt_disable(intnum);
 }
 #else
 static inline void xrp_interrupt_disable(uint32_t intnum)
 {
-	_xtos_interrupt_enable(intnum);
+	_xtos_interrupt_disable(intnum);
 }
 #endif
 
