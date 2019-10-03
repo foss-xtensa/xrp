@@ -2244,14 +2244,16 @@ static int xrp_probe(struct platform_device *pdev)
 	long ret = -EINVAL;
 
 #ifdef CONFIG_OF
-	{
-		const struct of_device_id *match;
-		xrp_init_function *init;
+	const struct of_device_id *match;
 
-	        match = of_match_device(xrp_of_match, &pdev->dev);
-		init = match->data;
+	match = of_match_device(xrp_of_match, &pdev->dev);
+	if (match) {
+		xrp_init_function *init = match->data;
+
 		ret = init(pdev, 0, &hw_ops, NULL);
 		return IS_ERR_VALUE(ret) ? ret : 0;
+	} else {
+		pr_debug("%s: no OF device match found\n", __func__);
 	}
 #endif
 #ifdef CONFIG_ACPI
