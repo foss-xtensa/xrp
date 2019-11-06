@@ -258,7 +258,7 @@ AC_CONFIG_FILES([xrp-dsp/simple/Makefile])
 AC_CONFIG_FILES([xrp-dsp/simple-xos/Makefile])
 AC_CONFIG_FILES([xrp-dsp/hikey960/Makefile])
 
-AC_SUBST(DSP_LSP, ["${DSP_LSP:-\$(srcdir)/MW-MP/P6_0/xtensa-elf/lib/sim-stacklocal}"])
+AC_SUBST(DSP_LSP, ["${DSP_LSP:-vp6-mp/package/cores/DSP_0/xtensa-elf/lib/sim-stacklocal}"])
 AC_ARG_VAR(DSP_LSP, [use specific Xtensa LSP for example firmware])
 
 AC_SUBST(DSP_COMM_BASE, ["${DSP_COMM_BASE:-0xf0000000}"])
@@ -268,7 +268,7 @@ AC_ARG_VAR(DSP_COMM_BASE, [DSP communication base address for standalone
 AC_SUBST(DSP_CACHEATTR, ["${DSP_CACHEATTR:-0x44441141}"])
 AC_ARG_VAR(DSP_CACHEATTR, [default DSP memmap cacheattr for example firmware])
 
-AC_SUBST(HOST_LSP, ["${DSP_LSP:-\$(srcdir)/MW-MP/P6_1/xtensa-elf/lib/sim-stacklocal}"])
+AC_SUBST(HOST_LSP, ["${DSP_LSP:-vp6-mp/package/cores/DSP_1/xtensa-elf/lib/sim-stacklocal}"])
 AC_ARG_VAR(HOST_LSP, [use specific Xtensa LSP for example standalone ELF host])
 
 AC_SUBST(HOST_CACHEATTR, ["${HOST_CACHEATTR:-0x22222222}"])

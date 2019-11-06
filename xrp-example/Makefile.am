@@ -69,6 +69,8 @@ xrp_dsp_standalone_SOURCES = dsp_main.c dsp_test.c
 xrp_dsp_standalone_CPPFLAGS = $(dsp_cppflags)
 xrp_dsp_standalone_LDFLAGS = $(dsp_ldflags) \
 			     -Wl,--defsym,xrp_dsp_comm_base_magic=$(DSP_COMM_BASE)
+EXTRA_xrp_dsp_standalone_DEPENDENCIES = $(DSP_LSP)
+
 if BUILD_EXTERNAL
 xrp_dsp_standalone_LDADD = -lxrp-dsp \
 			   -lxrp-dsp-hw-$(HW_PORT) \
@@ -85,6 +87,8 @@ xrp_dsp_hosted_SOURCES = dsp_main.c dsp_test.c
 xrp_dsp_hosted_CPPFLAGS = $(dsp_cppflags)
 xrp_dsp_hosted_LDFLAGS = $(dsp_ldflags) \
 			 -Wl,--defsym,xrp_dsp_comm_base_magic=0x20161006
+EXTRA_xrp_dsp_hosted_DEPENDENCIES = $(DSP_LSP)
+
 if BUILD_EXTERNAL
 xrp_dsp_hosted_LDADD = -lxrp-dsp \
 		       -lxrp-dsp-hw-$(HW_PORT) \
@@ -109,6 +113,7 @@ if HOST_OS_ELF
 xrp_host_standalone_LDFLAGS = $(AM_LDFLAGS) \
 			      -mlsp=$(HOST_LSP) \
 			      -Wl,--defsym,_memmap_cacheattr_reset=$(HOST_CACHEATTR)
+EXTRA_xrp_host_standalone_DEPENDENCIES = $(HOST_LSP)
 endif
 
 if HOST_OS_LINUX
@@ -133,3 +138,8 @@ endif
 xrp_dtb.$(OBJEXT): xrp.dtb
 xrp.dtb: $(srcdir)/xrp.dts
 	$(AM_V_GEN)$(DTC) -o $@ -O dtb $<
+
+vp6-mp/package/%: $(srcdir)/vp6-mp/subsys.xtsys
+	$$(dirname $$(which $(CC)))/../libexec/xt-mbuild \
+		-socfile $< -root `pwd` -syspkg `pwd`/vp6-mp/package -sysbuild `pwd`/vp6-mp/build \
+		-preclean -build sw -lsps sim,sim-stacklocal
