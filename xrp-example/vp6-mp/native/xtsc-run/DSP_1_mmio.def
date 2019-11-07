@@ -1,0 +1,19 @@
+/*
+register  <RegisterName>  <BitWidth>  <Address>   {<InitialValue>}
+--------  --------------  ----------  ----------   --------------  */
+register    DSP_1_intr_reg  32       0x30002000         0
+
+register    DSP_1_BReset         1    0x30002004     0
+register    DSP_1_RunStall       1    0x30002008     1
+register    DSP_1_StatVectorSel  1    0x3000200c     0
+
+/*
+output  <PortName>    <RegisterName>  {<HighBit>  {<LowBit>}}
+------  ------------  --------------   ---------   --------  */
+output   DSP_1_intr_reg_0   DSP_1_intr_reg   0     0
+output   DSP_1_intr_reg_1   DSP_1_intr_reg   1     1
+output   DSP_1_intr_reg_2   DSP_1_intr_reg   2     2
+
+output   DSP_1_BReset         DSP_1_BReset         0     0
+output   DSP_1_RunStall       DSP_1_RunStall       0     0
+output   DSP_1_StatVectorSel  DSP_1_StatVectorSel  0     0

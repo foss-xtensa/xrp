@@ -1,0 +1,23 @@
+/* <Port>  <LowAddr>   <HighAddr>  <NewBaseAddr>  */
+
+    0     0x20080000     0x20087fff            /* DSP_0 INSTRAM0 */
+    0     0x20040000     0x2007ffff            /* DSP_0 DATARAM0 */
+    0     0x20000000     0x2003ffff            /* DSP_0 DATARAM1 */
+    0     0x30001000     0x300011ff            /* DSP_0 MMIO */
+    1     0x20140000     0x20147fff            /* DSP_1 INSTRAM0 */
+    1     0x20100000     0x2013ffff            /* DSP_1 DATARAM0 */
+    1     0x200c0000     0x200fffff            /* DSP_1 DATARAM1 */
+    1     0x30002000     0x300021ff            /* DSP_1 MMIO */
+    2     0x20200000     0x20207fff            /* DSP_2 INSTRAM0 */
+    2     0x201c0000     0x201fffff            /* DSP_2 DATARAM0 */
+    2     0x20180000     0x201bffff            /* DSP_2 DATARAM1 */
+    2     0x30003000     0x300031ff            /* DSP_2 MMIO */
+    3     0x202c0000     0x202c7fff            /* DSP_3 INSTRAM0 */
+    3     0x20280000     0x202bffff            /* DSP_3 DATARAM0 */
+    3     0x20240000     0x2027ffff            /* DSP_3 DATARAM1 */
+    3     0x30004000     0x300041ff            /* DSP_3 MMIO */
+    4     0x30000000     0x300001ff            /* Host MMIO */
+    5     0xe0000000     0xffffffff            /* System RAM */
+    6     0xd0080000     0xd107ffff            /* System ROM */
+    7     0x00000000     0x7ffffff            /* DeviceMemory: SystemRAM_L */
+    8     0x08000000     0x1fffffff            /* DeviceMemory: SharedRAM_L */

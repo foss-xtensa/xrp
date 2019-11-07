@@ -1,0 +1,23 @@
+DSP simulation for standalone host may be started like this:
+
+$XTENSA_TOOLS/XtensaTools/bin/xtsc-run \
+		--xtensa-system=$XTENSA_TOOLS/XtensaTools/config \
+		--set_xtsc_parm=turbo=true \
+		--define=DSP_0_BINARY=<standalone DSP build dir>/xrp-example/xrp-dsp-standalone0 \
+		--define=DSP_1_BINARY=<standalone DSP build dir>/xrp-example/xrp-dsp-standalone1 \
+		--define=DSP_2_BINARY=<standalone DSP build dir>/xrp-example/xrp-dsp-standalone2 \
+		--define=DSP_3_BINARY=<standalone DSP build dir>/xrp-example/xrp-dsp-standalone3 \
+		--include=./xtsc-run/SubSystem.inc
+
+
+Simulation of ELF standlalone host + DSP may be started like this:
+
+$XTENSA_TOOLS/XtensaTools/bin/xtsc-run \
+		--xtensa-system=$XTENSA_TOOLS/XtensaTools/config \
+		--set_xtsc_parm=turbo=true \
+                --define=DSP_0_BINARY=<standalone host build dir>/xrp-example/xrp-host-standalone \
+                --define=DSP_1_BINARY=<standalone DSP build dir>/xrp-example/xrp-dsp-standalone1 \
+                --define=DSP_2_BINARY=<standalone DSP build dir>/xrp-example/xrp-dsp-standalone2 \
+                --define=DSP_3_BINARY=<standalone DSP build dir>/xrp-example/xrp-dsp-standalone3 \
+                --define=DSP_0_BINARY_ARGS=1 \
+		--include=./xtsc-run/SubSystem.inc

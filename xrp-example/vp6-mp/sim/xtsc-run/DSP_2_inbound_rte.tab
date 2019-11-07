@@ -1,0 +1,6 @@
+/* <Port>  <LowAddr>   <HighAddr>  <NewBaseAddr>  */
+
+    0     0x20200000     0x20207fff    0xd0000000    /* DSP_2 INSTRAM0 */
+    0     0x201c0000     0x201fffff    0xcffc0000    /* DSP_2 DATARAM0 */
+    0     0x20180000     0x201bffff    0xcff80000    /* DSP_2 DATARAM1 */
+    1     0x30003000     0x300031ff                  /* DSP_2 MMIO */

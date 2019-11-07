@@ -1,0 +1,17 @@
+Link or copy Image.elf and rootfs.ext2 to this directory and run xtsc as follows:
+
+$XTENSA_TOOLS/XtensaTools/bin/xtsc-run \
+		--xtensa-system=$XTENSA_TOOLS/XtensaTools/config \
+		--set_xtsc_parm=turbo=true \
+		--define=Host_BINARY=Image.elf \
+		--define=Host_BINARY_ARGS= \
+		--define=DSP_0_BINARY= \
+		--define=DSP_1_BINARY= \
+		--define=DSP_2_BINARY= \
+		--define=DSP_3_BINARY= \
+		--include=./xtsc-run/SubSystem.inc
+
+
+Or run QEMU built from xtensa-vision branch as follows:
+
+qemu-system-xtensa -M xrp_simple -smp 5 -nographic -monitor null -serial stdio -kernel ./Image.elf -semihosting

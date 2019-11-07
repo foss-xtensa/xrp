@@ -1,0 +1,1 @@
+profile --disable --all --no-inclusive gmon.out

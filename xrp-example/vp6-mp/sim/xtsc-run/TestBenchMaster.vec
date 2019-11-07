@@ -1,0 +1,59 @@
+#define WAIT_ARG 1000000
+#define INTR_SHMEM 0x100
+#define INTR_SHMEM_NAME "Shared_RAM_L"
+#define DSP_INTR_OFFSET {0x0, 0x4, 0x8, 0xc}
+#define DSP_MMIO {0x30001000, 0x30002000, 0x30003000, 0x30004000}
+#define DSP_NAMES_STR {"DSP_0", "DSP_1", "DSP_2", "DSP_3"}
+#define CMD_ADDR 0x110
+#define NUM_DSPS 4
+#define DSP_RESET {0x30001004, 0x30002004, 0x30003004, 0x30004004, }
+#define DSP_RESET_MASK {0x01 0x00 0x00 0x00, 0x01 0x00 0x00 0x00, 0x01 0x00 0x00 0x00, 0x01 0x00 0x00 0x00, }
+#define DSP_RUNSTALL {0x30001008, 0x30002008, 0x30003008, 0x30004008, }
+#define DSP_RUNSTALL_MASK {0x01 0x00 0x00 0x00, 0x01 0x00 0x00 0x00, 0x01 0x00 0x00 0x00, 0x01 0x00 0x00 0x00, }
+#define DSP_INTERRUPT_MASK {"0x04 0x00 0x00 0x00", "0x04 0x00 0x00 0x00", "0x04 0x00 0x00 0x00", "0x04 0x00 0x00 0x00"}
+#define DSP_INTERRUPT_TYPE {"Edge", "Edge", "Edge", "Edge"}
+
+#lua_beg
+
+  function get_int_value(addr)
+    local str = xtsc.cmd($(INTR_SHMEM_NAME) .. " peek " .. addr .. " 4")
+    local val = tonumber(string.sub(str, 16, 19) ..
+                         string.sub(str, 13, 14) ..
+                         string.sub(str, 8, 9) ..
+                         string.sub(str, 3, 4))
+    return val
+  end
+
+  DSP_INTR_OFFS  = $(DSP_INTR_OFFSET)
+  DSP_MMIO_ADDRS = $(DSP_MMIO)
+  DSP_INTR_MASK = $(DSP_INTERRUPT_MASK)
+  DSP_INTR_TYPE = $(DSP_INTERRUPT_TYPE)
+  DSP_NAMES = $(DSP_NAMES_STR)
+  DSP_RUNSTALL_ADDRS = $(DSP_RUNSTALL)
+  DSP_RESET = $(DSP_RESET)
+  while true do
+    xtsc.cmd("sc wait $(WAIT_ARG)")
+    for c = 1, $(NUM_DSPS) do
+      intr_type = DSP_INTR_TYPE[c]
+      if (intr_type ~= "None") then
+        intr_off = $(INTR_SHMEM) + DSP_INTR_OFFS[c]
+        intr = xtsc.cmd($(INTR_SHMEM_NAME) .. " peek " .. intr_off .. " 4")
+        mmio = DSP_MMIO_ADDRS[c]
+        intr_mask = DSP_INTR_MASK[c]
+        if (intr == intr_mask) then
+          -- Send interrupt and clear intr
+          if (intr_type == "Edge") then
+            xtsc.write("now poke " .. mmio     .. " 4 0x00 0x00 0x00 0x00")
+          end
+          xtsc.write("now poke " .. mmio     .. " 4 " .. intr_mask)
+          xtsc.cmd($(INTR_SHMEM_NAME) .. " poke " .. intr_off .. " 4 0x00 0x00 0x00 0x00")
+        end
+      end
+    end
+    exit = xtsc.cmd($(INTR_SHMEM_NAME) .. " peek " .. $(CMD_ADDR) .. " 4")
+    if (exit == "0xff 0x00 0x00 0x00") then
+      xtsc.write("now poke " .. $(CMD_ADDR) .. " 4 0x00 0x00 0x00 0x00")
+      xtsc.cmd("sc sc_stop")
+    end
+  end
+#lua_end
