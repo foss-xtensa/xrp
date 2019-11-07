@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016 - 2017 Cadence Design Systems Inc.
+ * Copyright (c) 2016 - 2019 Cadence Design Systems Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -35,7 +35,7 @@
 
 	memory@0 {
 		device_type = "memory";
-		reg = <0x00050000 0x07fb0000>;
+		reg = <0x00000000 0x20000000>;
 	};
 
 	cpus {
@@ -59,58 +59,88 @@
 
 	sim-shmem {
 		compatible = "cdns,sim-shmem";
-		reg = <0xf0000000 0x08000000
-		       0x00000000 0x10000000>;
-		exit-loc = <0xf0000108>;
-		reg-names = "SharedRAM_L", "SystemRAM_L";
+		reg = <0x00000000 0x20000000>;
+		exit-loc = <0x00000110>;
+		reg-names = "SharedRAM_L";
 	};
 
 	xvp@0 {
 		#address-cells = <1>;
 		#size-cells = <1>;
 		compatible = "cdns,xrp-hw-simple,v1";
-		queue-priority = <7 6 8>;
-		reg = <0xf0000000 0x04000000
-		       0xfd001000 0x00000200>;
-		device-irq = <0xfaffe000 0 16>; /* offset, bit#, IRQ# */
+		reg = <0x10000000 0x04000000
+		       0x30001000 0x00000200>;
+		device-irq = <0 2 16>; /* offset, bit#, IRQ# */
 		device-irq-mode = <3>;
-		host-irq = <0xfffff000 0>; /* offset, bit# */
-		host-irq-mode = <2>;
-		interrupts = <15 0>;
-		firmware-name = "xrp0.elf";
-		ranges = <0x00000000 0x00000000 0x10000000
-			  0x3ffc0000 0xc0000000 0x00020000
-			  0x3ffe0000 0xc0020000 0x00020000
-			  0x50000000 0x50000000 0x01000000
-			  0x60000000 0x60000000 0x20000000
-			  0xf0000000 0xf0000000 0x0d000000>;
+		device-irq-host-offset = <0xcffff100>;
+		queue-priority = <7 5 6>;
+		ranges = <0x00000000 0x00000000 0x20000000
+			  0xcff80000 0x20000000 0x00040000
+			  0xcffc0000 0x20040000 0x00040000
+			  0xd0000000 0x20080000 0x00008000
+			  0xd0080000 0xd0080000 0x01000000
+			  0xe0000000 0xe0000000 0x20000000>;
+		dsp@0 {
+		};
 	};
 
 	xvp@1 {
 		#address-cells = <1>;
 		#size-cells = <1>;
 		compatible = "cdns,xrp-hw-simple,v1";
-		queue-priority = <6 7 8>;
-		reg = <0xf4000000 0x03fff000
-		       0xfd002000 0x00000200>;
-		device-irq = <0xfaffd004 0 16>; /* offset, bit#, IRQ# */
+		reg = <0x14000000 0x04000000
+		       0x30002000 0x00000200>;
+		device-irq = <0 2 16>; /* offset, bit#, IRQ# */
 		device-irq-mode = <3>;
-		host-irq = <0xffffe000 0>; /* offset, bit# */
-		host-irq-mode = <2>;
-		interrupts = <15 0>;
-		firmware-name = "xrp1.elf";
-		ranges = <0x00000000 0x00000000 0x10000000
-			  0x3ffc0000 0xc0040000 0x00020000
-			  0x3ffe0000 0xc0060000 0x00020000
-			  0x50000000 0x50000000 0x01000000
-			  0x60000000 0x60000000 0x20000000
-			  0xf0000000 0xf0000000 0x0d000000>;
+		device-irq-host-offset = <0xcfffe104>;
+		queue-priority = <7 6 5>;
+		ranges = <0x00000000 0x00000000 0x20000000
+			  0xcff80000 0x200c0000 0x00040000
+			  0xcffc0000 0x20100000 0x00040000
+			  0xd0000000 0x20140000 0x00008000
+			  0xd0080000 0xd0080000 0x01000000
+			  0xe0000000 0xe0000000 0x20000000>;
+		dsp@0 {
+		};
 	};
 
-	soc {
+	xvp@2 {
 		#address-cells = <1>;
 		#size-cells = <1>;
-		compatible = "simple-bus";
-		ranges = <0x00000000 0xf0000000 0x10000000>;
+		compatible = "cdns,xrp-hw-simple,v1";
+		reg = <0x18000000 0x04000000
+		       0x30003000 0x00000200>;
+		device-irq = <0 2 16>; /* offset, bit#, IRQ# */
+		device-irq-mode = <1>;
+		device-irq-host-offset = <0xcfffd108>;
+		queue-priority = <7 6 5>;
+		ranges = <0x00000000 0x00000000 0x20000000
+			  0xcff80000 0x20180000 0x00040000
+			  0xcffc0000 0x201c0000 0x00040000
+			  0xd0000000 0x20200000 0x00008000
+			  0xd0080000 0xd0080000 0x01000000
+			  0xe0000000 0xe0000000 0x20000000>;
+		dsp@0 {
+		};
+	};
+
+	xvp@3 {
+		#address-cells = <1>;
+		#size-cells = <1>;
+		compatible = "cdns,xrp-hw-simple,v1";
+		reg = <0x1c000000 0x04000000
+		       0x30004000 0x00000200>;
+		device-irq = <0 2 16>; /* offset, bit#, IRQ# */
+		device-irq-mode = <1>;
+		device-irq-host-offset = <0xcfffc10c>;
+		queue-priority = <7 6 5>;
+		ranges = <0x00000000 0x00000000 0x20000000
+			  0xcff80000 0x20240000 0x00040000
+			  0xcffc0000 0x20280000 0x00040000
+			  0xd0000000 0x202c0000 0x00008000
+			  0xd0080000 0xd0080000 0x01000000
+			  0xe0000000 0xe0000000 0x20000000>;
+		dsp@0 {
+		};
 	};
 };
