@@ -102,7 +102,7 @@ work on a very broad range of Xtensa cores. It is tested with Xtensa
 software versions RF.5 and later.
 
 The Linux kernel driver is tested with a number of Linux kernel versions from
-3.18 to 4.16 and is known to work on Xtensa, 32- and 64-bit ARM and x86 Linux.
+3.18 to 5.3 and is known to work on Xtensa, 32- and 64-bit ARM and x86 Linux.
 
 The driver makes the following assumptions:
 - The DSP has the same endianness as the host.
@@ -1090,8 +1090,8 @@ binary may be used with `configure` or `make` command.
 <pre>
   $ ./configure --host=xtensa-elf --disable-host --disable-standalone \
     --enable-example \
-    DSP_LSP=MW-MP/P6_0/xtensa-elf/lib/sim-stacklocal \
-    CC='xt-xcc --xtensa-core=visionp6cnn_ao_exls'
+    DSP_LSP=vp6-mp/package/cores/DSP_0/xtensa-elf/lib/sim-stacklocal \
+    CC='xt-xcc --xtensa-core=visionp6_ao'
   $ make
 </pre>
 
@@ -1110,9 +1110,9 @@ binary may be used with `configure` or `make` command.
 <pre>
   $ ./configure --host=xtensa-elf --disable-host --disable-hosted \
     --enable-standalone --enable-example \
-    DSP_LSP=MW-MP/P6_0/xtensa-elf/lib/sim-stacklocal \
-    DSP_COMM_BASE=0xf0000000 \
-    CC='xt-xcc --xtensa-core=visionp6cnn_ao_exls'
+    DSP_LSP=vp6-mp/package/cores/DSP_0/xtensa-elf/lib/sim-stacklocal \
+    DSP_COMM_BASE=0x10000000 \
+    CC='xt-xcc --xtensa-core=visionp6_ao'
   $ make
 </pre>
 
