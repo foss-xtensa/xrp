@@ -36,10 +36,7 @@
 #define mb() barrier()
 #define schedule() barrier()
 
-typedef uint8_t __u8;
-typedef uint32_t __u32;
-typedef uint64_t __u64;
-
+#include "xrp_types.h"
 #include "xrp_debug.h"
 #include "xrp_host_common.h"
 #include "xrp_host_impl.h"
