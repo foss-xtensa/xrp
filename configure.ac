@@ -173,6 +173,8 @@ AC_ARG_WITH([libfdt],
 AC_SUBST(LIBFDT_CPPFLAGS)
 AC_SUBST(LIBFDT_LDFLAGS)
 
+AC_CHECK_TYPES([__u8, __u32, __u64])
+
 AS_IF([test x$build_host = xtrue],
       [
       AC_MSG_CHECKING([for working _Atomic support])

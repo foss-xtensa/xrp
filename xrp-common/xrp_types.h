@@ -26,13 +26,14 @@
 
 #include <stdint.h>
 
-typedef int8_t __i8;
+#ifndef HAVE___U8
 typedef uint8_t __u8;
-typedef int16_t __i16;
-typedef uint16_t __u16;
-typedef int32_t __i32;
+#endif
+#ifndef HAVE___U32
 typedef uint32_t __u32;
-typedef int64_t __i64;
+#endif
+#ifndef HAVE___U64
 typedef uint64_t __u64;
+#endif
 
 #endif
