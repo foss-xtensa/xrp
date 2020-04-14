@@ -254,6 +254,7 @@ AS_IF([test x$build_dsp = xtrue],
       # but are preferred to _xtos_* functions when present.
       #
       AC_CHECK_FUNCS([xtos_set_interrupt_handler xtos_interrupt_enable xtos_interrupt_disable])
+      AC_CHECK_FUNCS([xtos_set_exception_handler])
       ])
 
 AC_CONFIG_FILES([xrp-dsp/simple/Makefile])

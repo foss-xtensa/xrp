@@ -51,9 +51,27 @@ void abort(void)
 #if HAVE_THREADS_XOS
 static void xos_exception(XosExcFrame *frame)
 {
-	fprintf(stderr, "%s: EXCCAUSE = %ld, EXCVADDR = 0x%08lx, PS = 0x%08lx, EPC1 = 0x%08lx\n",
+	fprintf(stderr, "%s: EXCCAUSE = %ld/0x%lx, EXCVADDR = 0x%08lx, PS = 0x%08lx, EPC1 = 0x%08lx\n",
 		__func__,
-		(unsigned long)frame->exccause, (unsigned long)frame->excvaddr,
+		(unsigned long)frame->exccause, (unsigned long)frame->exccause,
+		(unsigned long)frame->excvaddr,
+		(unsigned long)frame->ps, (unsigned long)frame->pc);
+	hang();
+}
+#else
+#if HAVE_XTOS_SET_EXCEPTION_HANDLER
+static void xtos_exception(void *arg)
+{
+#if XCHAL_HAVE_XEA3
+	ExcFrame *frame = arg;
+#else
+	UserFrame *frame = arg;
+#endif
+
+	fprintf(stderr, "%s: EXCCAUSE = %ld/0x%lx, PS = 0x%08lx, EPC1 = 0x%08lx\n",
+		__func__,
+		(unsigned long)frame->exccause,
+		(unsigned long)frame->exccause,
 		(unsigned long)frame->ps, (unsigned long)frame->pc);
 	hang();
 }
@@ -74,7 +92,39 @@ static void exception(void)
 	hang();
 }
 #endif
+#endif
 
+static void register_exception_handler(uint32_t cause)
+{
+#if HAVE_THREADS_XOS
+	xos_register_exception_handler(cause, xos_exception);
+#else
+#if HAVE_XTOS_SET_EXCEPTION_HANDLER
+	xtos_set_exception_handler(cause, xtos_exception, NULL);
+#else
+	_xtos_set_exception_handler(cause, exception);
+#endif
+#endif
+}
+
+#if XCHAL_HAVE_XEA3
+static void register_exception_handlers(void)
+{
+	static const int cause[] = {
+		EXCCAUSE_INSTRUCTION,
+		EXCCAUSE_ADDRESS,
+		EXCCAUSE_EXTERNAL,
+		EXCCAUSE_HARDWARE,
+		EXCCAUSE_MEMORY,
+		EXCCAUSE_CP_DISABLED,
+	};
+
+	unsigned i;
+
+	for (i = 0; i < sizeof(cause) / sizeof(cause[0]); ++i)
+		register_exception_handler(cause[i]);
+}
+#else
 static void register_exception_handlers(void)
 {
 	static const int cause[] = {
@@ -98,17 +148,13 @@ static void register_exception_handlers(void)
 		EXCCAUSE_LOAD_PROHIBITED,
 		EXCCAUSE_STORE_PROHIBITED,
 	};
+
 	unsigned i;
 
-	for (i = 0; i < sizeof(cause) / sizeof(cause[0]); ++i) {
-#if HAVE_THREADS_XOS
-		xos_register_exception_handler(cause[i], xos_exception);
-#else
-		_xtos_set_exception_handler(cause[i], exception);
-#endif
-	}
+	for (i = 0; i < sizeof(cause) / sizeof(cause[0]); ++i)
+		register_exception_handler(cause[i]);
 }
-
+#endif
 
 int main(void)
 {
