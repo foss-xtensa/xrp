@@ -401,7 +401,7 @@ xrp_dsp_standalone_CPPFLAGS = $(dsp_cppflags)
 xrp_dsp_standalone_LDFLAGS = $(dsp_ldflags) \
 			     -Wl,--defsym,xrp_dsp_comm_base_magic=$(DSP_COMM_BASE)
 
-EXTRA_xrp_dsp_standalone_DEPENDENCIES = $(DSP_LSP)
+@BUILD_EXAMPLE_LSP_TRUE@EXTRA_xrp_dsp_standalone_DEPENDENCIES = $(DSP_LSP)
 @BUILD_EXTERNAL_FALSE@xrp_dsp_standalone_LDADD = ../xrp-dsp/libxrp-dsp.a \
 @BUILD_EXTERNAL_FALSE@			   ../xrp-dsp/$(HW_PORT)/libxrp-dsp-hw-$(HW_PORT).a \
 @BUILD_EXTERNAL_FALSE@			   ../xrp-common/libxrp-common.a \
@@ -417,7 +417,7 @@ xrp_dsp_hosted_CPPFLAGS = $(dsp_cppflags)
 xrp_dsp_hosted_LDFLAGS = $(dsp_ldflags) \
 			 -Wl,--defsym,xrp_dsp_comm_base_magic=0x20161006
 
-EXTRA_xrp_dsp_hosted_DEPENDENCIES = $(DSP_LSP)
+@BUILD_EXAMPLE_LSP_TRUE@EXTRA_xrp_dsp_hosted_DEPENDENCIES = $(DSP_LSP)
 @BUILD_EXTERNAL_FALSE@xrp_dsp_hosted_LDADD = ../xrp-dsp/libxrp-dsp.a \
 @BUILD_EXTERNAL_FALSE@		       ../xrp-dsp/$(HW_PORT)/libxrp-dsp-hw-$(HW_PORT).a \
 @BUILD_EXTERNAL_FALSE@		       ../xrp-common/libxrp-common.a \

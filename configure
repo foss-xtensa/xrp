@@ -636,6 +636,8 @@ LIBFDT_LDFLAGS
 LIBFDT_CPPFLAGS
 BUILD_EXTERNAL_FALSE
 BUILD_EXTERNAL_TRUE
+BUILD_EXAMPLE_LSP_FALSE
+BUILD_EXAMPLE_LSP_TRUE
 BUILD_EXAMPLE_FALSE
 BUILD_EXAMPLE_TRUE
 BUILD_SINGLE_FALSE
@@ -776,6 +778,7 @@ enable_standalone
 enable_hosted
 enable_single
 enable_example
+enable_example_lsp
 enable_external
 with_libfdt
 enable_all_simple_ports
@@ -1443,6 +1446,7 @@ Optional Features:
   --enable-hosted         build hosted library/example [detect]
   --enable-single         build single library/example [yes]
   --enable-example        build example application [no]
+  --enable-example-lsp    generate example LSP [detect]
   --enable-external       build example using external libraries [no]
   --enable-all-simple-ports
                           build all simple ports [no]
@@ -5057,6 +5061,27 @@ else
 fi
 
 
+# Check whether --enable-example-lsp was given.
+if test "${enable_example_lsp+set}" = set; then :
+  enableval=$enable_example_lsp; if test "x${enableval}" = xno; then :
+  build_example_lsp=false
+else
+  build_example_lsp=true
+fi
+else
+  build_example_lsp=${DSP_LSP:+false} ;
+	       build_example_lsp=${build_example_lsp:-$build_example}
+fi
+
+ if test x$build_example_lsp = xtrue; then
+  BUILD_EXAMPLE_LSP_TRUE=
+  BUILD_EXAMPLE_LSP_FALSE='#'
+else
+  BUILD_EXAMPLE_LSP_TRUE='#'
+  BUILD_EXAMPLE_LSP_FALSE=
+fi
+
+
 # Check whether --enable-external was given.
 if test "${enable_external+set}" = set; then :
   enableval=$enable_external; if test "x${enableval}" = xno; then :
@@ -5395,6 +5420,17 @@ _ACEOF
 fi
 done
 
+      for ac_func in xtos_set_exception_handler
+do :
+  ac_fn_c_check_func "$LINENO" "xtos_set_exception_handler" "ac_cv_func_xtos_set_exception_handler"
+if test "x$ac_cv_func_xtos_set_exception_handler" = xyes; then :
+  cat >>confdefs.h <<_ACEOF
+#define HAVE_XTOS_SET_EXCEPTION_HANDLER 1
+_ACEOF
+
+fi
+done
+
 
 fi
 
@@ -5657,6 +5693,10 @@ Usually this means the macro was only invoked conditionally." "$LINENO" 5
 fi
 if test -z "${BUILD_EXAMPLE_TRUE}" && test -z "${BUILD_EXAMPLE_FALSE}"; then
   as_fn_error $? "conditional \"BUILD_EXAMPLE\" was never defined.
+Usually this means the macro was only invoked conditionally." "$LINENO" 5
+fi
+if test -z "${BUILD_EXAMPLE_LSP_TRUE}" && test -z "${BUILD_EXAMPLE_LSP_FALSE}"; then
+  as_fn_error $? "conditional \"BUILD_EXAMPLE_LSP\" was never defined.
 Usually this means the macro was only invoked conditionally." "$LINENO" 5
 fi
 if test -z "${BUILD_EXTERNAL_TRUE}" && test -z "${BUILD_EXTERNAL_FALSE}"; then
