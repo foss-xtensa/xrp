@@ -2233,32 +2233,10 @@ MODULE_DEVICE_TABLE(of, xrp_of_match);
 #endif
 
 #ifdef CONFIG_ACPI
-static const struct acpi_device_id xrp_acpi_match[] = {
-	{ "CXRP0001", 0 },
-	{ },
-};
-MODULE_DEVICE_TABLE(acpi, xrp_acpi_match);
-#endif
-
-static int xrp_probe(struct platform_device *pdev)
+static long xrp_acpi_init_v1(struct platform_device *pdev)
 {
-	long ret = -EINVAL;
+	long ret = xrp_init_v1(pdev, 0, &hw_ops, NULL);
 
-#ifdef CONFIG_OF
-	const struct of_device_id *match;
-
-	match = of_match_device(xrp_of_match, &pdev->dev);
-	if (match) {
-		xrp_init_function *init = match->data;
-
-		ret = init(pdev, 0, &hw_ops, NULL);
-		return IS_ERR_VALUE(ret) ? ret : 0;
-	} else {
-		pr_debug("%s: no OF device match found\n", __func__);
-	}
-#endif
-#ifdef CONFIG_ACPI
-	ret = xrp_init_v1(pdev, 0, &hw_ops, NULL);
 	if (!IS_ERR_VALUE(ret)) {
 		struct xrp_address_map_entry *entry;
 		struct xvp *xvp = ERR_PTR(ret);
@@ -2279,6 +2257,49 @@ static int xrp_probe(struct platform_device *pdev)
 				"%s: couldn't find mapping for shared memory\n",
 				__func__);
 			ret = -EINVAL;
+		}
+	}
+	return ret;
+}
+
+static const struct acpi_device_id xrp_acpi_match[] = {
+	{ "CXRP0001", (unsigned long)xrp_acpi_init_v1, },
+	{ },
+};
+MODULE_DEVICE_TABLE(acpi, xrp_acpi_match);
+#endif
+
+static int xrp_probe(struct platform_device *pdev)
+{
+	long ret = -EINVAL;
+
+#ifdef CONFIG_OF
+	{
+		const struct of_device_id *match;
+
+		match = of_match_device(xrp_of_match, &pdev->dev);
+		if (match) {
+			xrp_init_function *init = match->data;
+
+			ret = init(pdev, 0, &hw_ops, NULL);
+			return IS_ERR_VALUE(ret) ? ret : 0;
+		} else {
+			pr_debug("%s: no OF device match found\n", __func__);
+		}
+	}
+#endif
+#ifdef CONFIG_ACPI
+	{
+		const struct acpi_device_id *match;
+
+		match = acpi_match_device(xrp_acpi_match, &pdev->dev);
+		if (match) {
+			xrp_init_function *init = (void *)match->driver_data;
+
+			ret = init(pdev, 0, &hw_ops, NULL);
+			return IS_ERR_VALUE(ret) ? ret : 0;
+		} else {
+			pr_debug("%s: no ACPI device match found\n", __func__);
 		}
 	}
 #endif
