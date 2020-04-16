@@ -92,6 +92,7 @@ static void atomic_set(atomic_t *p, uint32_t v)
 	void *__mptr = (void *)(ptr);					\
 	((type *)(__mptr - offsetof(type, member))); })
 
+#define DEFINE_MUTEX(name) struct mutex name
 #endif
 
 struct xrp_private_pool {
@@ -100,7 +101,12 @@ struct xrp_private_pool {
 	phys_addr_t start;
 	u32 size;
 	struct xrp_allocation *free_list;
+	struct xrp_private_pool *next;
+	u32 ref;
 };
+
+static DEFINE_MUTEX(private_pool_list_lock);
+static struct xrp_private_pool *private_pool_list;
 
 static inline void xrp_pool_lock(struct xrp_private_pool *pool)
 {
@@ -289,8 +295,23 @@ static void xrp_private_free_pool(struct xrp_allocation_pool *pool)
 	struct xrp_private_pool *ppool = container_of(pool,
 						      struct xrp_private_pool,
 						      pool);
-	kfree(ppool->free_list);
-	kfree(ppool);
+	mutex_lock(&private_pool_list_lock);
+	if (ppool->ref == 1) {
+		struct xrp_private_pool **p = &private_pool_list;
+
+		while (*p)
+			if (*p == ppool) {
+				*p = ppool->next;
+				break;
+			} else {
+				p = &(*p)->next;
+			}
+		kfree(ppool->free_list);
+		kfree(ppool);
+	} else {
+		--ppool->ref;
+	}
+	mutex_unlock(&private_pool_list_lock);
 }
 
 static phys_addr_t xrp_private_offset(const struct xrp_allocation *allocation)
@@ -311,30 +332,59 @@ static const struct xrp_allocation_ops xrp_private_pool_ops = {
 long xrp_init_private_pool(struct xrp_allocation_pool **ppool,
 			   phys_addr_t start, u32 size)
 {
-	struct xrp_private_pool *pool = kmalloc(sizeof(*pool), GFP_KERNEL);
-	struct xrp_allocation *allocation = kmalloc(sizeof(*allocation),
-						    GFP_KERNEL);
+	struct xrp_private_pool *pool;
 
-	if (!pool || !allocation) {
-		kfree(pool);
-		kfree(allocation);
-		return -ENOMEM;
+#ifndef __KERNEL__
+	if (private_pool_list == NULL)
+		mutex_init(&private_pool_list_lock);
+#endif
+
+	mutex_lock(&private_pool_list_lock);
+	for (pool = private_pool_list; pool; pool = pool->next) {
+		if (pool->start == start &&
+		    pool->size == size) {
+			++pool->ref;
+			break;
+		}
+		if (start + size > pool->start &&
+		    start < pool->start + pool->size) {
+			mutex_unlock(&private_pool_list_lock);
+			return -EINVAL;
+		}
 	}
 
-	*allocation = (struct xrp_allocation){
-		.pool = &pool->pool,
-		.start = start,
-		.size = size,
-	};
-	*pool = (struct xrp_private_pool){
-		.pool = {
-			.ops = &xrp_private_pool_ops,
-		},
-		.start = start,
-		.size = size,
-		.free_list = allocation,
-	};
-	mutex_init(&pool->free_list_lock);
+	if (!pool) {
+		struct xrp_allocation *allocation = kmalloc(sizeof(*allocation),
+							    GFP_KERNEL);
+
+		pool = kmalloc(sizeof(*pool), GFP_KERNEL);
+		if (!pool || !allocation) {
+			kfree(pool);
+			kfree(allocation);
+			mutex_unlock(&private_pool_list_lock);
+			return -ENOMEM;
+		}
+
+		*allocation = (struct xrp_allocation){
+			.pool = &pool->pool,
+				.start = start,
+				.size = size,
+		};
+		*pool = (struct xrp_private_pool){
+			.pool = {
+				.ops = &xrp_private_pool_ops,
+			},
+			.start = start,
+			.size = size,
+			.free_list = allocation,
+			.next = private_pool_list,
+			.ref = 1,
+		};
+		mutex_init(&pool->free_list_lock);
+		private_pool_list = pool;
+	}
+	mutex_unlock(&private_pool_list_lock);
 	*ppool = &pool->pool;
+
 	return 0;
 }
