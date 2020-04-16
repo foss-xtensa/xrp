@@ -2233,6 +2233,40 @@ MODULE_DEVICE_TABLE(of, xrp_of_match);
 #endif
 
 #ifdef CONFIG_ACPI
+static long xrp_acpi_init_v0(struct platform_device *pdev)
+{
+	long ret = xrp_init(pdev, 0, &hw_ops, NULL);
+
+	if (!IS_ERR_VALUE(ret)) {
+		struct xvp *xvp = ERR_PTR(ret);
+		struct xrp_address_map_entry entry[] = {
+			{
+				.src_addr = xvp->comm_phys,
+				.dst_addr = (u32)xvp->comm_phys,
+				.size = PAGE_SIZE,
+			}, {
+				.src_addr = xvp->pmem,
+				.dst_addr = (u32)xvp->pmem,
+				.size = xvp->shared_size,
+			},
+		};
+
+		/*
+		 * On ACPI system DSP can currently only access
+		 * its communication area and shared memory.
+		 */
+		ret = xrp_set_address_map(&xvp->address_map,
+					  ARRAY_SIZE(entry),
+					  entry);
+		if (ret) {
+			dev_err(xvp->dev,
+				"%s: couldn't set up mapping for shared memory\n",
+				__func__);
+		}
+	}
+	return ret;
+}
+
 static long xrp_acpi_init_v1(struct platform_device *pdev)
 {
 	long ret = xrp_init_v1(pdev, 0, &hw_ops, NULL);
@@ -2261,6 +2295,7 @@ static long xrp_acpi_init_v1(struct platform_device *pdev)
 }
 
 static const struct acpi_device_id xrp_acpi_match[] = {
+	{ "CXRP0000", (unsigned long)xrp_acpi_init_v0, },
 	{ "CXRP0001", (unsigned long)xrp_acpi_init_v1, },
 	{ },
 };
