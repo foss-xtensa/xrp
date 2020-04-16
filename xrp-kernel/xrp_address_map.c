@@ -114,7 +114,7 @@ empty:
 	map->entry = kmalloc(sizeof(*map->entry), GFP_KERNEL);
 	map->entry->src_addr = 0;
 	map->entry->dst_addr = 0;
-	map->entry->size = ~0ul;
+	map->entry->size = (u32)~0ul;
 	return ret;
 }
 
