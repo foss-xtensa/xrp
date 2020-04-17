@@ -2238,25 +2238,23 @@ static long xrp_acpi_init_v1(struct platform_device *pdev)
 	long ret = xrp_init_v1(pdev, 0, &hw_ops, NULL);
 
 	if (!IS_ERR_VALUE(ret)) {
-		struct xrp_address_map_entry *entry;
 		struct xvp *xvp = ERR_PTR(ret);
+		struct xrp_address_map_entry entry = {
+			.src_addr = xvp->comm_phys,
+			.dst_addr = (u32)xvp->comm_phys,
+			.size = (u32)xvp->shared_size + PAGE_SIZE,
+		};
 
-		ret = 0;
 		/*
 		 * On ACPI system DSP can currently only access
 		 * its own shared memory.
 		 */
-		entry = xrp_get_address_mapping(&xvp->address_map,
-						xvp->comm_phys);
-		if (entry) {
-			entry->src_addr = xvp->comm_phys;
-			entry->dst_addr = (u32)xvp->comm_phys;
-			entry->size = (u32)xvp->shared_size + PAGE_SIZE;
-		} else {
+		ret = xrp_set_address_map(&xvp->address_map,
+					  1, &entry);
+		if (ret) {
 			dev_err(xvp->dev,
-				"%s: couldn't find mapping for shared memory\n",
+				"%s: couldn't set up mapping for shared memory\n",
 				__func__);
-			ret = -EINVAL;
 		}
 	}
 	return ret;

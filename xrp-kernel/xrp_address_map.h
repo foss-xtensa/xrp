@@ -47,6 +47,10 @@ struct xrp_address_map {
 int xrp_init_address_map(struct device *dev,
 			 struct xrp_address_map *map);
 
+int xrp_set_address_map(struct xrp_address_map *map,
+			size_t n,
+			const struct xrp_address_map_entry *entry);
+
 void xrp_free_address_map(struct xrp_address_map *map);
 
 struct xrp_address_map_entry *
