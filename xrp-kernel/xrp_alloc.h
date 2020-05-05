@@ -99,10 +99,13 @@ static inline void xrp_allocation_get(struct xrp_allocation *xrp_allocation)
 	atomic_inc(&xrp_allocation->ref);
 }
 
-static inline void xrp_allocation_put(struct xrp_allocation *xrp_allocation)
+static inline int xrp_allocation_put(struct xrp_allocation *xrp_allocation)
 {
-	if (atomic_dec_and_test(&xrp_allocation->ref))
+	if (atomic_dec_and_test(&xrp_allocation->ref)) {
 		xrp_allocation->pool->ops->free(xrp_allocation);
+		return 1;
+	}
+	return 0;
 }
 
 static inline phys_addr_t xrp_allocation_offset(const struct xrp_allocation *allocation)

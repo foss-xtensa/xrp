@@ -135,6 +135,17 @@ static DEFINE_SPINLOCK(xrp_known_files_lock);
 
 static DEFINE_IDA(xvp_nodeid);
 
+static DEFINE_MUTEX(xrp_shared_allocations_lock);
+static DEFINE_HASHTABLE(xrp_shared_allocations, 10);
+
+struct xrp_shared_allocation {
+	unsigned long flags;
+	unsigned long vaddr;
+	unsigned long size;
+	struct xrp_allocation *allocation;
+	struct hlist_node node;
+};
+
 static int xrp_boot_firmware(struct xvp *xvp);
 
 static bool xrp_cacheable(struct xvp *xvp, unsigned long pfn,
@@ -343,6 +354,64 @@ static bool xrp_is_known_file(struct file *filp)
 	}
 	spin_unlock(&xrp_known_files_lock);
 	return ret;
+}
+
+static void xrp_lock_shared_allocations(void)
+{
+	mutex_lock(&xrp_shared_allocations_lock);
+}
+
+static void xrp_unlock_shared_allocations(void)
+{
+	mutex_unlock(&xrp_shared_allocations_lock);
+}
+
+static struct xrp_allocation *xrp_get_shared_allocation(unsigned long flags,
+							unsigned long vaddr,
+							unsigned long size)
+{
+	struct xrp_shared_allocation *p;
+
+	hash_for_each_possible(xrp_shared_allocations, p, node, vaddr ^ size) {
+		if (p->vaddr == vaddr &&
+		    p->size == size) {
+			return p->allocation;
+		}
+	}
+	return NULL;
+}
+
+static long xrp_add_shared_allocation(unsigned long flags,
+				      unsigned long vaddr,
+				      unsigned long size,
+				      struct xrp_allocation *allocation)
+{
+	struct xrp_shared_allocation *p = kmalloc(sizeof(*p), GFP_KERNEL);
+
+	if (!p)
+		return -ENOMEM;
+
+	p->flags = flags;
+	p->vaddr = vaddr;
+	p->size = size;
+	p->allocation = allocation;
+
+	hash_add(xrp_shared_allocations, &p->node, vaddr ^ size);
+	return 0;
+}
+
+static void xrp_remove_shared_allocation(struct xrp_allocation *allocation)
+{
+	struct xrp_shared_allocation *p;
+	unsigned i;
+
+	hash_for_each(xrp_shared_allocations, i, p, node) {
+		if (p->allocation == allocation) {
+			hash_del(&p->node);
+			kfree(p);
+			break;
+		}
+	}
 }
 
 static void xrp_sync_v2(struct xvp *xvp,
@@ -632,7 +701,10 @@ static void xrp_alien_mapping_destroy(struct xrp_alien_mapping *alien_mapping)
 			      PFN_DOWN(alien_mapping->vaddr));
 		break;
 	case ALIEN_COPY:
-		xrp_allocation_put(alien_mapping->allocation);
+		xrp_lock_shared_allocations();
+		if (xrp_allocation_put(alien_mapping->allocation))
+			xrp_remove_shared_allocation(alien_mapping->allocation);
+		xrp_unlock_shared_allocations();
 		break;
 	default:
 		break;
@@ -861,22 +933,41 @@ static long xvp_copy_virt_to_phys(struct xvp_file *xvp_file,
 	struct xrp_allocation *allocation;
 	long rc;
 
-	rc = xrp_allocate(xvp_file->xvp->pool,
-			  size + align, align, &allocation);
-	if (rc < 0)
-		return rc;
+	xrp_lock_shared_allocations();
+	allocation = xrp_get_shared_allocation(flags, vaddr, size);
+	if (allocation) {
+		xrp_allocation_get(allocation);
+		phys = (allocation->start & -align) | offset;
+		if (phys < allocation->start)
+			phys += align;
+	} else {
+		rc = xrp_allocate(xvp_file->xvp->pool,
+				  size + align, align, &allocation);
+		if (rc < 0) {
+			xrp_unlock_shared_allocations();
+			return rc;
+		}
 
-	phys = (allocation->start & -align) | offset;
-	if (phys < allocation->start)
-		phys += align;
+		phys = (allocation->start & -align) | offset;
+		if (phys < allocation->start)
+			phys += align;
 
-	if (flags & XRP_FLAG_READ) {
-		if (xrp_copy_user_to_phys(xvp_file->xvp,
-					  vaddr, size, phys, flags)) {
+		if (flags & XRP_FLAG_READ) {
+			if (xrp_copy_user_to_phys(xvp_file->xvp,
+						  vaddr, size, phys, flags)) {
+				xrp_allocation_put(allocation);
+				xrp_unlock_shared_allocations();
+				return -EFAULT;
+			}
+		}
+		rc = xrp_add_shared_allocation(flags, vaddr, size, allocation);
+		if (rc < 0) {
 			xrp_allocation_put(allocation);
-			return -EFAULT;
+			xrp_unlock_shared_allocations();
+			return rc;
 		}
 	}
+	xrp_unlock_shared_allocations();
 
 	*paddr = phys;
 	*mapping = (struct xrp_alien_mapping){
