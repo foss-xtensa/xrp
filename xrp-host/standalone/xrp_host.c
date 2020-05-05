@@ -103,7 +103,79 @@ struct xrp_request {
 	struct xrp_dsp_buffer *buffer_ptr;
 };
 
+struct xrp_shared_allocation {
+	unsigned long flags;
+	void *vaddr;
+	size_t size;
+	struct xrp_allocation *allocation;
+	struct xrp_shared_allocation *next;
+};
+
+struct xrp_shared_allocation *xrp_shared_allocations;
+xrp_mutex xrp_shared_allocations_lock;
+
 /* Helpers */
+
+static void xrp_lock_shared_allocations(void)
+{
+	xrp_mutex_lock(&xrp_shared_allocations_lock);
+}
+
+static void xrp_unlock_shared_allocations(void)
+{
+	xrp_mutex_unlock(&xrp_shared_allocations_lock);
+}
+
+static struct xrp_shared_allocation *
+xrp_get_shared_allocation(unsigned long flags,
+			  void *vaddr,
+			  unsigned long size)
+{
+	struct xrp_shared_allocation *p;
+
+	(void)flags;
+	for (p = xrp_shared_allocations; p; p = p->next) {
+		if (p->vaddr == vaddr &&
+		    p->size == size)
+			return p;
+	}
+	return NULL;
+}
+
+static struct xrp_shared_allocation *
+xrp_add_shared_allocation(unsigned long flags,
+			  void *vaddr,
+			  unsigned long size,
+			  struct xrp_allocation *allocation)
+{
+	struct xrp_shared_allocation *p = malloc(sizeof(*p));
+
+	if (!p)
+		return NULL;
+
+	p->flags = flags;
+	p->vaddr = vaddr;
+	p->size = size;
+	p->allocation = allocation;
+	p->next = xrp_shared_allocations;
+	xrp_shared_allocations = p;
+
+	return p;
+}
+
+static void xrp_remove_shared_allocation(struct xrp_allocation *p)
+{
+	struct xrp_shared_allocation **pp, *cur;
+
+	for (pp = &xrp_shared_allocations; *pp; pp = &(*pp)->next) {
+		cur = *pp;
+		if (cur->allocation == p) {
+			*pp = cur->next;
+			free(cur);
+			return;
+		}
+	}
+}
 
 static uint32_t getprop_u32(const void *value, int offset)
 {
@@ -537,6 +609,8 @@ static void initialize(void)
 
 		++xrp_device_count;
 	}
+
+	xrp_mutex_init(&xrp_shared_allocations_lock);
 }
 
 /* Device API. */
@@ -667,17 +741,23 @@ static void _xrp_run_command(struct xrp_device *device,
 
 	for (i = 0; i < rq->n_buffers; ++i) {
 		phys_addr_t addr;
+		struct xrp_buffer_group_record *bgr = rq->buffer_group->buffer + i;
 
-		if (rq->buffer_group->buffer[i].buffer->type != XRP_BUFFER_TYPE_DEVICE) {
+		if (bgr->buffer->type != XRP_BUFFER_TYPE_DEVICE) {
 			if (rq->buffer_ptr[i].flags & XRP_DSP_BUFFER_FLAG_WRITE) {
 				addr = rq->user_buffer_allocation[i]->start;
 				if (!(rq->buffer_ptr[i].flags & XRP_DSP_BUFFER_FLAG_READ))
 					VALGRIND_MAKE_MEM_DEFINED(p2v(addr),
-								  rq->buffer_group->buffer[i].buffer->size);
-				memcpy(rq->buffer_group->buffer[i].buffer->ptr, p2v(addr),
-				       rq->buffer_group->buffer[i].buffer->size);
+								  bgr->buffer->size);
+				memcpy(bgr->buffer->ptr, p2v(addr),
+				       bgr->buffer->size);
 			}
-			xrp_free(rq->user_buffer_allocation[i]);
+
+			xrp_lock_shared_allocations();
+			if (xrp_allocation_put(rq->user_buffer_allocation[i])) {
+				xrp_remove_shared_allocation(rq->user_buffer_allocation[i]);
+			}
+			xrp_unlock_shared_allocations();
 		}
 	}
 	if (rq->n_buffers > XRP_DSP_CMD_INLINE_BUFFER_COUNT) {
@@ -783,25 +863,52 @@ void xrp_enqueue_command(struct xrp_queue *queue,
 	rq->user_buffer_allocation = malloc(n_buffers * sizeof(void *));
 	for (i = 0; i < n_buffers; ++i) {
 		phys_addr_t addr;
+		struct xrp_buffer_group_record *bgr = buffer_group->buffer + i;
 
-		if (buffer_group->buffer[i].buffer->type == XRP_BUFFER_TYPE_DEVICE) {
-			addr = buffer_group->buffer[i].buffer->impl.xrp_allocation->start;
+		if (bgr->buffer->type == XRP_BUFFER_TYPE_DEVICE) {
+			addr = bgr->buffer->impl.xrp_allocation->start;
 		} else {
-			long rc = xrp_allocate(device->impl.description->shared_pool,
-					       buffer_group->buffer[i].buffer->size,
-					       0x10, rq->user_buffer_allocation + i);
+			struct xrp_shared_allocation *shared_allocation;
 
-			if (rc < 0) {
-				set_status(status, XRP_STATUS_FAILURE);
-				return;
+			xrp_lock_shared_allocations();
+			shared_allocation =
+				xrp_get_shared_allocation(bgr->access_flags,
+							  bgr->buffer->ptr,
+							  bgr->buffer->size);
+			if (shared_allocation) {
+				rq->user_buffer_allocation[i] = shared_allocation->allocation;
+				xrp_allocation_get(shared_allocation->allocation);
+			} else {
+				long rc = xrp_allocate(device->impl.description->shared_pool,
+						       bgr->buffer->size,
+						       0x10, rq->user_buffer_allocation + i);
+
+				if (rc < 0) {
+					xrp_unlock_shared_allocations();
+					set_status(status, XRP_STATUS_FAILURE);
+					return;
+				}
+				shared_allocation =
+					xrp_add_shared_allocation(bgr->access_flags,
+								  bgr->buffer->ptr,
+								  bgr->buffer->size,
+								  rq->user_buffer_allocation[i]);
+				if (!shared_allocation) {
+					xrp_allocation_put(rq->user_buffer_allocation[i]);
+					xrp_unlock_shared_allocations();
+					set_status(status, XRP_STATUS_FAILURE);
+					return;
+				}
 			}
+			xrp_unlock_shared_allocations();
+
 			addr = rq->user_buffer_allocation[i]->start;
-			memcpy(p2v(addr), buffer_group->buffer[i].buffer->ptr,
-			       buffer_group->buffer[i].buffer->size);
+			memcpy(p2v(addr), bgr->buffer->ptr,
+			       bgr->buffer->size);
 		}
 		rq->buffer_ptr[i] = (struct xrp_dsp_buffer){
-			.flags = buffer_group->buffer[i].access_flags,
-			.size = buffer_group->buffer[i].buffer->size,
+			.flags = bgr->access_flags,
+			.size = bgr->buffer->size,
 			.addr = addr,
 		};
 	}
