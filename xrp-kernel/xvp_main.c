@@ -76,11 +76,21 @@
 #define __io_virt(a) ((void __force *)(a))
 #endif
 
+struct xrp_shared_allocation {
+	unsigned long flags;
+	unsigned long vaddr;
+	unsigned long size;
+	unsigned long mm;
+	struct xrp_allocation *allocation;
+	struct hlist_node node;
+};
+
 struct xrp_alien_mapping {
 	unsigned long vaddr;
 	unsigned long size;
 	phys_addr_t paddr;
-	void *allocation;
+	struct xrp_allocation *allocation;
+	struct xrp_shared_allocation *shared_allocation;
 	enum {
 		ALIEN_GUP,
 		ALIEN_PFN_MAP,
@@ -137,6 +147,9 @@ static DEFINE_HASHTABLE(xrp_known_files, 10);
 static DEFINE_SPINLOCK(xrp_known_files_lock);
 
 static DEFINE_IDA(xvp_nodeid);
+
+static DEFINE_MUTEX(xrp_shared_allocations_lock);
+static DEFINE_HASHTABLE(xrp_shared_allocations, 10);
 
 static int xrp_boot_firmware(struct xvp *xvp);
 
@@ -439,6 +452,65 @@ static bool xrp_is_known_file(struct file *filp)
 	}
 	spin_unlock(&xrp_known_files_lock);
 	return ret;
+}
+
+static void xrp_lock_shared_allocations(void)
+{
+	mutex_lock(&xrp_shared_allocations_lock);
+}
+
+static void xrp_unlock_shared_allocations(void)
+{
+	mutex_unlock(&xrp_shared_allocations_lock);
+}
+
+static struct xrp_shared_allocation *
+xrp_get_shared_allocation(unsigned long flags,
+			  unsigned long vaddr,
+			  unsigned long size)
+{
+	struct xrp_shared_allocation *p;
+	unsigned long mm = (unsigned long)(current->mm);
+
+	hash_for_each_possible(xrp_shared_allocations, p, node, vaddr ^ size ^ mm) {
+		if (p->vaddr == vaddr &&
+		    p->size == size &&
+		    p->mm == mm) {
+			return p;
+		}
+	}
+	return NULL;
+}
+
+static struct xrp_shared_allocation *
+xrp_add_shared_allocation(unsigned long flags,
+			  unsigned long vaddr,
+			  unsigned long size,
+			  struct xrp_allocation *allocation)
+{
+	struct xrp_shared_allocation *p = kmalloc(sizeof(*p), GFP_KERNEL);
+	unsigned long mm = (unsigned long)(current->mm);
+
+	if (!p)
+		return NULL;
+
+	p->flags = flags;
+	p->vaddr = vaddr;
+	p->size = size;
+	p->mm = mm;
+	p->allocation = allocation;
+
+	hash_add(xrp_shared_allocations, &p->node, vaddr ^ size ^ mm);
+	return p;
+}
+
+static void xrp_remove_shared_allocation(struct xrp_shared_allocation *p)
+{
+	WARN_ON(!p);
+	if (p) {
+		hash_del(&p->node);
+		kfree(p);
+	}
 }
 
 static void xrp_sync_v2(struct xvp *xvp,
@@ -746,7 +818,10 @@ static void xrp_alien_mapping_destroy(struct xrp_alien_mapping *alien_mapping)
 			      PFN_DOWN(alien_mapping->vaddr));
 		break;
 	case ALIEN_COPY:
-		xrp_allocation_put(alien_mapping->allocation);
+		xrp_lock_shared_allocations();
+		if (xrp_allocation_put(alien_mapping->allocation))
+			xrp_remove_shared_allocation(alien_mapping->shared_allocation);
+		xrp_unlock_shared_allocations();
 		break;
 	default:
 		break;
@@ -1020,25 +1095,49 @@ static long xvp_copy_virt_to_phys(struct xvp_file *xvp_file,
 	unsigned long align = clamp(vaddr & -vaddr, 16ul, PAGE_SIZE);
 	unsigned long offset = vaddr & (align - 1);
 	struct xrp_allocation *allocation;
+	struct xrp_shared_allocation *shared_allocation;
 	long rc;
 
-	rc = xrp_allocate(xvp_file->xvp->pool,
-			  size + align, align, &allocation);
-	if (rc < 0)
-		return rc;
+	xrp_lock_shared_allocations();
+	shared_allocation = xrp_get_shared_allocation(flags, vaddr, size);
+	if (shared_allocation) {
+		pr_debug("%s: sharing bounce buffer for va: 0x%08lx x 0x%08lx",
+			 __func__, vaddr, size);
+		allocation = shared_allocation->allocation;
+		xrp_allocation_get(allocation);
+		phys = (allocation->start & -align) | offset;
+		if (phys < allocation->start)
+			phys += align;
+	} else {
+		rc = xrp_allocate(xvp_file->xvp->pool,
+				  size + align, align, &allocation);
+		if (rc < 0) {
+			xrp_unlock_shared_allocations();
+			return rc;
+		}
 
-	phys = (allocation->start & -align) | offset;
-	if (phys < allocation->start)
-		phys += align;
+		phys = (allocation->start & -align) | offset;
+		if (phys < allocation->start)
+			phys += align;
 
-	if (flags & XRP_FLAG_READ) {
-		if (xrp_copy_user_to_phys(xvp_file->xvp,
-					  vaddr, size, phys,
-					  flags, user)) {
+		if (flags & XRP_FLAG_READ) {
+			if (xrp_copy_user_to_phys(xvp_file->xvp,
+						  vaddr, size, phys,
+						  flags, user)) {
+				xrp_allocation_put(allocation);
+				xrp_unlock_shared_allocations();
+				return -EFAULT;
+			}
+		}
+		shared_allocation = xrp_add_shared_allocation(flags, vaddr,
+							      size, allocation);
+		if (!shared_allocation) {
 			xrp_allocation_put(allocation);
-			return -EFAULT;
+			xrp_unlock_shared_allocations();
+			return -ENOMEM;
 		}
 	}
+	xrp_unlock_shared_allocations();
 
 	*paddr = phys;
 	*mapping = (struct xrp_alien_mapping){
@@ -1046,6 +1145,7 @@ static long xvp_copy_virt_to_phys(struct xvp_file *xvp_file,
 		.size = size,
 		.paddr = *paddr,
 		.allocation = allocation,
+		.shared_allocation = shared_allocation,
 		.type = ALIEN_COPY,
 	};
 	pr_debug("%s: copying to pa: %pap\n", __func__, paddr);
