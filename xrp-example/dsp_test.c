@@ -143,6 +143,62 @@ static enum xrp_status example_v2_handler(void *handler_context,
 	}
 }
 
+static enum xrp_status example_v3_handler(void *handler_context,
+					  const void *in_data, size_t in_data_size,
+					  void *out_data, size_t out_data_size,
+					  struct xrp_buffer_group *buffer_group)
+{
+	const struct example_v3_cmd *cmd = in_data;
+	struct example_v3_rsp *rsp = out_data;
+	struct xrp_buffer *sbuf, *dbuf;
+	void *src, *dst;
+	volatile uint32_t i;
+
+	(void)handler_context;
+
+	if (in_data_size < sizeof(*cmd) ||
+	    out_data_size < sizeof(*rsp))
+		return XRP_STATUS_FAILURE;
+
+	rsp->code = 0;
+
+	sbuf = xrp_get_buffer_from_group(buffer_group, 0, NULL);
+	dbuf = xrp_get_buffer_from_group(buffer_group, 1, NULL);
+
+	if (!sbuf || !dbuf) {
+		rsp->code = 1;
+		goto out_release;
+	}
+
+	src = xrp_map_buffer(sbuf, cmd->off, cmd->sz, XRP_READ, NULL);
+	dst = xrp_map_buffer(dbuf, cmd->off, cmd->sz, XRP_WRITE, NULL);
+
+	if (!src || !dst) {
+		rsp->code = 2;
+		goto out_unmap;
+	}
+
+	pr_debug("%s: copy %d bytes from %p to %p\n",
+		 __func__, cmd->sz, src, dst);
+	memcpy(dst, src, cmd->sz);
+
+	for (i = 0; i < cmd->timeout; ++i) {
+	}
+
+out_unmap:
+	if (src)
+		xrp_unmap_buffer(sbuf, src, NULL);
+	if (dst)
+		xrp_unmap_buffer(dbuf, dst, NULL);
+out_release:
+	if (sbuf)
+		xrp_release_buffer(sbuf);
+	if (dbuf)
+		xrp_release_buffer(dbuf);
+
+	return XRP_STATUS_SUCCESS;
+}
+
 static enum xrp_status test_ns(struct xrp_device *device)
 {
 	enum xrp_status status;
@@ -200,6 +256,12 @@ void __attribute__((constructor)) dsp_test_register(void)
 				      example_v2_handler, NULL, &status);
 	if (status != XRP_STATUS_SUCCESS) {
 		pr_debug("xrp_register_namespace for XRP_EXAMPLE_V2_NSID failed\n");
+		goto err_release;
+	}
+	xrp_device_register_namespace(device, XRP_EXAMPLE_V3_NSID,
+				      example_v3_handler, NULL, &status);
+	if (status != XRP_STATUS_SUCCESS) {
+		pr_debug("xrp_register_namespace for XRP_EXAMPLE_V3_NSID failed\n");
 		goto err_release;
 	}
 err_release:
