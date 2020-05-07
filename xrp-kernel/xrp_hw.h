@@ -186,6 +186,75 @@ struct xrp_hw_ops {
 	 * \param p: pointer to free
 	 */
 	void (*free_host)(void *hw_arg, void *p);
+
+	/*!
+	 * Copy block of size sz from the kernel address p to the DSP
+	 * allocation at address paddr.
+	 *
+	 * Provide this function when DSP memory is not directly mappable to
+	 * the host address space.
+	 *
+	 * \param hw_arg: opaque parameter passed to xrp_init at initialization
+	 *                time
+	 * \param p: kernel data pointer
+	 * \param sz: size of data block
+	 * \param paddr: address on the DSP side
+	 * \return 0 if ok, negative error code if error
+	 */
+	long (*copy_to_alloc)(void *hw_arg,
+			      const void *p, unsigned long sz,
+			      phys_addr_t paddr);
+	/*!
+	 * Copy block of size sz to the kernel address p from the DSP
+	 * allocation at address paddr.
+	 *
+	 * Provide this function when DSP memory is not directly mappable to
+	 * the host address space.
+	 *
+	 * \param hw_arg: opaque parameter passed to xrp_init at initialization
+	 *                time
+	 * \param p: kernel data pointer
+	 * \param sz: size of data block
+	 * \param paddr: address on the DSP side
+	 * \return 0 if ok, negative error code if error
+	 */
+	long (*copy_from_alloc)(void *hw_arg,
+				void *p, unsigned long sz,
+				phys_addr_t paddr);
+	/*!
+	 * Copy block of size sz from the user address vaddr to the DSP
+	 * allocation at address paddr.
+	 *
+	 * Provide this function when DSP memory is not directly mappable to
+	 * the host address space.
+	 *
+	 * \param hw_arg: opaque parameter passed to xrp_init at initialization
+	 *                time
+	 * \param vaddr: user data pointer
+	 * \param sz: size of data block
+	 * \param paddr: address on the DSP side
+	 * \return 0 if ok, negative error code if error
+	 */
+	long (*copy_to_alloc_user)(void *hw_arg,
+				   unsigned long vaddr, unsigned long sz,
+				   phys_addr_t paddr);
+	/*!
+	 * Copy block of size sz to the user address vaddr from the DSP
+	 * allocation at address paddr.
+	 *
+	 * Provide this function when DSP memory is not directly mappable to
+	 * the host address space.
+	 *
+	 * \param hw_arg: opaque parameter passed to xrp_init at initialization
+	 *                time
+	 * \param vaddr: user data pointer
+	 * \param sz: size of data block
+	 * \param paddr: address on the DSP side
+	 * \return 0 if ok, negative error code if error
+	 */
+	long (*copy_from_alloc_user)(void *hw_arg,
+				     unsigned long vaddr, unsigned long sz,
+				     phys_addr_t paddr);
 };
 
 enum xrp_init_flags {

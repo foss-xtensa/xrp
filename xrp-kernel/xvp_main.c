@@ -254,6 +254,38 @@ static void xrp_free_host(struct xvp *xvp, void *p)
 		kfree(p);
 }
 
+static inline void xrp_copy_from_alloc(struct xvp *xvp,
+				       void *p, unsigned long sz,
+				       phys_addr_t paddr)
+{
+	if (!xvp->direct_mapping)
+		xvp->hw_ops->copy_from_alloc(xvp->hw_arg, p, sz, paddr);
+}
+
+static inline void xrp_comm_copy_from_alloc(struct xvp *xvp,
+					    volatile void __iomem *p,
+					    unsigned long sz)
+{
+	xrp_copy_from_alloc(xvp, (void __force *)p, sz,
+			    xvp->comm_phys + (p - xvp->comm));
+}
+
+static inline void xrp_copy_to_alloc(struct xvp *xvp,
+				     const void *p, unsigned long sz,
+				     phys_addr_t paddr)
+{
+	if (!xvp->direct_mapping)
+		xvp->hw_ops->copy_to_alloc(xvp->hw_arg, p, sz, paddr);
+}
+
+static inline void xrp_comm_copy_to_alloc(struct xvp *xvp,
+					  const volatile void __iomem *p,
+					  unsigned long sz)
+{
+	xrp_copy_to_alloc(xvp, (const void __force *)p, sz,
+			  xvp->comm_phys + (p - xvp->comm));
+}
+
 static inline void xrp_comm_write32(volatile void __iomem *addr, u32 v)
 {
 	__raw_writel(v, addr);
@@ -262,6 +294,20 @@ static inline void xrp_comm_write32(volatile void __iomem *addr, u32 v)
 static inline u32 xrp_comm_read32(volatile void __iomem *addr)
 {
 	return __raw_readl(addr);
+}
+
+static inline void xrp_comm_copy_write32(struct xvp *xvp,
+					 volatile void __iomem *addr, u32 v)
+{
+	xrp_comm_write32(addr, v);
+	xrp_comm_copy_to_alloc(xvp, addr, sizeof(u32));
+}
+
+static inline u32 xrp_comm_copy_read32(struct xvp *xvp,
+				       volatile void __iomem *addr)
+{
+	xrp_comm_copy_from_alloc(xvp, addr, sizeof(u32));
+	return xrp_comm_read32(addr);
 }
 
 static inline void __iomem *xrp_comm_put_tlv(void __iomem **addr,
@@ -468,10 +514,11 @@ static int xrp_synchronize(struct xvp *xvp)
 		goto err;
 	}
 	ret = -ENODEV;
-	xrp_comm_write32(&shared_sync->sync, XRP_DSP_SYNC_START);
+	xrp_comm_copy_write32(xvp, &shared_sync->sync, XRP_DSP_SYNC_START);
+
 	mb();
 	do {
-		v = xrp_comm_read32(&shared_sync->sync);
+		v = xrp_comm_copy_read32(xvp, &shared_sync->sync);
 		if (v != XRP_DSP_SYNC_START)
 			break;
 		if (xrp_panic_check(xvp))
@@ -500,12 +547,14 @@ static int xrp_synchronize(struct xvp *xvp)
 		goto err;
 	}
 
+	xrp_comm_copy_to_alloc(xvp, shared_sync, PAGE_SIZE);
 	mb();
-	xrp_comm_write32(&shared_sync->sync, XRP_DSP_SYNC_HOST_TO_DSP);
+	xrp_comm_copy_write32(xvp, &shared_sync->sync,
+			      XRP_DSP_SYNC_HOST_TO_DSP);
 
 	do {
 		mb();
-		v1 = xrp_comm_read32(&shared_sync->sync);
+		v1 = xrp_comm_copy_read32(xvp, &shared_sync->sync);
 		if (v1 == XRP_DSP_SYNC_DSP_TO_HOST)
 			break;
 		if (xrp_panic_check(xvp))
@@ -518,6 +567,8 @@ static int xrp_synchronize(struct xvp *xvp)
 			"DSP haven't confirmed initialization data reception\n");
 		goto err;
 	}
+
+	xrp_comm_copy_from_alloc(xvp, shared_sync, PAGE_SIZE);
 
 	if (v == XRP_DSP_SYNC_DSP_READY_V2) {
 		ret = xrp_sync_complete_v2(xvp, sz);
@@ -543,7 +594,7 @@ static int xrp_synchronize(struct xvp *xvp)
 	ret = 0;
 err:
 	kfree(hw_sync_data);
-	xrp_comm_write32(&shared_sync->sync, XRP_DSP_SYNC_IDLE);
+	xrp_comm_copy_write32(xvp, &shared_sync->sync, XRP_DSP_SYNC_IDLE);
 	return ret;
 }
 
@@ -552,6 +603,7 @@ static bool xrp_cmd_complete(struct xvp *xvp, struct xrp_comm *xrp_comm)
 	struct xrp_dsp_cmd __iomem *cmd = xrp_comm->comm;
 	u32 flags;
 
+	xrp_comm_copy_from_alloc(xvp, cmd, sizeof(*cmd));
 	flags = xrp_comm_read32(&cmd->flags);
 
 	rmb();
@@ -896,14 +948,36 @@ static long xrp_copy_user_to_phys(struct xvp *xvp,
 				  unsigned long vaddr, unsigned long size,
 				  phys_addr_t paddr, unsigned long flags)
 {
-	return _xrp_copy_user_phys(xvp, vaddr, size, paddr, flags, true);
+	if (!xvp->direct_mapping) {
+		if (segment_eq(get_fs(), KERNEL_DS))
+			return xvp->hw_ops->copy_to_alloc(xvp->hw_arg,
+							  (const void *)vaddr,
+							  size, paddr);
+		else
+			return xvp->hw_ops->copy_to_alloc_user(xvp->hw_arg,
+							       vaddr, size,
+							       paddr);
+	} else {
+		return _xrp_copy_user_phys(xvp, vaddr, size, paddr, flags, true);
+	}
 }
 
 static long xrp_copy_user_from_phys(struct xvp *xvp,
 				    unsigned long vaddr, unsigned long size,
 				    phys_addr_t paddr, unsigned long flags)
 {
-	return _xrp_copy_user_phys(xvp, vaddr, size, paddr, flags, false);
+	if (!xvp->direct_mapping) {
+		if (segment_eq(get_fs(), KERNEL_DS))
+			return xvp->hw_ops->copy_from_alloc(xvp->hw_arg,
+							    (void *)vaddr,
+							    size, paddr);
+		else
+			return xvp->hw_ops->copy_from_alloc_user(xvp->hw_arg,
+								 vaddr, size,
+								 paddr);
+	} else {
+		return _xrp_copy_user_phys(xvp, vaddr, size, paddr, flags, false);
+	}
 }
 
 static long xvp_copy_virt_to_phys(struct xvp_file *xvp_file,
@@ -1592,7 +1666,8 @@ share_err:
 	return ret;
 }
 
-static void xrp_fill_hw_request(struct xrp_dsp_cmd __iomem *cmd,
+static void xrp_fill_hw_request(struct xvp *xvp,
+				struct xrp_dsp_cmd __iomem *cmd,
 				struct xrp_request *rq,
 				const struct xrp_address_map *map)
 {
@@ -1632,11 +1707,12 @@ static void xrp_fill_hw_request(struct xrp_dsp_cmd __iomem *cmd,
 	}
 #endif
 
+	xrp_comm_copy_to_alloc(xvp, cmd, sizeof(*cmd));
 	wmb();
 	/* update flags */
-	xrp_comm_write32(&cmd->flags,
-			 (rq->ioctl_queue.flags & ~XRP_DSP_CMD_FLAG_RESPONSE_VALID) |
-			 XRP_DSP_CMD_FLAG_REQUEST_VALID);
+	xrp_comm_copy_write32(xvp, &cmd->flags,
+			      (rq->ioctl_queue.flags & ~XRP_DSP_CMD_FLAG_RESPONSE_VALID) |
+			      XRP_DSP_CMD_FLAG_REQUEST_VALID);
 }
 
 static long xrp_complete_hw_request(struct xrp_dsp_cmd __iomem *cmd,
@@ -1709,7 +1785,8 @@ retry:
 		if (xvp->off) {
 			ret = -ENODEV;
 		} else {
-			xrp_fill_hw_request(queue->comm, rq, &xvp->address_map);
+			xrp_fill_hw_request(xvp, queue->comm, rq,
+					    &xvp->address_map);
 
 			xrp_send_device_irq(xvp);
 
@@ -1940,7 +2017,8 @@ static int xrp_boot_firmware(struct xvp *xvp)
 		}
 
 		if (loopback < LOOPBACK_NOIO) {
-			xrp_comm_write32(&shared_sync->sync, XRP_DSP_SYNC_IDLE);
+			xrp_comm_copy_write32(xvp, &shared_sync->sync,
+					      XRP_DSP_SYNC_IDLE);
 			mb();
 		}
 	}
@@ -2118,8 +2196,17 @@ static long xrp_init_common(struct platform_device *pdev,
 	xvp->hw_arg = hw_arg;
 	if (init_flags & XRP_INIT_USE_HOST_IRQ)
 		xvp->host_irq_mode = true;
-	if (!(init_flags & XRP_INIT_NO_DIRECT_MAPPING))
+	if (!(init_flags & XRP_INIT_NO_DIRECT_MAPPING)) {
 		xvp->direct_mapping = true;
+	} else {
+		if (WARN_ON(hw_ops->copy_to_alloc == NULL ||
+			    hw_ops->copy_from_alloc == NULL ||
+			    hw_ops->copy_to_alloc_user == NULL ||
+			    hw_ops->copy_from_alloc_user == NULL)) {
+			ret = -EINVAL;
+			goto err;
+		}
+	}
 	platform_set_drvdata(pdev, xvp);
 
 	ret = xrp_init_regs(pdev, xvp);
