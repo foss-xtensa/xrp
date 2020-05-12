@@ -47,3 +47,16 @@ config XRP_HW_HIKEY960
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called xrp_hw_hikey960.
+
+config XRP_HW_PROTIUM_PCIE
+	tristate "XRP for PCIe protium board"
+	depends on XRP
+	help
+	  This is hardware-specific XRP kernel driver for the PCIe protium
+	  hardware. It should be enabled to support XRP on protium platform
+	  with PCIe interface.
+
+	  If unsure, say N.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called xrp_hw_protium_pcie.
