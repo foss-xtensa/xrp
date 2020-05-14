@@ -32,6 +32,7 @@
 #ifndef _XRP_HW
 #define _XRP_HW
 
+#include <linux/elf.h>
 #include <linux/irqreturn.h>
 #include <linux/platform_device.h>
 #include <linux/types.h>
@@ -142,6 +143,24 @@ struct xrp_hw_ops {
 	 * \return whether the core has crashed and needs to be restarted
 	 */
 	bool (*panic_check)(void *hw_arg);
+
+	/*!
+	 * Load firmware segment to the DSP.
+	 *
+	 * Load program segment described by phdr from the firmware image
+	 * pointed to by image to the DSP.
+	 * Provide this function when DSP memory is not directly mappable to
+	 * the host address space and thus memcpy_tohw/memset_hw cannot be
+	 * used.
+	 *
+	 * \param hw_arg: opaque parameter passed to xrp_init at initialization
+	 *                time
+	 * \param image: binary image of the firmware
+	 * \param phdr: program header of a segment to be loaded
+	 */
+	long (*load_fw_segment)(void *hw_arg,
+				const void *image,
+				Elf32_Phdr *phdr);
 };
 
 enum xrp_init_flags {

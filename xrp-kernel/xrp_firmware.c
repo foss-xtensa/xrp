@@ -141,6 +141,26 @@ static int xrp_load_segment_to_iomem(struct xvp *xvp, Elf32_Phdr *phdr)
 	return 0;
 }
 
+static int xrp_load_segment(struct xvp *xvp, Elf32_Phdr *phdr)
+{
+	phys_addr_t pa;
+
+	pa = xrp_translate_to_cpu(xvp, phdr);
+	if (pa == (phys_addr_t)OF_BAD_ADDR) {
+		dev_err(xvp->dev,
+			"device address 0x%08x could not be mapped to host physical address",
+			(u32)phdr->p_paddr);
+		return -EINVAL;
+	}
+	dev_dbg(xvp->dev, "loading segment (device 0x%08x) to physical %pap\n",
+		(u32)phdr->p_paddr, &pa);
+
+	if (pfn_valid(__phys_to_pfn(pa)))
+		return xrp_load_segment_to_sysmem(xvp, phdr);
+	else
+		return xrp_load_segment_to_iomem(xvp, phdr);
+}
+
 static inline bool xrp_section_bad(struct xvp *xvp, const Elf32_Shdr *shdr)
 {
 	return shdr->sh_offset > xvp->firmware->size ||
@@ -337,7 +357,6 @@ static int xrp_load_firmware(struct xvp *xvp)
 	for (i = 0; i < ehdr->e_phnum; ++i) {
 		Elf32_Phdr *phdr = (void *)xvp->firmware->data +
 			ehdr->e_phoff + i * ehdr->e_phentsize;
-		phys_addr_t pa;
 		int rc;
 
 		/* Only load non-empty loadable segments, R/W/X */
@@ -354,25 +373,18 @@ static int xrp_load_firmware(struct xvp *xvp)
 			return -EINVAL;
 		}
 
-		pa = xrp_translate_to_cpu(xvp, phdr);
-		if (pa == (phys_addr_t)OF_BAD_ADDR) {
-			dev_err(xvp->dev,
-				"device address 0x%08x could not be mapped to host physical address",
-				(u32)phdr->p_paddr);
-			return -EINVAL;
-		}
-		dev_dbg(xvp->dev, "loading segment %d (device 0x%08x) to physical %pap\n",
-			i, (u32)phdr->p_paddr, &pa);
+		dev_dbg(xvp->dev, "loading segment %d\n", i);
 
-		if (pfn_valid(__phys_to_pfn(pa)))
-			rc = xrp_load_segment_to_sysmem(xvp, phdr);
+		if (xvp->hw_ops->load_fw_segment)
+			rc = xvp->hw_ops->load_fw_segment(xvp->hw_arg,
+							  (const void *)xvp->firmware->data,
+							  phdr);
 		else
-			rc = xrp_load_segment_to_iomem(xvp, phdr);
+			rc = xrp_load_segment(xvp, phdr);
 
 		if (rc < 0)
 			return rc;
 	}
-
 	return 0;
 }
 
