@@ -106,6 +106,7 @@ void xrp_impl_release_device_buffer(struct xrp_buffer *buffer)
 {
 	struct xrp_ioctl_alloc ioctl_alloc = {
 		.addr = (uintptr_t)buffer->ptr,
+		.size = buffer->size,
 	};
 	ioctl(buffer->device->impl.fd,
 	      XRP_IOCTL_FREE, &ioctl_alloc);

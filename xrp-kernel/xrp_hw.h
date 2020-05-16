@@ -191,6 +191,9 @@ struct xrp_hw_ops {
 enum xrp_init_flags {
 	/*! Use interrupts in DSP->host communication */
 	XRP_INIT_USE_HOST_IRQ = 0x1,
+
+	/*! DSP memory cannot be mapped directly to host address space */
+	XRP_INIT_NO_DIRECT_MAPPING = 0x2,
 };
 
 /*!

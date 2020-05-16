@@ -637,18 +637,28 @@ static long xrp_ioctl_alloc(struct file *filp,
 	pr_debug("%s: size = %d, align = %x\n", __func__,
 		 xrp_ioctl_alloc.size, xrp_ioctl_alloc.align);
 
-	err = xrp_allocate(xvp_file->xvp->pool,
-			   xrp_ioctl_alloc.size,
-			   xrp_ioctl_alloc.align,
-			   &xrp_allocation);
-	if (err)
-		return err;
+	if (xvp_file->xvp->direct_mapping) {
+		err = xrp_allocate(xvp_file->xvp->pool,
+				   xrp_ioctl_alloc.size,
+				   xrp_ioctl_alloc.align,
+				   &xrp_allocation);
+		if (err)
+			return err;
 
-	xrp_allocation_queue(xvp_file, xrp_allocation);
+		xrp_allocation_queue(xvp_file, xrp_allocation);
 
-	vaddr = vm_mmap(filp, 0, xrp_allocation->size,
-			PROT_READ | PROT_WRITE, MAP_SHARED,
-			xrp_allocation_offset(xrp_allocation));
+		vaddr = vm_mmap(filp, 0, xrp_allocation->size,
+				PROT_READ | PROT_WRITE, MAP_SHARED,
+				xrp_allocation_offset(xrp_allocation));
+	} else {
+		vaddr = vm_mmap(NULL, 0, xrp_ioctl_alloc.size,
+				PROT_READ | PROT_WRITE,
+				MAP_SHARED | MAP_ANONYMOUS, 0);
+	}
+
+	if (IS_ERR((void *)vaddr)) {
+		return PTR_ERR((void *)vaddr);
+	}
 
 	xrp_ioctl_alloc.addr = vaddr;
 
@@ -977,7 +987,8 @@ static long xrp_share_kernel(struct file *filp,
 	long err = 0;
 
 	pr_debug("%s: sharing kernel-only buffer: %pap\n", __func__, &phys);
-	if (xrp_translate_to_dsp(&xvp->address_map, phys) ==
+	if (!xvp->direct_mapping ||
+	    xrp_translate_to_dsp(&xvp->address_map, phys) ==
 	    XRP_NO_TRANSLATION) {
 		mm_segment_t oldfs = get_fs();
 
@@ -1025,10 +1036,14 @@ static long __xrp_share_block(struct file *filp,
 	struct xvp_file *xvp_file = filp->private_data;
 	struct xvp *xvp = xvp_file->xvp;
 	struct mm_struct *mm = current->mm;
-	struct vm_area_struct *vma = find_vma(mm, virt);
+	struct vm_area_struct *vma;
 	bool do_cache = true;
 	long rc = -EINVAL;
 
+	if (!xvp->direct_mapping)
+		goto no_direct_mapping;
+
+	vma = find_vma(mm, virt);
 	if (!vma) {
 		pr_debug("%s: no vma for vaddr/size = 0x%08lx/0x%08lx\n",
 			 __func__, virt, size);
@@ -1146,6 +1161,8 @@ static long __xrp_share_block(struct file *filp,
 		 * If we couldn't share try to make a shadow copy.
 		 */
 		if (rc < 0) {
+no_direct_mapping:
+			alien_mapping = &mapping->alien_mapping;
 			rc = xvp_copy_virt_to_phys(xvp_file, flags,
 						   virt, size, &phys,
 						   alien_mapping);
@@ -1274,10 +1291,12 @@ static long __xrp_unshare_block(struct file *filp, struct xrp_mapping *mapping,
 static long xrp_ioctl_free(struct file *filp,
 			   struct xrp_ioctl_alloc __user *p)
 {
+	struct xvp_file *xvp_file = filp->private_data;
 	struct mm_struct *mm = current->mm;
 	struct xrp_ioctl_alloc xrp_ioctl_alloc;
 	struct vm_area_struct *vma;
 	unsigned long start;
+	size_t size;
 
 	pr_debug("%s: %p\n", __func__, p);
 	if (copy_from_user(&xrp_ioctl_alloc, p, sizeof(*p)))
@@ -1286,23 +1305,26 @@ static long xrp_ioctl_free(struct file *filp,
 	start = xrp_ioctl_alloc.addr;
 	pr_debug("%s: virt_addr = 0x%08lx\n", __func__, start);
 
-	down_read(&mm->mmap_sem);
-	vma = find_vma(mm, start);
+	if (xvp_file->xvp->direct_mapping) {
+		down_read(&mm->mmap_sem);
+		vma = find_vma(mm, start);
 
-	if (vma && vma->vm_file == filp &&
-	    vma->vm_start <= start && start < vma->vm_end) {
-		size_t size;
-
-		start = vma->vm_start;
-		size = vma->vm_end - vma->vm_start;
+		if (vma && vma->vm_file == filp &&
+		    vma->vm_start <= start && start < vma->vm_end) {
+			start = vma->vm_start;
+			size = vma->vm_end - vma->vm_start;
+			up_read(&mm->mmap_sem);
+			pr_debug("%s: 0x%lx x %zu\n", __func__, start, size);
+			return vm_munmap(start, size);
+		}
+		pr_debug("%s: no vma/bad vma for vaddr = 0x%08lx\n", __func__, start);
 		up_read(&mm->mmap_sem);
-		pr_debug("%s: 0x%lx x %zu\n", __func__, start, size);
+
+		return -EINVAL;
+	} else {
+		size = xrp_ioctl_alloc.size;
 		return vm_munmap(start, size);
 	}
-	pr_debug("%s: no vma/bad vma for vaddr = 0x%08lx\n", __func__, start);
-	up_read(&mm->mmap_sem);
-
-	return -EINVAL;
 }
 
 static long xvp_complete_cmd_irq(struct xvp *xvp, struct xrp_comm *comm,
@@ -2000,7 +2022,10 @@ static int xrp_init_regs_v0(struct platform_device *pdev, struct xvp *xvp)
 		return -ENODEV;
 
 	xvp->comm_phys = mem->start;
-	xvp->comm = devm_ioremap_resource(&pdev->dev, mem);
+	if (xvp->direct_mapping)
+		xvp->comm = devm_ioremap_resource(&pdev->dev, mem);
+	else
+		xvp->comm = xrp_alloc_host(xvp, resource_size(mem));
 
 	mem = platform_get_resource(pdev, IORESOURCE_MEM, 2);
 	if (!mem)
@@ -2034,7 +2059,10 @@ static int xrp_init_regs_v1(struct platform_device *pdev, struct xvp *xvp)
 
 	r = *mem;
 	r.end = r.start + PAGE_SIZE;
-	xvp->comm = devm_ioremap_resource(&pdev->dev, &r);
+	if (xvp->direct_mapping)
+		xvp->comm = devm_ioremap_resource(&pdev->dev, &r);
+	else
+		xvp->comm = xrp_alloc_host(xvp, PAGE_SIZE);
 	return xrp_init_private_pool(&xvp->pool, xvp->pmem,
 				     xvp->shared_size);
 }
@@ -2090,6 +2118,8 @@ static long xrp_init_common(struct platform_device *pdev,
 	xvp->hw_arg = hw_arg;
 	if (init_flags & XRP_INIT_USE_HOST_IRQ)
 		xvp->host_irq_mode = true;
+	if (!(init_flags & XRP_INIT_NO_DIRECT_MAPPING))
+		xvp->direct_mapping = true;
 	platform_set_drvdata(pdev, xvp);
 
 	ret = xrp_init_regs(pdev, xvp);
@@ -2198,10 +2228,11 @@ err_free_map:
 	xrp_free_address_map(&xvp->address_map);
 err_free_pool:
 	xrp_free_pool(xvp->pool);
-	if (xvp->comm_phys && !xvp->pmem) {
+	if (!xvp->direct_mapping)
+		xrp_free_host(xvp, xvp->comm);
+	else if (xvp->comm_phys && !xvp->pmem)
 		dma_free_attrs(xvp->dev, PAGE_SIZE, xvp->comm,
 			       phys_to_dma(xvp->dev, xvp->comm_phys), 0);
-	}
 err:
 	dev_err(&pdev->dev, "%s: ret = %ld\n", __func__, ret);
 	return ret;
@@ -2246,10 +2277,11 @@ int xrp_deinit(struct platform_device *pdev)
 	misc_deregister(&xvp->miscdev);
 	xrp_release_firmware(xvp);
 	xrp_free_pool(xvp->pool);
-	if (xvp->comm_phys && !xvp->pmem) {
+	if (!xvp->direct_mapping)
+		xrp_free_host(xvp, xvp->comm);
+	else if (xvp->comm_phys && !xvp->pmem)
 		dma_free_attrs(xvp->dev, PAGE_SIZE, xvp->comm,
 			       phys_to_dma(xvp->dev, xvp->comm_phys), 0);
-	}
 	xrp_free_address_map(&xvp->address_map);
 	ida_simple_remove(&xvp_nodeid, xvp->nodeid);
 	return 0;

@@ -73,6 +73,7 @@ struct xvp {
 	struct xrp_allocation_pool *pool;
 	bool off;
 	int nodeid;
+	bool direct_mapping;
 };
 
 #endif
