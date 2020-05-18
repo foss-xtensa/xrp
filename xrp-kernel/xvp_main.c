@@ -502,10 +502,12 @@ err:
 	return ret;
 }
 
-static bool xrp_cmd_complete(struct xrp_comm *xvp)
+static bool xrp_cmd_complete(struct xvp *xvp, struct xrp_comm *xrp_comm)
 {
-	struct xrp_dsp_cmd __iomem *cmd = xvp->comm;
-	u32 flags = xrp_comm_read32(&cmd->flags);
+	struct xrp_dsp_cmd __iomem *cmd = xrp_comm->comm;
+	u32 flags;
+
+	flags = xrp_comm_read32(&cmd->flags);
 
 	rmb();
 	return (flags & (XRP_DSP_CMD_FLAG_REQUEST_VALID |
@@ -523,7 +525,7 @@ irqreturn_t xrp_irq_handler(int irq, struct xvp *xvp)
 		return IRQ_NONE;
 
 	for (i = 0; i < xvp->n_queues; ++i) {
-		if (xrp_cmd_complete(xvp->queue + i)) {
+		if (xrp_cmd_complete(xvp, xvp->queue + i)) {
 			dev_dbg(xvp->dev, "  completing queue %d\n", i);
 			complete(&xvp->queue[i].completion);
 			++n;
@@ -1259,18 +1261,19 @@ static long xrp_ioctl_free(struct file *filp,
 }
 
 static long xvp_complete_cmd_irq(struct xvp *xvp, struct xrp_comm *comm,
-				 bool (*cmd_complete)(struct xrp_comm *p))
+				 bool (*cmd_complete)(struct xvp *xvp,
+						      struct xrp_comm *p))
 {
 	long timeout = firmware_command_timeout * HZ;
 
-	if (cmd_complete(comm))
+	if (cmd_complete(xvp, comm))
 		return 0;
 	if (xrp_panic_check(xvp))
 		return -EBUSY;
 	do {
 		timeout = wait_for_completion_interruptible_timeout(&comm->completion,
 								    timeout);
-		if (cmd_complete(comm))
+		if (cmd_complete(xvp, comm))
 			return 0;
 		if (xrp_panic_check(xvp))
 			return -EBUSY;
@@ -1282,12 +1285,13 @@ static long xvp_complete_cmd_irq(struct xvp *xvp, struct xrp_comm *comm,
 }
 
 static long xvp_complete_cmd_poll(struct xvp *xvp, struct xrp_comm *comm,
-				  bool (*cmd_complete)(struct xrp_comm *p))
+				  bool (*cmd_complete)(struct xvp *xvp,
+						       struct xrp_comm *p))
 {
 	unsigned long deadline = jiffies + firmware_command_timeout * HZ;
 
 	do {
-		if (cmd_complete(comm))
+		if (cmd_complete(xvp, comm))
 			return 0;
 		if (xrp_panic_check(xvp))
 			return -EBUSY;
