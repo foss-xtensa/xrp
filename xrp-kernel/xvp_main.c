@@ -49,7 +49,9 @@
 #include <linux/of.h>
 #include <linux/of_address.h>
 #include <linux/of_device.h>
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 12, 0)
 #include <linux/of_reserved_mem.h>
+#endif
 #include <linux/platform_device.h>
 #include <linux/pm_runtime.h>
 #include <linux/property.h>
@@ -59,6 +61,7 @@
 #include <asm/mman.h>
 #include <asm/uaccess.h>
 #include "xrp_cma_alloc.h"
+#include "xrp_compat.h"
 #include "xrp_firmware.h"
 #include "xrp_hw.h"
 #include "xrp_internal.h"
@@ -136,6 +139,32 @@ static DEFINE_SPINLOCK(xrp_known_files_lock);
 static DEFINE_IDA(xvp_nodeid);
 
 static int xrp_boot_firmware(struct xvp *xvp);
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 12, 0)
+#define of_reserved_mem_device_init(dev) 0
+#endif
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 13, 0)
+#define devm_kmalloc devm_kzalloc
+#endif
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 15, 0)
+#define devm_kstrdup xrp_devm_kstrdup
+static char *xrp_devm_kstrdup(struct device *dev, const char *s, gfp_t gfp)
+{
+       size_t size;
+       char *buf;
+
+       if (!s)
+               return NULL;
+
+       size = strlen(s) + 1;
+       buf = devm_kmalloc(dev, size, gfp);
+       if (buf)
+               memcpy(buf, s, size);
+       return buf;
+}
+#endif
 
 static bool xrp_cacheable(struct xvp *xvp, unsigned long pfn,
 			  unsigned long n_pages)

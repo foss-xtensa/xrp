@@ -34,6 +34,7 @@
 #include <linux/of.h>
 #include <linux/of_address.h>
 #include "xrp_address_map.h"
+#include "xrp_compat.h"
 #include "xrp_hw.h"
 #include "xrp_internal.h"
 #include "xrp_firmware.h"
