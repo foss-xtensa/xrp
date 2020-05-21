@@ -25,7 +25,7 @@
 #
 
 xrp-y += xvp_main.o xrp_address_map.o xrp_alloc.o
-xrp-$(CONFIG_OF) += xrp_firmware.o
+xrp-$(CONFIG_FW_LOADER) += xrp_firmware.o
 xrp-$(CONFIG_CMA) += xrp_cma_alloc.o
 
 obj-$(CONFIG_XRP) += xrp.o

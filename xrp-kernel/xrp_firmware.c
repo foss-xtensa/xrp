@@ -39,8 +39,13 @@
 #include "xrp_firmware.h"
 #include "xrp_kernel_dsp_interface.h"
 
+#ifndef OF_BAD_ADDR
+#define OF_BAD_ADDR (-1ul)
+#endif
+
 static phys_addr_t xrp_translate_to_cpu(struct xvp *xvp, Elf32_Phdr *phdr)
 {
+#if IS_ENABLED(CONFIG_OF)
 	phys_addr_t res;
 	__be32 addr = cpu_to_be32((u32)phdr->p_paddr);
 	struct device_node *node =
@@ -54,6 +59,9 @@ static phys_addr_t xrp_translate_to_cpu(struct xvp *xvp, Elf32_Phdr *phdr)
 	if (node != xvp->dev->of_node)
 		of_node_put(node);
 	return res;
+#else
+	return phdr->p_paddr;
+#endif
 }
 
 static int xrp_load_segment_to_sysmem(struct xvp *xvp, Elf32_Phdr *phdr)
