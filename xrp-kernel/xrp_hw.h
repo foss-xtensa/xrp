@@ -161,6 +161,31 @@ struct xrp_hw_ops {
 	long (*load_fw_segment)(void *hw_arg,
 				const void *image,
 				Elf32_Phdr *phdr);
+
+	/*!
+	 * Allocate host memory suitable for DMA to/from device.
+	 *
+	 * Provide this function when DSP memory is not directly mappable to
+	 * the host address space.
+	 *
+	 * \param hw_arg: opaque parameter passed to xrp_init at initialization
+	 *                time
+	 * \param sz: amount of memory to allocate
+	 * \return pointer to allocated memory or NULL in case of error
+	 */
+	void *(*alloc_host)(void *hw_arg, size_t sz);
+
+	/*!
+	 * Free host memory allocated with alloc_host.
+	 *
+	 * Provide this function when DSP memory is not directly mappable to
+	 * the host address space.
+	 *
+	 * \param hw_arg: opaque parameter passed to xrp_init at initialization
+	 *                time
+	 * \param p: pointer to free
+	 */
+	void (*free_host)(void *hw_arg, void *p);
 };
 
 enum xrp_init_flags {

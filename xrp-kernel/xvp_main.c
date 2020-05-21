@@ -209,6 +209,22 @@ static void xrp_dma_sync_for_cpu(struct xvp *xvp,
 		xrp_default_dma_sync_for_cpu(xvp, phys, size, flags);
 }
 
+static void *xrp_alloc_host(struct xvp *xvp, size_t sz)
+{
+	if (xvp->hw_ops->alloc_host)
+		return xvp->hw_ops->alloc_host(xvp->hw_arg, sz);
+	else
+		return kmalloc(sz, GFP_KERNEL);
+}
+
+static void xrp_free_host(struct xvp *xvp, void *p)
+{
+	if (xvp->hw_ops->free_host)
+		xvp->hw_ops->free_host(xvp->hw_arg, p);
+	else
+		kfree(p);
+}
+
 static inline void xrp_comm_write32(volatile void __iomem *addr, u32 v)
 {
 	__raw_writel(v, addr);
@@ -1326,6 +1342,8 @@ struct xrp_request {
 
 static void xrp_unmap_request_nowb(struct file *filp, struct xrp_request *rq)
 {
+	struct xvp_file *xvp_file = filp->private_data;
+	struct xvp *xvp = xvp_file->xvp;
 	size_t n_buffers = rq->n_buffers;
 	size_t i;
 
@@ -1341,13 +1359,15 @@ static void xrp_unmap_request_nowb(struct file *filp, struct xrp_request *rq)
 	if (n_buffers) {
 		kfree(rq->buffer_mapping);
 		if (n_buffers > XRP_DSP_CMD_INLINE_BUFFER_COUNT) {
-			kfree(rq->dsp_buffer);
+			xrp_free_host(xvp, rq->dsp_buffer);
 		}
 	}
 }
 
 static long xrp_unmap_request(struct file *filp, struct xrp_request *rq)
 {
+	struct xvp_file *xvp_file = filp->private_data;
+	struct xvp *xvp = xvp_file->xvp;
 	size_t n_buffers = rq->n_buffers;
 	size_t i;
 	long ret = 0;
@@ -1391,7 +1411,7 @@ static long xrp_unmap_request(struct file *filp, struct xrp_request *rq)
 	if (n_buffers) {
 		kfree(rq->buffer_mapping);
 		if (n_buffers > XRP_DSP_CMD_INLINE_BUFFER_COUNT) {
-			kfree(rq->dsp_buffer);
+			xrp_free_host(xvp, rq->dsp_buffer);
 		}
 		rq->n_buffers = 0;
 	}
@@ -1425,8 +1445,8 @@ static long xrp_map_request(struct file *filp, struct xrp_request *rq,
 				GFP_KERNEL);
 		if (n_buffers > XRP_DSP_CMD_INLINE_BUFFER_COUNT) {
 			rq->dsp_buffer =
-				kmalloc(n_buffers * sizeof(*rq->dsp_buffer),
-					GFP_KERNEL);
+				xrp_alloc_host(xvp,
+					       n_buffers * sizeof(*rq->dsp_buffer));
 			if (!rq->dsp_buffer) {
 				kfree(rq->buffer_mapping);
 				return -ENOMEM;
@@ -1590,17 +1610,24 @@ static long xrp_ioctl_submit_sync(struct file *filp,
 	struct xvp_file *xvp_file = filp->private_data;
 	struct xvp *xvp = xvp_file->xvp;
 	struct xrp_comm *queue = xvp->queue;
-	struct xrp_request xrp_rq, *rq = &xrp_rq;
+	struct xrp_request *rq;
 	long ret = 0;
 	bool went_off = false;
 
-	if (copy_from_user(&rq->ioctl_queue, p, sizeof(*p)))
-		return -EFAULT;
+	rq = xrp_alloc_host(xvp, sizeof(struct xrp_request));
+	if (!rq)
+		return -ENOMEM;
+
+	if (copy_from_user(&rq->ioctl_queue, p, sizeof(*p))) {
+		ret =-EFAULT;
+		goto err;
+	}
 
 	if (rq->ioctl_queue.flags & ~XRP_QUEUE_VALID_FLAGS) {
 		dev_dbg(xvp->dev, "%s: invalid flags 0x%08x\n",
 			__func__, rq->ioctl_queue.flags);
-		return -EINVAL;
+		ret = -EINVAL;
+		goto err;
 	}
 
 	if (xvp->n_queues > 1) {
@@ -1616,7 +1643,7 @@ static long xrp_ioctl_submit_sync(struct file *filp,
 
 	ret = xrp_map_request(filp, rq, current->mm);
 	if (ret < 0)
-		return ret;
+		goto err;
 
 	if (loopback < LOOPBACK_NOIO) {
 		int reboot_cycle;
@@ -1685,6 +1712,8 @@ retry:
 	 * going on with the DSP; the DSP may still be reading and writing
 	 * this memory.
 	 */
+err:
+	xrp_free_host(xvp, rq);
 
 	return ret;
 }
