@@ -33,11 +33,16 @@ struct xvp;
 
 #if IS_ENABLED(CONFIG_FW_LOADER)
 int xrp_request_firmware(struct xvp *xvp);
+void xrp_release_firmware(struct xvp *xvp);
 #else
-int xrp_request_firmware(struct xvp *xvp)
+static inline int xrp_request_firmware(struct xvp *xvp)
 {
 	(void)xvp;
 	return -EINVAL;
+}
+
+static inline void xrp_release_firmware(struct xvp *xvp)
+{
 }
 #endif
 

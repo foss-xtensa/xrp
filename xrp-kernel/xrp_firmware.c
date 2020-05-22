@@ -298,10 +298,9 @@ static int xrp_firmware_fixup_symbol(struct xvp *xvp, const char *name,
 	return 0;
 }
 
-static int xrp_load_firmware(struct xvp *xvp)
+static int xrp_prepare_firmware(struct xvp *xvp)
 {
 	Elf32_Ehdr *ehdr = (Elf32_Ehdr *)xvp->firmware->data;
-	int i;
 
 	if (memcmp(ehdr->e_ident, ELFMAG, SELFMAG)) {
 		dev_err(xvp->dev, "bad firmware ELF magic\n");
@@ -325,9 +324,15 @@ static int xrp_load_firmware(struct xvp *xvp)
 		return -EINVAL;
 	}
 
-	xrp_firmware_fixup_symbol(xvp, "xrp_dsp_comm_base",
-				  xrp_translate_to_dsp(&xvp->address_map,
-						       xvp->comm_phys));
+	return xrp_firmware_fixup_symbol(xvp, "xrp_dsp_comm_base",
+					 xrp_translate_to_dsp(&xvp->address_map,
+							      xvp->comm_phys));
+}
+
+static int xrp_load_firmware(struct xvp *xvp)
+{
+	Elf32_Ehdr *ehdr = (Elf32_Ehdr *)xvp->firmware->data;
+	int i;
 
 	for (i = 0; i < ehdr->e_phnum; ++i) {
 		Elf32_Phdr *phdr = (void *)xvp->firmware->data +
@@ -373,15 +378,30 @@ static int xrp_load_firmware(struct xvp *xvp)
 
 int xrp_request_firmware(struct xvp *xvp)
 {
-	int ret = request_firmware(&xvp->firmware, xvp->firmware_name,
-				   xvp->dev);
+	int ret;
 
-	if (ret < 0)
-		return ret;
+	if (!xvp->firmware) {
+		ret = request_firmware(&xvp->firmware, xvp->firmware_name,
+				       xvp->dev);
+		if (ret < 0)
+			return ret;
+
+		ret = xrp_prepare_firmware(xvp);
+		if (ret < 0)
+			goto err;
+	}
 
 	ret = xrp_load_firmware(xvp);
-	if (ret < 0) {
-		release_firmware(xvp->firmware);
-	}
+err:
+	if (ret < 0)
+		xrp_release_firmware(xvp);
 	return ret;
+}
+
+void xrp_release_firmware(struct xvp *xvp)
+{
+	if (xvp->firmware) {
+		release_firmware(xvp->firmware);
+		xvp->firmware = NULL;
+	}
 }

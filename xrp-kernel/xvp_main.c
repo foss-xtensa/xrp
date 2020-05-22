@@ -2182,7 +2182,7 @@ int xrp_deinit(struct platform_device *pdev)
 		xrp_runtime_suspend(xvp->dev);
 
 	misc_deregister(&xvp->miscdev);
-	release_firmware(xvp->firmware);
+	xrp_release_firmware(xvp);
 	xrp_free_pool(xvp->pool);
 	if (xvp->comm_phys && !xvp->pmem) {
 		dma_free_attrs(xvp->dev, PAGE_SIZE, xvp->comm,
