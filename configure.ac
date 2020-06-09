@@ -146,6 +146,16 @@ AC_ARG_ENABLE(example,
 	      [build_example=false])
 AM_CONDITIONAL([BUILD_EXAMPLE], [test x$build_example = xtrue])
 
+AC_ARG_ENABLE(example-lsp,
+	      [AS_HELP_STRING([--enable-example-lsp],
+			      [generate example LSP [detect]])],
+	      [AS_IF([test "x${enableval}" = xno],
+		     [build_example_lsp=false],
+		     [build_example_lsp=true])],
+	      [build_example_lsp=${DSP_LSP:+false} ;
+	       build_example_lsp=${build_example_lsp:-$build_example}])
+AM_CONDITIONAL([BUILD_EXAMPLE_LSP], [test x$build_example_lsp = xtrue])
+
 AC_ARG_ENABLE(external,
 	      [AS_HELP_STRING([--enable-external],
 			      [build example using external libraries [no]])],

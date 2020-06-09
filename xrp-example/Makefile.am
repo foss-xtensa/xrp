@@ -69,7 +69,9 @@ xrp_dsp_standalone_SOURCES = dsp_main.c dsp_test.c
 xrp_dsp_standalone_CPPFLAGS = $(dsp_cppflags)
 xrp_dsp_standalone_LDFLAGS = $(dsp_ldflags) \
 			     -Wl,--defsym,xrp_dsp_comm_base_magic=$(DSP_COMM_BASE)
+if BUILD_EXAMPLE_LSP
 EXTRA_xrp_dsp_standalone_DEPENDENCIES = $(DSP_LSP)
+endif
 
 if BUILD_EXTERNAL
 xrp_dsp_standalone_LDADD = -lxrp-dsp \
@@ -87,7 +89,9 @@ xrp_dsp_hosted_SOURCES = dsp_main.c dsp_test.c
 xrp_dsp_hosted_CPPFLAGS = $(dsp_cppflags)
 xrp_dsp_hosted_LDFLAGS = $(dsp_ldflags) \
 			 -Wl,--defsym,xrp_dsp_comm_base_magic=0x20161006
+if BUILD_EXAMPLE_LSP
 EXTRA_xrp_dsp_hosted_DEPENDENCIES = $(DSP_LSP)
+endif
 
 if BUILD_EXTERNAL
 xrp_dsp_hosted_LDADD = -lxrp-dsp \
