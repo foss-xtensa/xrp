@@ -255,6 +255,38 @@ struct xrp_hw_ops {
 	long (*copy_from_alloc_user)(void *hw_arg,
 				     unsigned long vaddr, unsigned long sz,
 				     phys_addr_t paddr);
+
+
+	/*!
+	 * Get named string property.
+	 *
+	 * \param hw_arg: opaque parameter passed to xrp_init at initialization
+	 *                time
+	 * \param name: property name
+	 * \param val: output pointer
+	 * \return 0 on success
+	 *         -ENODATA if named property does not exist
+	 */
+	long (*property_read_string)(void *hw_arg,
+				     const char *name,
+				     const char **val);
+	/*!
+	 * Get named u32 array property or its size.
+	 *
+	 * \param hw_arg: opaque parameter passed to xrp_init at initialization
+	 *                time
+	 * \param name: property name
+	 * \param val: output pointer, if NULL array size is returned
+	 * \param nval: number of u32 entries in val
+	 * \return number of entries if val == NULL
+	 *         0 on success
+	 *         -ENODATA if named property does not exist
+	 */
+	long (*property_read_u32_array)(void *hw_arg,
+					const char *name,
+					u32 *val, size_t nval);
+
+
 };
 
 enum xrp_init_flags {

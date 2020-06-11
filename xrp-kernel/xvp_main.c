@@ -54,7 +54,6 @@
 #endif
 #include <linux/platform_device.h>
 #include <linux/pm_runtime.h>
-#include <linux/property.h>
 #include <linux/sched.h>
 #include <linux/slab.h>
 #include <linux/sort.h>
@@ -68,6 +67,7 @@
 #include "xrp_kernel_defs.h"
 #include "xrp_kernel_dsp_interface.h"
 #include "xrp_private_alloc.h"
+#include "xrp_property.h"
 
 #define DRIVER_NAME "xrp"
 #define XRP_DEFAULT_TIMEOUT 10
@@ -2220,8 +2220,8 @@ static long xrp_init_common(struct platform_device *pdev,
 	if (ret < 0)
 		goto err_free_pool;
 
-	ret = device_property_read_u32_array(xvp->dev, "queue-priority",
-					     NULL, 0);
+	ret = xrp_property_read_u32_array(xvp, "queue-priority",
+					  NULL, 0);
 	if (ret > 0) {
 		xvp->n_queues = ret;
 		xvp->queue_priority = devm_kmalloc(&pdev->dev,
@@ -2229,10 +2229,10 @@ static long xrp_init_common(struct platform_device *pdev,
 						   GFP_KERNEL);
 		if (xvp->queue_priority == NULL)
 			goto err_free_pool;
-		ret = device_property_read_u32_array(xvp->dev,
-						     "queue-priority",
-						     xvp->queue_priority,
-						     xvp->n_queues);
+		ret = xrp_property_read_u32_array(xvp,
+						  "queue-priority",
+						  xvp->queue_priority,
+						  xvp->n_queues);
 		if (ret < 0)
 			goto err_free_pool;
 		dev_dbg(xvp->dev,
@@ -2271,8 +2271,8 @@ static long xrp_init_common(struct platform_device *pdev,
 		}
 	}
 
-	ret = device_property_read_string(xvp->dev, "firmware-name",
-					  &xvp->firmware_name);
+	ret = xrp_property_read_string(xvp, "firmware-name",
+				       &xvp->firmware_name);
 	if (ret == -EINVAL || ret == -ENODATA) {
 		dev_dbg(xvp->dev,
 			"no firmware-name property, not loading firmware");
