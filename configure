@@ -5201,6 +5201,17 @@ fi
 
 done
 
+      for ac_func in nanosleep
+do :
+  ac_fn_c_check_func "$LINENO" "nanosleep" "ac_cv_func_nanosleep"
+if test "x$ac_cv_func_nanosleep" = xyes; then :
+  cat >>confdefs.h <<_ACEOF
+#define HAVE_NANOSLEEP 1
+_ACEOF
+
+fi
+done
+
 
 fi
 
@@ -5303,17 +5314,6 @@ else
 $as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
 as_fn_error $? "No usable libfdt is found
 See \`config.log' for more details" "$LINENO" 5; }
-fi
-done
-
-      for ac_func in nanosleep
-do :
-  ac_fn_c_check_func "$LINENO" "nanosleep" "ac_cv_func_nanosleep"
-if test "x$ac_cv_func_nanosleep" = xyes; then :
-  cat >>confdefs.h <<_ACEOF
-#define HAVE_NANOSLEEP 1
-_ACEOF
-
 fi
 done
 
