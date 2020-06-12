@@ -434,7 +434,7 @@ static void f8(int devid)
 	struct xrp_device *device;
 	struct xrp_queue *queue0, *queue1;
 	struct example_v2_cmd cmd = {
-		.cmd = EXAMPLE_V2_CMD_LONG,
+		.cmd = EXAMPLE_V2_CMD_OK,
 	};
 	struct example_v2_rsp rsp;
 	struct xrp_event *event;
@@ -449,6 +449,19 @@ static void f8(int devid)
 	assert(status == XRP_STATUS_SUCCESS);
 	status = -1;
 
+	xrp_run_command_sync(queue0,
+			     &cmd, sizeof(cmd),
+			     NULL, 0, NULL, &status);
+	assert(status == XRP_STATUS_SUCCESS);
+	status = -1;
+
+	xrp_run_command_sync(queue1,
+			     &cmd, sizeof(cmd),
+			     NULL, 0, NULL, &status);
+	assert(status == XRP_STATUS_SUCCESS);
+	status = -1;
+
+	cmd.cmd = EXAMPLE_V2_CMD_LONG;
 	xrp_enqueue_command(queue0,
 			    &cmd, sizeof(cmd),
 			    NULL, 0,
