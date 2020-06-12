@@ -476,7 +476,7 @@ static void f8(int devid)
 		struct timespec req;
 
 		req.tv_sec = 0;
-		req.tv_nsec = 100000000;
+		req.tv_nsec = 10000000;
 		/*
 		 * This delay is here for the case of standalone host
 		 * that runs much faster than the simulated DSP. It
