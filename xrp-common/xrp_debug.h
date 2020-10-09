@@ -25,8 +25,13 @@
 #define _XRP_DEBUG_H
 
 #ifdef DEBUG
+#ifdef HAVE_THREADS_XOS
+#include <xtensa/xtutil.h>
+#define pr_debug xt_printf
+#else
 #include <stdio.h>
 #define pr_debug printf
+#endif
 #else
 static inline int pr_debug(const char *p, ...)
 {
