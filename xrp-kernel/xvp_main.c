@@ -2414,9 +2414,12 @@ MODULE_DEVICE_TABLE(of, xrp_of_match);
 #endif
 
 #ifdef CONFIG_ACPI
-static long xrp_acpi_init_v0(struct platform_device *pdev)
+static xrp_init_function xrp_acpi_init_v0;
+static long xrp_acpi_init_v0(struct platform_device *pdev,
+			     enum xrp_init_flags flags,
+			     const struct xrp_hw_ops *hw_ops, void *hw_arg)
 {
-	long ret = xrp_init(pdev, 0, &hw_ops, NULL);
+	long ret = xrp_init(pdev, flags, hw_ops, hw_arg);
 
 	if (!IS_ERR_VALUE(ret)) {
 		struct xvp *xvp = ERR_PTR(ret);
@@ -2448,9 +2451,12 @@ static long xrp_acpi_init_v0(struct platform_device *pdev)
 	return ret;
 }
 
-static long xrp_acpi_init_v1(struct platform_device *pdev)
+static xrp_init_function xrp_acpi_init_v1;
+static long xrp_acpi_init_v1(struct platform_device *pdev,
+			     enum xrp_init_flags flags,
+			     const struct xrp_hw_ops *hw_ops, void *hw_arg)
 {
-	long ret = xrp_init_v1(pdev, 0, &hw_ops, NULL);
+	long ret = xrp_init_v1(pdev, flags, hw_ops, hw_arg);
 
 	if (!IS_ERR_VALUE(ret)) {
 		struct xvp *xvp = ERR_PTR(ret);
