@@ -26,6 +26,7 @@
  * the GNU General Public License version 2 or later.
  */
 
+#include <linux/acpi.h>
 #include <linux/delay.h>
 #include <linux/interrupt.h>
 #include <linux/io.h>
@@ -408,7 +409,7 @@ static long init_cma(struct platform_device *pdev, struct xrp_hw_simple *hw)
 }
 
 #ifdef CONFIG_OF
-static const struct of_device_id xrp_hw_simple_match[] = {
+static const struct of_device_id xrp_of_hw_simple_match[] = {
 	{
 		.compatible = "cdns,xrp-hw-simple",
 		.data = init,
@@ -420,27 +421,94 @@ static const struct of_device_id xrp_hw_simple_match[] = {
 		.data = init_cma,
 	}, {},
 };
-MODULE_DEVICE_TABLE(of, xrp_hw_simple_match);
+MODULE_DEVICE_TABLE(of, xrp_of_hw_simple_match);
+#endif
+
+#ifdef CONFIG_ACPI
+static long acpi_init_v0(struct platform_device *pdev,
+			 struct xrp_hw_simple *hw)
+{
+	long ret;
+	enum xrp_init_flags init_flags = 0;
+	struct resource *mem;
+
+	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+	if (!mem) {
+		return -ENODEV;
+	} else {
+		u32 device_irq[] = {
+			0, 0, mem->end - mem->start + 1,
+		};
+		static u32 queue_priority[] = {
+			3, 5,
+		};
+		struct property_entry entry[] = {
+			PROPERTY_ENTRY_U32_ARRAY("device-irq", device_irq),
+			PROPERTY_ENTRY_U32("device-irq-mode", XRP_IRQ_EDGE_SW),
+			PROPERTY_ENTRY_U32_ARRAY("queue-priority", queue_priority),
+			{},
+		};
+		device_add_properties(&pdev->dev, entry);
+		mem->end = mem->start + 4 - 1;
+	}
+
+	ret = init_hw(pdev, hw, 0, &init_flags);
+	if (ret < 0)
+		return ret;
+
+	return xrp_acpi_init_v0(pdev, init_flags, &hw_ops, hw);
+}
+
+static const struct acpi_device_id xrp_acpi_hw_simple_match[] = {
+	{ "CXRS0000", (unsigned long)acpi_init_v0, },
+	{ },
+};
+MODULE_DEVICE_TABLE(acpi, xrp_acpi_hw_simple_match);
 #endif
 
 static int xrp_hw_simple_probe(struct platform_device *pdev)
 {
 	struct xrp_hw_simple *hw =
 		devm_kzalloc(&pdev->dev, sizeof(*hw), GFP_KERNEL);
-	const struct of_device_id *match;
-	long (*init)(struct platform_device *pdev, struct xrp_hw_simple *hw);
-	long ret;
+	long ret = -EINVAL;
 
 	if (!hw)
 		return -ENOMEM;
 
-	match = of_match_device(of_match_ptr(xrp_hw_simple_match),
-				&pdev->dev);
-	if (!match)
-		return -ENODEV;
+#ifdef CONFIG_OF
+	{
+		const struct of_device_id *match;
 
-	init = match->data;
-	ret = init(pdev, hw);
+		match = of_match_device(of_match_ptr(xrp_of_hw_simple_match),
+					&pdev->dev);
+		if (match) {
+			long (*init)(struct platform_device *pdev,
+				     struct xrp_hw_simple *hw);
+
+			init = match->data;
+			ret = init(pdev, hw);
+		} else {
+			pr_debug("%s: no OF device match found\n", __func__);
+		}
+	}
+#endif
+
+#ifdef CONFIG_ACPI
+	{
+		const struct acpi_device_id *match;
+
+		match = acpi_match_device(xrp_acpi_hw_simple_match, &pdev->dev);
+		if (match) {
+			long (*init)(struct platform_device *pdev,
+				     struct xrp_hw_simple *hw);
+
+			init = (void *)match->driver_data;
+			ret = init(pdev, hw);
+		} else {
+			pr_debug("%s: no ACPI device match found\n", __func__);
+		}
+	}
+#endif
 	if (IS_ERR_VALUE(ret)) {
 		xrp_deinit(pdev);
 		return ret;
@@ -466,7 +534,8 @@ static struct platform_driver xrp_hw_simple_driver = {
 	.remove  = xrp_hw_simple_remove,
 	.driver  = {
 		.name = DRIVER_NAME,
-		.of_match_table = of_match_ptr(xrp_hw_simple_match),
+		.of_match_table = of_match_ptr(xrp_of_hw_simple_match),
+		.acpi_match_table = ACPI_PTR(xrp_acpi_hw_simple_match),
 		.pm = &xrp_hw_simple_pm_ops,
 	},
 };
