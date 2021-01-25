@@ -2437,10 +2437,10 @@ MODULE_DEVICE_TABLE(of, xrp_of_match);
 #endif
 
 #ifdef CONFIG_ACPI
-static xrp_init_function xrp_acpi_init_v0;
-static long xrp_acpi_init_v0(struct platform_device *pdev,
-			     enum xrp_init_flags flags,
-			     const struct xrp_hw_ops *hw_ops, void *hw_arg)
+xrp_init_function xrp_acpi_init_v0;
+long xrp_acpi_init_v0(struct platform_device *pdev,
+		      enum xrp_init_flags flags,
+		      const struct xrp_hw_ops *hw_ops, void *hw_arg)
 {
 	long ret = xrp_init(pdev, flags, hw_ops, hw_arg);
 
@@ -2473,6 +2473,7 @@ static long xrp_acpi_init_v0(struct platform_device *pdev,
 	}
 	return ret;
 }
+EXPORT_SYMBOL(xrp_acpi_init_v0);
 
 static xrp_init_function xrp_acpi_init_v1;
 static long xrp_acpi_init_v1(struct platform_device *pdev,
