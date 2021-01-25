@@ -294,16 +294,16 @@ static long init_hw(struct platform_device *pdev, struct xrp_hw_simple *hw,
 	pr_debug("%s: regs = %pap/%p\n",
 		 __func__, &mem->start, hw->regs);
 
-	ret = of_property_read_u32_array(pdev->dev.of_node,
-					 "device-irq",
-					 hw->device_irq,
-					 ARRAY_SIZE(hw->device_irq));
+	ret = device_property_read_u32_array(&pdev->dev,
+					     "device-irq",
+					     hw->device_irq,
+					     ARRAY_SIZE(hw->device_irq));
 	if (ret == 0) {
 		u32 device_irq_host_offset;
 
-		ret = of_property_read_u32(pdev->dev.of_node,
-					   "device-irq-host-offset",
-					   &device_irq_host_offset);
+		ret = device_property_read_u32(&pdev->dev,
+					       "device-irq-host-offset",
+					       &device_irq_host_offset);
 		if (ret == 0) {
 			hw->device_irq_host_offset = device_irq_host_offset;
 		} else {
@@ -314,9 +314,9 @@ static long init_hw(struct platform_device *pdev, struct xrp_hw_simple *hw,
 	if (ret == 0) {
 		u32 device_irq_mode;
 
-		ret = of_property_read_u32(pdev->dev.of_node,
-					   "device-irq-mode",
-					   &device_irq_mode);
+		ret = device_property_read_u32(&pdev->dev,
+					       "device-irq-mode",
+					       &device_irq_mode);
 		if (device_irq_mode < XRP_IRQ_MAX)
 			hw->device_irq_mode = device_irq_mode;
 		else
@@ -333,15 +333,15 @@ static long init_hw(struct platform_device *pdev, struct xrp_hw_simple *hw,
 			 "using polling mode on the device side\n");
 	}
 
-	ret = of_property_read_u32_array(pdev->dev.of_node, "host-irq",
-					 hw->host_irq,
-					 ARRAY_SIZE(hw->host_irq));
+	ret = device_property_read_u32_array(&pdev->dev, "host-irq",
+					     hw->host_irq,
+					     ARRAY_SIZE(hw->host_irq));
 	if (ret == 0) {
 		u32 host_irq_mode;
 
-		ret = of_property_read_u32(pdev->dev.of_node,
-					   "host-irq-mode",
-					   &host_irq_mode);
+		ret = device_property_read_u32(&pdev->dev,
+					       "host-irq-mode",
+					       &host_irq_mode);
 		if (host_irq_mode < XRP_IRQ_MAX)
 			hw->host_irq_mode = host_irq_mode;
 		else
