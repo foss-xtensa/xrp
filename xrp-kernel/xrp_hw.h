@@ -280,6 +280,20 @@ long xrp_init(struct platform_device *pdev, enum xrp_init_flags flags,
 	      const struct xrp_hw_ops *hw, void *hw_arg);
 
 /*!
+ * Initialize generic XRP kernel driver from cdns,xrp-compatible device
+ * tree node. Set default address mapping.
+ *
+ * \param pdev: pointer to platform device associated with the XRP device
+ *              instance
+ * \param flags: initialization flags
+ * \param hw: pointer to xrp_hw_ops structeure for this device
+ * \param hw_arg: opaque pointer passed back to hw-specific functions
+ * \return error code or pointer to struct xvp, use IS_ERR_VALUE and ERR_PTR
+ */
+long xrp_acpi_init_v0(struct platform_device *pdev, enum xrp_init_flags flags,
+		      const struct xrp_hw_ops *hw, void *hw_arg);
+
+/*!
  * Initialize generic XRP kernel driver from cdns,xrp,v1-compatible device
  * tree node.
  *
