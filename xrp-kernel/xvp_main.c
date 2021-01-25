@@ -2378,6 +2378,8 @@ int xrp_deinit(struct platform_device *pdev)
 {
 	struct xvp *xvp = platform_get_drvdata(pdev);
 
+	if (!xvp)
+		return 0;
 	pm_runtime_disable(xvp->dev);
 	if (!pm_runtime_status_suspended(xvp->dev))
 		xrp_runtime_suspend(xvp->dev);
