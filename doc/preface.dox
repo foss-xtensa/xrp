@@ -35,12 +35,10 @@
 ///  Changes from the Previous Version
 ///  ---------------------------------
 ///  
-///  The following changes were made to this document for the Cadence RI-2019.1
+///  The following changes were made to this document for the Cadence RI-2021.6
 ///  release of Xtensa processors. Subsequent releases may contain updates for
 ///  features in this release or additional features may be added.
 ///  
-///  * New chapter \ref features is added and the chapter \ref features_operation
-///    is now a section inside this chapter.
-///  * New section \ref features_multiqueue is added to the \ref features chapter.
-///  * Information about the new `simple-xos` port is added to the
-///    \ref building_libraries chapter.
+///  * Range of tested and supported linux kernel versions is updated.
+///  * configure script invocation examples are updated to reflect new example
+///    directories layout, subsystem parameters and default compiler choice.
