@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2017-2019 Cadence Design Systems Inc.
+# Copyright (c) 2017-2021 Cadence Design Systems Inc.
 #
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
@@ -21,7 +21,7 @@
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 
-AC_INIT([xrp], [20191107])
+AC_INIT([xrp], [20210217])
 AC_CONFIG_AUX_DIR(autoconf)
 AC_CONFIG_MACRO_DIR(autoconf)
 AM_INIT_AUTOMAKE([foreign subdir-objects silent-rules])
