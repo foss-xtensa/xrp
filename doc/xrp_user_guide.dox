@@ -1034,8 +1034,9 @@ parts of the XRP are built and how:
 - Switch `--with-libfdt` may be used to specify a path to the libfdt headers
   and archive when it is installed in a non-standard location.
 
-Xtensa code needs an xcc-based toolchain. Provide the following environment
-variable to the `configure` or to `make`:
+Xtensa code needs Cadence toolchain for Xtensa as it uses the Xtensa Processor
+Hardware Abstraction Layer, XTOS and XOS.
+Provide the following environment variable to the `configure` or to `make`:
   - CC: name of the compiler together with the xtensa core specification.
   Without any other options this will produce all host and DSP XRP libraries
   for xtensa:
