@@ -27,17 +27,26 @@
 #ifdef DEBUG
 #ifdef HAVE_THREADS_XOS
 #include <xtensa/xtutil.h>
+#ifdef HAVE_XT_PRINTF
 #define pr_debug xt_printf
+#else
+#define XRP_WANT_DUMMY_PR_DEBUG
+#endif
 #else
 #include <stdio.h>
 #define pr_debug printf
 #endif
 #else
+#define XRP_WANT_DUMMY_PR_DEBUG
+#endif
+
+#ifdef XRP_WANT_DUMMY_PR_DEBUG
 static inline int pr_debug(const char *p, ...)
 {
 	(void)p;
 	return 0;
 }
+#undef XRP_WANT_DUMMY_PR_DEBUG
 #endif
 
 #endif

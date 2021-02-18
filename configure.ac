@@ -265,8 +265,8 @@ AS_IF([test x$build_dsp = xtrue],
       #
       AC_CHECK_FUNCS([xtos_set_interrupt_handler xtos_interrupt_enable xtos_interrupt_disable])
       AC_CHECK_FUNCS([xtos_set_exception_handler])
-      AC_CHECK_LIB([xtutil], [xt_printf],,
-		   AC_MSG_FAILURE([libxtutil not found]))
+      AC_SEARCH_LIBS([xt_printf], [xtutil])
+      AC_CHECK_FUNCS([xt_printf])
       ])
 
 AC_CONFIG_FILES([xrp-dsp/simple/Makefile])
