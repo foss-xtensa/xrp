@@ -166,6 +166,11 @@ static char *xrp_devm_kstrdup(struct device *dev, const char *s, gfp_t gfp)
 }
 #endif
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 8, 0)
+#define mmap_read_lock(mm) (down_read(&(mm)->mmap_sem))
+#define mmap_read_unlock(mm) (up_read(&(mm)->mmap_sem))
+#endif
+
 static bool xrp_cacheable(struct xvp *xvp, unsigned long pfn,
 			  unsigned long n_pages)
 {
@@ -1214,7 +1219,7 @@ static long __xrp_share_block(struct file *filp,
 				rc = -EINVAL;
 			}
 		} else {
-			up_read(&mm->mmap_sem);
+			mmap_read_unlock(mm);
 			rc = xvp_gup_virt_to_phys(xvp_file, virt,
 						  size, &phys,
 						  alien_mapping);
@@ -1226,7 +1231,7 @@ static long __xrp_share_block(struct file *filp,
 				xrp_put_pages(phys, n_pages);
 				rc = -EINVAL;
 			}
-			down_read(&mm->mmap_sem);
+			mmap_read_lock(mm);
 		}
 		if (rc == 0 && vma && !vma_needs_cache_ops(vma))
 			do_cache = false;
@@ -1380,19 +1385,19 @@ static long xrp_ioctl_free(struct file *filp,
 	pr_debug("%s: virt_addr = 0x%08lx\n", __func__, start);
 
 	if (xvp_file->xvp->direct_mapping) {
-		down_read(&mm->mmap_sem);
+		mmap_read_lock(mm);
 		vma = find_vma(mm, start);
 
 		if (vma && vma->vm_file == filp &&
 		    vma->vm_start <= start && start < vma->vm_end) {
 			start = vma->vm_start;
 			size = vma->vm_end - vma->vm_start;
-			up_read(&mm->mmap_sem);
+			mmap_read_unlock(mm);
 			pr_debug("%s: 0x%lx x %zu\n", __func__, start, size);
 			return vm_munmap(start, size);
 		}
 		pr_debug("%s: no vma/bad vma for vaddr = 0x%08lx\n", __func__, start);
-		up_read(&mm->mmap_sem);
+		mmap_read_unlock(mm);
 
 		return -EINVAL;
 	} else {
@@ -1581,7 +1586,7 @@ static long xrp_map_request(struct file *filp, struct xrp_request *rq,
 		}
 	}
 
-	down_read(&mm->mmap_sem);
+	mmap_read_lock(mm);
 
 	if (rq->ioctl_queue.in_data_size > XRP_DSP_CMD_INLINE_DATA_SIZE) {
 		ret = __xrp_share_block(filp, rq->ioctl_queue.in_data_addr,
@@ -1660,7 +1665,7 @@ static long xrp_map_request(struct file *filp, struct xrp_request *rq,
 		}
 	}
 share_err:
-	up_read(&mm->mmap_sem);
+	mmap_read_unlock(mm);
 	if (ret < 0)
 		xrp_unmap_request_nowb(filp, rq);
 	return ret;
