@@ -885,10 +885,30 @@ out:
 	return ret;
 }
 
+static long copy_from_x(void *dst, const void *src, size_t sz, bool user)
+{
+	if (user) {
+		return copy_from_user(dst, (void __user *)src, sz);
+	} else {
+		memcpy(dst, src, sz);
+		return 0;
+	}
+}
+
+static long copy_to_x(void *dst, const void *src, size_t sz, bool user)
+{
+	if (user) {
+		return copy_to_user((void __user *)dst, src, sz);
+	} else {
+		memcpy(dst, src, sz);
+		return 0;
+	}
+}
+
 static long _xrp_copy_user_phys(struct xvp *xvp,
 				unsigned long vaddr, unsigned long size,
 				phys_addr_t paddr, unsigned long flags,
-				bool to_phys)
+				bool to_phys, bool user)
 {
 	if (pfn_valid(__phys_to_pfn(paddr))) {
 		struct page *page = pfn_to_page(__phys_to_pfn(paddr));
@@ -910,12 +930,12 @@ static long _xrp_copy_user_phys(struct xvp *xvp,
 				copy_sz = size - offs;
 
 			if (to_phys)
-				rc = copy_from_user(p + page_offs,
-						    (void __user *)(vaddr + offs),
-						    copy_sz);
+				rc = copy_from_x(p + page_offs,
+						 (void *)(vaddr + offs),
+						 copy_sz, user);
 			else
-				rc = copy_to_user((void __user *)(vaddr + offs),
-						  p + page_offs, copy_sz);
+				rc = copy_to_x((void *)(vaddr + offs),
+					       p + page_offs, copy_sz, user);
 
 			page_offs = 0;
 			offs += copy_sz;
@@ -937,11 +957,11 @@ static long _xrp_copy_user_phys(struct xvp *xvp,
 			return -EINVAL;
 		}
 		if (to_phys)
-			rc = copy_from_user(__io_virt(p),
-					    (void __user *)vaddr, size);
+			rc = copy_from_x(__io_virt(p),
+					 (void *)vaddr, size, user);
 		else
-			rc = copy_to_user((void __user *)vaddr,
-					  __io_virt(p), size);
+			rc = copy_to_x((void *)vaddr,
+				       __io_virt(p), size, user);
 		iounmap(p);
 		if (rc)
 			return -EFAULT;
@@ -951,10 +971,11 @@ static long _xrp_copy_user_phys(struct xvp *xvp,
 
 static long xrp_copy_user_to_phys(struct xvp *xvp,
 				  unsigned long vaddr, unsigned long size,
-				  phys_addr_t paddr, unsigned long flags)
+				  phys_addr_t paddr, unsigned long flags,
+				  bool user)
 {
 	if (!xvp->direct_mapping) {
-		if (segment_eq(get_fs(), KERNEL_DS))
+		if (!user)
 			return xvp->hw_ops->copy_to_alloc(xvp->hw_arg,
 							  (const void *)vaddr,
 							  size, paddr);
@@ -963,16 +984,18 @@ static long xrp_copy_user_to_phys(struct xvp *xvp,
 							       vaddr, size,
 							       paddr);
 	} else {
-		return _xrp_copy_user_phys(xvp, vaddr, size, paddr, flags, true);
+		return _xrp_copy_user_phys(xvp, vaddr, size, paddr, flags,
+					   true, user);
 	}
 }
 
 static long xrp_copy_user_from_phys(struct xvp *xvp,
 				    unsigned long vaddr, unsigned long size,
-				    phys_addr_t paddr, unsigned long flags)
+				    phys_addr_t paddr, unsigned long flags,
+				    bool user)
 {
 	if (!xvp->direct_mapping) {
-		if (segment_eq(get_fs(), KERNEL_DS))
+		if (!user)
 			return xvp->hw_ops->copy_from_alloc(xvp->hw_arg,
 							    (void *)vaddr,
 							    size, paddr);
@@ -981,7 +1004,8 @@ static long xrp_copy_user_from_phys(struct xvp *xvp,
 								 vaddr, size,
 								 paddr);
 	} else {
-		return _xrp_copy_user_phys(xvp, vaddr, size, paddr, flags, false);
+		return _xrp_copy_user_phys(xvp, vaddr, size, paddr, flags,
+					   false, user);
 	}
 }
 
@@ -989,7 +1013,8 @@ static long xvp_copy_virt_to_phys(struct xvp_file *xvp_file,
 				  unsigned long flags,
 				  unsigned long vaddr, unsigned long size,
 				  phys_addr_t *paddr,
-				  struct xrp_alien_mapping *mapping)
+				  struct xrp_alien_mapping *mapping,
+				  bool user)
 {
 	phys_addr_t phys;
 	unsigned long align = clamp(vaddr & -vaddr, 16ul, PAGE_SIZE);
@@ -1008,7 +1033,8 @@ static long xvp_copy_virt_to_phys(struct xvp_file *xvp_file,
 
 	if (flags & XRP_FLAG_READ) {
 		if (xrp_copy_user_to_phys(xvp_file->xvp,
-					  vaddr, size, phys, flags)) {
+					  vaddr, size, phys,
+					  flags, user)) {
 			xrp_allocation_put(allocation);
 			return -EFAULT;
 		}
@@ -1069,15 +1095,11 @@ static long xrp_share_kernel(struct file *filp,
 	if (!xvp->direct_mapping ||
 	    xrp_translate_to_dsp(&xvp->address_map, phys) ==
 	    XRP_NO_TRANSLATION) {
-		mm_segment_t oldfs = get_fs();
-
 		pr_debug("%s: untranslatable addr, making shadow copy\n",
 			 __func__);
-	        set_fs(KERNEL_DS);
 		err = xvp_copy_virt_to_phys(xvp_file, flags,
 					    virt, size, paddr,
-					    &mapping->alien_mapping);
-		set_fs(oldfs);
+					    &mapping->alien_mapping, false);
 		mapping->type = XRP_MAPPING_ALIEN | XRP_MAPPING_KERNEL;
 	} else {
 		mapping->type = XRP_MAPPING_KERNEL;
@@ -1244,7 +1266,7 @@ no_direct_mapping:
 			alien_mapping = &mapping->alien_mapping;
 			rc = xvp_copy_virt_to_phys(xvp_file, flags,
 						   virt, size, &phys,
-						   alien_mapping);
+						   alien_mapping, true);
 			do_cache = false;
 		}
 
@@ -1274,7 +1296,7 @@ no_direct_mapping:
 
 static long xrp_writeback_alien_mapping(struct xvp_file *xvp_file,
 					struct xrp_alien_mapping *alien_mapping,
-					unsigned long flags)
+					unsigned long flags, bool user)
 {
 	struct page *page;
 	size_t nr_pages;
@@ -1306,7 +1328,7 @@ static long xrp_writeback_alien_mapping(struct xvp_file *xvp_file,
 					    alien_mapping->vaddr,
 					    alien_mapping->size,
 					    alien_mapping->paddr,
-					    flags))
+					    flags, user))
 			ret = -EINVAL;
 		break;
 
@@ -1323,10 +1345,6 @@ static long __xrp_unshare_block(struct file *filp, struct xrp_mapping *mapping,
 				unsigned long flags)
 {
 	long ret = 0;
-	mm_segment_t oldfs = get_fs();
-
-	if (mapping->type & XRP_MAPPING_KERNEL)
-	        set_fs(KERNEL_DS);
 
 	switch (mapping->type & ~XRP_MAPPING_KERNEL) {
 	case XRP_MAPPING_NATIVE:
@@ -1347,7 +1365,8 @@ static long __xrp_unshare_block(struct file *filp, struct xrp_mapping *mapping,
 		if (flags & XRP_FLAG_WRITE)
 			ret = xrp_writeback_alien_mapping(filp->private_data,
 							  &mapping->alien_mapping,
-							  flags);
+							  flags,
+							  !(mapping->type & XRP_MAPPING_KERNEL));
 
 		xrp_alien_mapping_destroy(&mapping->alien_mapping);
 		break;
@@ -1358,9 +1377,6 @@ static long __xrp_unshare_block(struct file *filp, struct xrp_mapping *mapping,
 	default:
 		break;
 	}
-
-	if (mapping->type & XRP_MAPPING_KERNEL)
-		set_fs(oldfs);
 
 	mapping->type = XRP_MAPPING_NONE;
 
