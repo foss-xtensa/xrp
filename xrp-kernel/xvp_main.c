@@ -171,6 +171,10 @@ static char *xrp_devm_kstrdup(struct device *dev, const char *s, gfp_t gfp)
 #define mmap_read_unlock(mm) (up_read(&(mm)->mmap_sem))
 #endif
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+#define uaccess_kernel() (segment_eq(get_fs(), KERNEL_DS))
+#endif
+
 static bool xrp_cacheable(struct xvp *xvp, unsigned long pfn,
 			  unsigned long n_pages)
 {
@@ -954,7 +958,7 @@ static long xrp_copy_user_to_phys(struct xvp *xvp,
 				  phys_addr_t paddr, unsigned long flags)
 {
 	if (!xvp->direct_mapping) {
-		if (segment_eq(get_fs(), KERNEL_DS))
+		if (uaccess_kernel())
 			return xvp->hw_ops->copy_to_alloc(xvp->hw_arg,
 							  (const void *)vaddr,
 							  size, paddr);
@@ -972,7 +976,7 @@ static long xrp_copy_user_from_phys(struct xvp *xvp,
 				    phys_addr_t paddr, unsigned long flags)
 {
 	if (!xvp->direct_mapping) {
-		if (segment_eq(get_fs(), KERNEL_DS))
+		if (uaccess_kernel())
 			return xvp->hw_ops->copy_from_alloc(xvp->hw_arg,
 							    (void *)vaddr,
 							    size, paddr);
