@@ -1073,15 +1073,19 @@ static long xrp_share_kernel(struct file *filp,
 	if (!xvp->direct_mapping ||
 	    xrp_translate_to_dsp(&xvp->address_map, phys) ==
 	    XRP_NO_TRANSLATION) {
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 10, 0)
 		mm_segment_t oldfs = get_fs();
 
+	        set_fs(KERNEL_DS);
+#endif
 		pr_debug("%s: untranslatable addr, making shadow copy\n",
 			 __func__);
-	        set_fs(KERNEL_DS);
 		err = xvp_copy_virt_to_phys(xvp_file, flags,
 					    virt, size, paddr,
 					    &mapping->alien_mapping);
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 10, 0)
 		set_fs(oldfs);
+#endif
 		mapping->type = XRP_MAPPING_ALIEN | XRP_MAPPING_KERNEL;
 	} else {
 		mapping->type = XRP_MAPPING_KERNEL;
@@ -1327,10 +1331,12 @@ static long __xrp_unshare_block(struct file *filp, struct xrp_mapping *mapping,
 				unsigned long flags)
 {
 	long ret = 0;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 10, 0)
 	mm_segment_t oldfs = get_fs();
 
 	if (mapping->type & XRP_MAPPING_KERNEL)
 	        set_fs(KERNEL_DS);
+#endif
 
 	switch (mapping->type & ~XRP_MAPPING_KERNEL) {
 	case XRP_MAPPING_NATIVE:
@@ -1363,8 +1369,10 @@ static long __xrp_unshare_block(struct file *filp, struct xrp_mapping *mapping,
 		break;
 	}
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 10, 0)
 	if (mapping->type & XRP_MAPPING_KERNEL)
 		set_fs(oldfs);
+#endif
 
 	mapping->type = XRP_MAPPING_NONE;
 
