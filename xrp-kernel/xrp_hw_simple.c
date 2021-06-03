@@ -127,7 +127,7 @@ static void reset(void *hw_arg)
 	reg_write32(hw_arg, XRP_REG_RESET, 0);
 }
 
-static void halt(void *hw_arg)
+static void xrp_hw_simple_halt(void *hw_arg)
 {
 	reg_write32(hw_arg, XRP_REG_RUNSTALL, 1);
 }
@@ -262,7 +262,7 @@ static void dma_sync_for_cpu(void *hw_arg,
 #endif
 
 static const struct xrp_hw_ops hw_ops = {
-	.halt = halt,
+	.halt = xrp_hw_simple_halt,
 	.release = release,
 	.reset = reset,
 
