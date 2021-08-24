@@ -582,6 +582,101 @@ static void f9(int devid)
 #undef N_CMD
 }
 
+/* Test buffer sharing */
+static void f10(int devid)
+{
+#define MAX_N_DEV 16
+	enum xrp_status status = -1;
+	struct xrp_device *device[MAX_N_DEV];
+	struct xrp_queue *queue[MAX_N_DEV];
+	int i, j;
+	int size;
+
+	for (i = 0; i < devid; ++i) {
+		device[i] = xrp_open_device(i, &status);
+		assert(status == XRP_STATUS_SUCCESS);
+		status = -1;
+
+		queue[i] = xrp_create_ns_queue(device[i], XRP_EXAMPLE_V3_NSID, &status);
+		assert(status == XRP_STATUS_SUCCESS);
+		status = -1;
+	}
+
+	for (i = 0, size = devid; i < 2; ++i, size += 8192) {
+		struct xrp_buffer_group *group;
+		struct xrp_buffer *buf;
+		struct xrp_event *event[MAX_N_DEV];
+		struct example_v3_cmd cmd[MAX_N_DEV];
+		struct example_v3_rsp rsp[MAX_N_DEV];
+		char in[10000];
+		char out[10000];
+
+		group = xrp_create_buffer_group(&status);
+		assert(status == XRP_STATUS_SUCCESS);
+		status = -1;
+
+		buf = xrp_create_buffer(device[0], size, in, &status);
+		assert(status == XRP_STATUS_SUCCESS);
+		status = -1;
+
+		for (j = 0; j < devid; ++j)
+			in[j] = i + j + 1;
+
+		memset(out, 0, sizeof(out));
+
+		xrp_add_buffer_to_group(group, buf, XRP_READ, &status);
+		assert(status == XRP_STATUS_SUCCESS);
+		status = -1;
+
+		xrp_release_buffer(buf);
+
+		buf = xrp_create_buffer(device[0], size, out, &status);
+		assert(status == XRP_STATUS_SUCCESS);
+		status = -1;
+
+		xrp_add_buffer_to_group(group, buf, XRP_WRITE, &status);
+		assert(status == XRP_STATUS_SUCCESS);
+		status = -1;
+
+		xrp_release_buffer(buf);
+
+		memset(rsp, 0, sizeof(rsp));
+
+		for (j = 0; j < devid; ++j) {
+			cmd[j].off = j;
+			cmd[j].sz = 1;
+			cmd[j].timeout = 0x100000;
+		}
+
+		for (j = 0; j < devid; ++j) {
+			xrp_enqueue_command(queue[j],
+					    cmd + j, sizeof(cmd[j]),
+					    rsp + j, sizeof(rsp[j]),
+					    group, event + j, &status);
+			assert(status == XRP_STATUS_SUCCESS);
+			status = -1;
+		}
+
+		for (j = 0; j < devid; ++j) {
+			xrp_wait(event[j], &status);
+			assert(status == XRP_STATUS_SUCCESS);
+			status = -1;
+
+			xrp_release_event(event[j]);
+		}
+
+		assert(memcmp(in, out, devid) == 0);
+
+		xrp_release_buffer_group(group);
+	}
+
+	for (i = 0; i < devid; ++i) {
+		xrp_release_queue(queue[i]);
+		xrp_release_device(device[i]);
+	}
+#undef MAX_N_DEV
+}
+
 enum {
 	CMD_TEST,
 
@@ -662,6 +757,10 @@ int main(int argc, char **argv)
 			}
 			if (tests & 0x100) {
 				f9(devid);
+				printf("=======================================================\n");
+			}
+			if (tests & 0x200) {
+				f10(devid);
 				printf("=======================================================\n");
 			}
 		}
