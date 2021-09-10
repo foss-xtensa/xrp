@@ -193,19 +193,20 @@ static int xrp_firmware_find_symbol(struct xvp *xvp, const char *name,
 		return -EINVAL;
 	}
 
-	/* find symbols and string sections */
+	/* find symbols */
 
 	for (i = 0; i < ehdr->e_shnum; ++i) {
 		const Elf32_Shdr *shdr = shdr_data + i * ehdr->e_shentsize;
 
-		switch (shdr->sh_type) {
-		case SHT_SYMTAB:
+		if (shdr->sh_type == SHT_SYMTAB) {
 			sh_symtab = shdr;
-			break;
-		case SHT_STRTAB:
-			sh_strtab = shdr;
-			break;
-		default:
+			if (sh_symtab->sh_link < ehdr->e_shnum) {
+				const Elf32_Shdr *shdr = shdr_data +
+					sh_symtab->sh_link * ehdr->e_shentsize;
+
+				if (shdr->sh_type == SHT_STRTAB)
+					sh_strtab = shdr;
+			}
 			break;
 		}
 	}
