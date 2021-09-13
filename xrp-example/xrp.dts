@@ -111,7 +111,7 @@
 		reg = <0x18000000 0x04000000
 		       0x30003000 0x00000200>;
 		device-irq = <0 2 16>; /* offset, bit#, IRQ# */
-		device-irq-mode = <1>;
+		device-irq-mode = <3>;
 		device-irq-host-offset = <0xcfffd108>;
 		queue-priority = <7 6 5>;
 		ranges = <0x00000000 0x00000000 0x20000000
@@ -131,7 +131,7 @@
 		reg = <0x1c000000 0x04000000
 		       0x30004000 0x00000200>;
 		device-irq = <0 2 16>; /* offset, bit#, IRQ# */
-		device-irq-mode = <1>;
+		device-irq-mode = <3>;
 		device-irq-host-offset = <0xcfffc10c>;
 		queue-priority = <7 6 5>;
 		ranges = <0x00000000 0x00000000 0x20000000
