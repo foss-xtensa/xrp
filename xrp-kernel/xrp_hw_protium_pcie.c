@@ -81,6 +81,10 @@ enum xrp_irq_mode {
 	XRP_IRQ_MAX,
 };
 
+static int xdma_instance = 0;
+module_param(xdma_instance, int, 0644);
+MODULE_PARM_DESC(xdma_instance, "Specify XDMA instance to open. The default is 0 (int).");
+
 struct xrp_hw_protium {
 	struct xvp *xrp;
 	phys_addr_t regs_phys;
@@ -379,13 +383,20 @@ static long init_hw(struct platform_device *pdev, struct xrp_hw_protium *hw,
 	struct file *write_filp;
 	struct file *read_filp;
 	u32 v;
+	char h2c[32];
+	char c2h[32];
 
 	hw->scratch = vmalloc(PAGE_SIZE);
 	if (!hw->scratch)
 		return -ENOMEM;
 
-	write_filp = filp_open("/dev/xdma0_h2c_0", O_WRONLY, 0);
-	read_filp = filp_open("/dev/xdma0_c2h_0", O_RDONLY, 0);
+	snprintf(h2c, 32, "/dev/xdma%d_h2c_0", xdma_instance);
+	snprintf(c2h, 32, "/dev/xdma%d_c2h_0", xdma_instance);
+	pr_debug("write_filp: %s", h2c);
+	pr_debug("read_filp: %s", c2h);
+
+	write_filp = filp_open(h2c, O_WRONLY, 0);
+	read_filp = filp_open(c2h, O_RDONLY, 0);
 	if (IS_ERR(write_filp)) {
 		ret = PTR_ERR(write_filp);
 		goto err;
