@@ -89,6 +89,10 @@ static uint shared_mem_loc[2] = {0x80000000, 0x87ffffff};
 module_param_array(shared_mem_loc, uint, NULL, 0644);
 MODULE_PARM_DESC(shared_mem_loc, "Array of IO_RESOUCE_MEM start/end. The default is {0x80000000, 0x87fffffff}.");
 
+static int stat_vector_sel = 0;
+module_param(stat_vector_sel, int, 0644);
+MODULE_PARM_DESC(stat_vector_sel, "StatVectorSel. The default is 0 (int).");
+
 struct xrp_hw_protium {
 	struct xvp *xrp;
 	phys_addr_t regs_phys;
@@ -199,32 +203,46 @@ static void *get_hw_sync_data(void *hw_arg, size_t *sz)
 static void xrp_hw_protium_reset(void *hw_arg)
 {
 	struct xrp_hw_protium *hw = hw_arg;
+	pr_debug("%s: hw->core0_control=0x%08x\n", __func__, hw->core0_control);
+
+	if (stat_vector_sel) {
+		pr_debug("%s: using StatVectoSel\n", __func__);
+		hw->core0_control |= CORE0_CONTROL_STAT_VECTOR_SEL;
+		reg_write32(hw_arg, CORE0_CONTROL, hw->core0_control);
+		udelay(1);
+	}
 
 	reg_write32(hw_arg, CORE0_CONTROL,
 		    hw->core0_control | CORE0_CONTROL_BRESET);
 	udelay(1);
 	reg_write32(hw_arg, CORE0_CONTROL, hw->core0_control);
+	pr_debug("%s: hw->core0_control=0x%08x\n", __func__, hw->core0_control);
 }
 
 static void xrp_hw_protium_halt(void *hw_arg)
 {
 	struct xrp_hw_protium *hw = hw_arg;
+	pr_debug("%s: hw->core0_control=0x%08x\n", __func__, hw->core0_control);
 
 	hw->core0_control |= CORE0_CONTROL_RUNSTALL;
 	reg_write32(hw_arg, CORE0_CONTROL, hw->core0_control);
+	pr_debug("%s: hw->core0_control=0x%08x\n", __func__, hw->core0_control);
 }
 
 static void xrp_hw_protium_release(void *hw_arg)
 {
 	struct xrp_hw_protium *hw = hw_arg;
+	pr_debug("%s: hw->core0_control=0x%08x\n", __func__, hw->core0_control);
 
 	hw->core0_control &= ~CORE0_CONTROL_RUNSTALL;
 	reg_write32(hw_arg, CORE0_CONTROL, hw->core0_control);
+	pr_debug("%s: hw->core0_control=0x%08x\n", __func__, hw->core0_control);
 }
 
 static void send_irq(void *hw_arg)
 {
 	struct xrp_hw_protium *hw = hw_arg;
+	pr_debug("%s\n", __func__);
 
 	switch (hw->device_irq_mode) {
 	case XRP_IRQ_EDGE:
