@@ -85,6 +85,10 @@ static int xdma_instance = 0;
 module_param(xdma_instance, int, 0644);
 MODULE_PARM_DESC(xdma_instance, "Specify XDMA instance to open. The default is 0 (int).");
 
+static uint shared_mem_loc[2] = {0x80000000, 0x87ffffff};
+module_param_array(shared_mem_loc, uint, NULL, 0644);
+MODULE_PARM_DESC(shared_mem_loc, "Array of IO_RESOUCE_MEM start/end. The default is {0x80000000, 0x87fffffff}.");
+
 struct xrp_hw_protium {
 	struct xvp *xrp;
 	phys_addr_t regs_phys;
@@ -385,6 +389,7 @@ static long init_hw(struct platform_device *pdev, struct xrp_hw_protium *hw,
 	u32 v;
 	char h2c[32];
 	char c2h[32];
+	struct resource *r;
 
 	hw->scratch = vmalloc(PAGE_SIZE);
 	if (!hw->scratch)
@@ -479,6 +484,12 @@ static long init_hw(struct platform_device *pdev, struct xrp_hw_protium *hw,
 		dev_info(&pdev->dev, "using polling mode on the host side\n");
 	}
 	ret = 0;
+
+	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+	r->start = shared_mem_loc[0];
+	r->end = shared_mem_loc[1];
+	pr_debug("shared mem start: 0x%8x\n", (uint)r->start);
+	pr_debug("shared mem end: 0x%8x\n", (uint)r->end);
 
 	return ret;
 
