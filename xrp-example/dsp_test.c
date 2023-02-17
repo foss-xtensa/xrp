@@ -29,6 +29,8 @@
 #include "example_namespace.h"
 #include "xrp_debug.h"
 
+#undef HAVE_THREADS
+
 void xrp_run_command(const void *in_data, size_t in_data_size,
 		     void *out_data, size_t out_data_size,
 		     struct xrp_buffer_group *buffer_group,
