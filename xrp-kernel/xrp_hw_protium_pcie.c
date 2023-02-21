@@ -81,6 +81,18 @@ enum xrp_irq_mode {
 	XRP_IRQ_MAX,
 };
 
+static int xdma_instance = 0;
+module_param(xdma_instance, int, 0644);
+MODULE_PARM_DESC(xdma_instance, "Specify XDMA instance to open. The default is 0 (int).");
+
+static uint shared_mem_loc[2] = {0x80000000, 0x87ffffff};
+module_param_array(shared_mem_loc, uint, NULL, 0644);
+MODULE_PARM_DESC(shared_mem_loc, "Array of IO_RESOUCE_MEM start/end. The default is {0x80000000, 0x87fffffff}.");
+
+static int stat_vector_sel = 0;
+module_param(stat_vector_sel, int, 0644);
+MODULE_PARM_DESC(stat_vector_sel, "StatVectorSel. The default is 0 (int).");
+
 struct xrp_hw_protium {
 	struct xvp *xrp;
 	phys_addr_t regs_phys;
@@ -191,32 +203,46 @@ static void *get_hw_sync_data(void *hw_arg, size_t *sz)
 static void xrp_hw_protium_reset(void *hw_arg)
 {
 	struct xrp_hw_protium *hw = hw_arg;
+	pr_debug("%s: hw->core0_control=0x%08x\n", __func__, hw->core0_control);
+
+	if (stat_vector_sel) {
+		pr_debug("%s: using StatVectoSel\n", __func__);
+		hw->core0_control |= CORE0_CONTROL_STAT_VECTOR_SEL;
+		reg_write32(hw_arg, CORE0_CONTROL, hw->core0_control);
+		udelay(1);
+	}
 
 	reg_write32(hw_arg, CORE0_CONTROL,
 		    hw->core0_control | CORE0_CONTROL_BRESET);
 	udelay(1);
 	reg_write32(hw_arg, CORE0_CONTROL, hw->core0_control);
+	pr_debug("%s: hw->core0_control=0x%08x\n", __func__, hw->core0_control);
 }
 
 static void xrp_hw_protium_halt(void *hw_arg)
 {
 	struct xrp_hw_protium *hw = hw_arg;
+	pr_debug("%s: hw->core0_control=0x%08x\n", __func__, hw->core0_control);
 
 	hw->core0_control |= CORE0_CONTROL_RUNSTALL;
 	reg_write32(hw_arg, CORE0_CONTROL, hw->core0_control);
+	pr_debug("%s: hw->core0_control=0x%08x\n", __func__, hw->core0_control);
 }
 
 static void xrp_hw_protium_release(void *hw_arg)
 {
 	struct xrp_hw_protium *hw = hw_arg;
+	pr_debug("%s: hw->core0_control=0x%08x\n", __func__, hw->core0_control);
 
 	hw->core0_control &= ~CORE0_CONTROL_RUNSTALL;
 	reg_write32(hw_arg, CORE0_CONTROL, hw->core0_control);
+	pr_debug("%s: hw->core0_control=0x%08x\n", __func__, hw->core0_control);
 }
 
 static void send_irq(void *hw_arg)
 {
 	struct xrp_hw_protium *hw = hw_arg;
+	pr_debug("%s\n", __func__);
 
 	switch (hw->device_irq_mode) {
 	case XRP_IRQ_EDGE:
@@ -379,13 +405,21 @@ static long init_hw(struct platform_device *pdev, struct xrp_hw_protium *hw,
 	struct file *write_filp;
 	struct file *read_filp;
 	u32 v;
+	char h2c[32];
+	char c2h[32];
+	struct resource *r;
 
 	hw->scratch = vmalloc(PAGE_SIZE);
 	if (!hw->scratch)
 		return -ENOMEM;
 
-	write_filp = filp_open("/dev/xdma0_h2c_0", O_WRONLY, 0);
-	read_filp = filp_open("/dev/xdma0_c2h_0", O_RDONLY, 0);
+	snprintf(h2c, 32, "/dev/xdma%d_h2c_0", xdma_instance);
+	snprintf(c2h, 32, "/dev/xdma%d_c2h_0", xdma_instance);
+	pr_debug("write_filp: %s", h2c);
+	pr_debug("read_filp: %s", c2h);
+
+	write_filp = filp_open(h2c, O_WRONLY, 0);
+	read_filp = filp_open(c2h, O_RDONLY, 0);
 	if (IS_ERR(write_filp)) {
 		ret = PTR_ERR(write_filp);
 		goto err;
@@ -468,6 +502,12 @@ static long init_hw(struct platform_device *pdev, struct xrp_hw_protium *hw,
 		dev_info(&pdev->dev, "using polling mode on the host side\n");
 	}
 	ret = 0;
+
+	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+	r->start = shared_mem_loc[0];
+	r->end = shared_mem_loc[1];
+	pr_debug("shared mem start: 0x%8x\n", (uint)r->start);
+	pr_debug("shared mem end: 0x%8x\n", (uint)r->end);
 
 	return ret;
 
