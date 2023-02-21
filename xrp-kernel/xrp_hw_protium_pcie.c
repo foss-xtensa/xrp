@@ -585,25 +585,62 @@ static struct resource xrp_hw_protium_pcie_res[] = {
 	},
 };
 
+static void xrp_hw_protium_device_release(struct device *dev)
+{
+	/*  xrp_hw_protium_device_release()
+
+	It is not xrp_hw_protium_release().
+
+	platform_device_register() does not initialize pdev->dev->release.
+	Thus when removing the device, the kernel complains about the lack of
+	release() function.
+
+	On the other hand, xrp_hw_protium_pcie has nothing to do here since
+	it is already halted and will be reset when reloading this module.
+
+	To keep the system clean, this function must be defined and left
+	as empty.
+
+	*/
+
+	pr_debug("%s:\n", __func__);
+
+}
+
 static struct platform_device xrp_hw_protium_pcie_device = {
 	.name		= DRIVER_NAME,
 	.id		= -1,
 	.num_resources	= ARRAY_SIZE(xrp_hw_protium_pcie_res),
 	.resource	= xrp_hw_protium_pcie_res,
 	.dev		= {
+		.release = xrp_hw_protium_device_release,
 		//.platform_data = xrp_protium_device_data,
 	},
 };
 
 static int __init xrp_hw_protium_pcie_devinit(void)
 {
+	pr_debug("xrp_hw_protium_pcie_devinit:start");
 	platform_driver_register(&xrp_hw_protium_pcie_driver);
 	platform_device_register(&xrp_hw_protium_pcie_device);
+	pr_debug("xrp_hw_protium_pcie_devinit:end");
 	return 0;
 }
 
-device_initcall(xrp_hw_protium_pcie_devinit);
+static void __exit xrp_hw_protium_pcie_devexit(void)
+{
+	pr_debug("platform_device_unregister:start");
+	platform_device_unregister(&xrp_hw_protium_pcie_device);
+	pr_debug("platform_device_unregister:end");
+	platform_driver_unregister(&xrp_hw_protium_pcie_driver);
+	pr_debug("platform_driver_unregister:end");
+}
+
+module_init(xrp_hw_protium_pcie_devinit);
+module_exit(xrp_hw_protium_pcie_devexit);
 
 MODULE_AUTHOR("Max Filippov");
+MODULE_AUTHOR("Takayuki Sugawara");
+MODULE_AUTHOR("Umesh Pandey");
 MODULE_DESCRIPTION("XRP: low level device driver for Xtensa Remote Processing");
 MODULE_LICENSE("Dual MIT/GPL");
