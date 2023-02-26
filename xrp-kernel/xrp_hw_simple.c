@@ -456,9 +456,16 @@ static int xrp_hw_simple_remove(struct platform_device *pdev)
 	return xrp_deinit(pdev);
 }
 
+static int xrp_hw_simple_idle(struct device *dev)
+{
+	/* Power management is flaky, don't do it now. */
+	return 1;
+}
+
 static const struct dev_pm_ops xrp_hw_simple_pm_ops = {
 	SET_RUNTIME_PM_OPS(xrp_runtime_suspend,
-			   xrp_runtime_resume, NULL)
+			   xrp_runtime_resume,
+			   xrp_hw_simple_idle)
 };
 
 static struct platform_driver xrp_hw_simple_driver = {
