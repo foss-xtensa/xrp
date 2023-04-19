@@ -25,7 +25,6 @@
 #define _XRP_LINUX_SIM_H
 
 #include <xrp_api.h>
-#include "xrp_thread_impl.h"
 #include "xrp_queue_impl.h"
 
 struct xrp_device_description;
