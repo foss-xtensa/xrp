@@ -1,3 +1,0 @@
-/* <Port>  <LowAddr>   <HighAddr>  <NewBaseAddr>  */
-
-    0     0x30000000     0x300001ff                  /* Host MMIO */

@@ -1,5 +1,6 @@
-#
-# Copyright (c) 2018 Cadence Design Systems Inc.
+### Makefile for generating XRP documentation
+
+# Copyright (c) 2015 - 2018 Cadence Design Systems, Inc.
 #
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
@@ -19,19 +20,29 @@
 # CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
 # TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+
+# Running 'make all' here will generate the HTML and PDF output.
+# The PDF will be generated in the latex directory and renamed/copied here.
 #
+# Requires Doxygen 1.8.9.1 or later, pdfTeX 3.14159265-2.6-1.40.16 (TeX Live 2015) or later.
 
-SUBDIRS = $(HW_PORT)
-if BUILD_ALL_SIMPLE
-SUBDIRS += simple simple-xos
-endif
+srcdir = .
 
-AM_CPPFLAGS = -I$(srcdir)/.. \
-	      -I$(srcdir)/../xrp-common \
-	      -I$(srcdir)/../xrp-kernel
-AM_CFLAGS = -W -Wall
+all: html pdf
 
-include_HEADERS = ../xrp_api.h xrp_dsp_hw.h xrp_dsp_user.h
-lib_LIBRARIES = libxrp-dsp.a
+doxygen: xrp.conf
+	doxygen xrp.conf
 
-libxrp_dsp_a_SOURCES = xrp_dsp.c
+html: doxygen
+pdf: doxygen
+	cp -f $(srcdir)/xrp.sty latex/
+	cp -f $(srcdir)/Cadence_Logo_Red.png latex/
+	make -C latex pdf
+	cp latex/refman.pdf xrp_rm.pdf
+
+clean:
+	rm -rf html latex
+	rm -f xrp_rm.pdf
+
+.PHONY : all doxygen html pdf clean
