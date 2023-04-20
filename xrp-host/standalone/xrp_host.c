@@ -40,7 +40,7 @@
 #include "xrp_debug.h"
 #include "xrp_host_common.h"
 #include "xrp_host_impl.h"
-#include "xrp_kernel_dsp_interface.h"
+#include "xrp_dsp_interface.h"
 #include "xrp_hw_simple_dsp_interface.h"
 #include "xrp_private_alloc.h"
 #include "xrp_host.h"

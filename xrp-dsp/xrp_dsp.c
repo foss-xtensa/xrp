@@ -34,7 +34,7 @@
 #include "xrp_dsp_user.h"
 #include "xrp_ns.h"
 #include "xrp_types.h"
-#include "xrp_kernel_dsp_interface.h"
+#include "xrp_dsp_interface.h"
 
 extern char xrp_dsp_comm_base_magic[] __attribute__((weak));
 void *xrp_dsp_comm_base = &xrp_dsp_comm_base_magic;

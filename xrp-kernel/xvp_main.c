@@ -66,7 +66,7 @@
 #include "xrp_hw.h"
 #include "xrp_internal.h"
 #include "xrp_kernel_defs.h"
-#include "xrp_kernel_dsp_interface.h"
+#include "xrp_dsp_interface.h"
 #include "xrp_private_alloc.h"
 
 #define DRIVER_NAME "xrp"
