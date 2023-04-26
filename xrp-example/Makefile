@@ -29,6 +29,11 @@ ifndef XRP_DSP_HW_PORT
   XRP_DSP_HW_PORT := simple
 endif
 
+XRP_DSP_LIBS := \
+	-lxrp-common \
+	-lxrp-dsp \
+	-lxrp-dsp-hw-${XRP_DSP_HW_PORT}
+
 ifeq (${XRP_DSP_HW_PORT}, simple)
 else ifeq (${XRP_DSP_HW_PORT}, simple-xos)
   XRP_DSP_CPPFLAGS += \
@@ -109,22 +114,6 @@ lspbld: ## Build LSPs
 dspbld:
 	mkdir -p $@
 
-dspbld/xrp_rb_file.o: ${XRP_SRC}/xrp-common/xrp_rb_file.c
-	$(XRP_DSP_CC) -c $(XRP_DSP_CFLAGS) $(XRP_DSP_CPPFLAGS) \
-	  -o $@ $<
-
-dspbld/xrp_ns.o: ${XRP_SRC}/xrp-common/xrp_ns.c
-	$(XRP_DSP_CC) -c $(XRP_DSP_CFLAGS) $(XRP_DSP_CPPFLAGS) \
-	  -o $@ $<
-
-dspbld/xrp_dsp_hw_${XRP_DSP_HW_PORT}.o: ${XRP_SRC}/xrp-dsp/${XRP_DSP_HW_PORT}/xrp_dsp_hw_${XRP_DSP_HW_PORT}.c
-	$(XRP_DSP_CC) -c $(XRP_DSP_CFLAGS) $(XRP_DSP_CPPFLAGS) \
-	  -o $@ $<
-
-dspbld/xrp_dsp.o: ${XRP_SRC}/xrp-dsp/xrp_dsp.c
-	$(XRP_DSP_CC) -c $(XRP_DSP_CFLAGS) $(XRP_DSP_CPPFLAGS) \
-	  -o $@ $<
-
 dspbld/xrp_dsp_standalone-dsp_test.o: ${XRP_SRC}/xrp-example/dsp_test.c
 	$(XRP_DSP_CC) -c $(XRP_DSP_CFLAGS) $(XRP_DSP_CPPFLAGS) \
 	  -o $@ $<
@@ -133,17 +122,13 @@ dspbld/xrp_dsp_standalone-dsp_main.o: ${XRP_SRC}/xrp-example/dsp_main.c
 	$(XRP_DSP_CC) -c $(XRP_DSP_CFLAGS) $(XRP_DSP_CPPFLAGS) \
 	  -o $@ $<
 
-xrp-dsp-standalone0: dspbld/xrp_rb_file.o dspbld/xrp_ns.o dspbld/xrp_dsp_hw_${XRP_DSP_HW_PORT}.o dspbld/xrp_dsp.o \
-  dspbld/xrp_dsp_standalone-dsp_test.o dspbld/xrp_dsp_standalone-dsp_main.o
+xrp-dsp-standalone0: dspbld/xrp_dsp_standalone-dsp_test.o dspbld/xrp_dsp_standalone-dsp_main.o
 	$(XRP_DSP_CC) ${xrp-dsp-standalone0_CFLAGS} \
-	  -o $@ $^ \
-	  ${XRP_DSP_LIBS}
+	  -o $@ -Wl,--start-group $^ ${XRP_DSP_LIBS} -Wl,--end-group
 
-xrp-dsp-standalone1: dspbld/xrp_rb_file.o dspbld/xrp_ns.o dspbld/xrp_dsp_hw_${XRP_DSP_HW_PORT}.o dspbld/xrp_dsp.o \
-  dspbld/xrp_dsp_standalone-dsp_test.o dspbld/xrp_dsp_standalone-dsp_main.o
+xrp-dsp-standalone1: dspbld/xrp_dsp_standalone-dsp_test.o dspbld/xrp_dsp_standalone-dsp_main.o
 	$(XRP_DSP_CC) ${xrp-dsp-standalone1_CFLAGS} \
-	  -o $@ $^ \
-	  ${XRP_DSP_LIBS}
+	  -o $@ -Wl,--start-group $^ ${XRP_DSP_LIBS} -Wl,--end-group
 
 hostbld:
 	mkdir -p $@
