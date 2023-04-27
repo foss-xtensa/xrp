@@ -7,6 +7,13 @@ ifndef XTENSA_CORE
   $(error XTENSA_CORE is not defined)
 endif
 
+ifndef XTSUBSYS_SRC
+XTSUBSYS_SRC := \
+  ${XTENSA_SYSTEM}/../../../../builds/${XTENSA_RELEASE}/${XTENSA_CORE}/examples/MP_Subsystem/xt_sysbuilder_mp/
+endif
+
+-include ${XTSUBSYS_SRC}/Makefile.attr
+
 XTENSA_TOOLS := ${XTENSA_SYSTEM}/..
 XTCLANG := ${XTENSA_TOOLS}/bin/xt-clang
 
@@ -48,16 +55,6 @@ else
   $(error XRP_DSP_HW_PORT must be "simple" or "simple-xos")
 endif
 
-xrp-dsp-standalone0_CFLAGS := \
-  -mlsp=lspbld/package/cores/DSP_0/xtensa-elf/lib/sim-stacklocal \
-  -Wl,--defsym,_memmap_cacheattr_reset=0x44441141 \
-  -Wl,--defsym,xrp_dsp_comm_base_magic=0x90000000
-
-xrp-dsp-standalone1_CFLAGS := \
-  -mlsp=lspbld/package/cores/DSP_1/xtensa-elf/lib/sim-stacklocal \
-  -Wl,--defsym,_memmap_cacheattr_reset=0x44441141 \
-  -Wl,--defsym,xrp_dsp_comm_base_magic=0x90001000
-
 XRP_HOST_CC := gcc
 
 XRP_HOST_CPPFLAGS := \
@@ -87,14 +84,19 @@ else
   $(error XRP_HOST_QUEUE_TYPE must be "sync" or "threaded")
 endif
 
+CORE_NUMS := 0 $(shell seq `expr $(NUM_CORES) - 1`)
+XRP_DSP_BINARIES := $(addprefix xrp-dsp-standalone,$(CORE_NUMS))
+CORES = $(addprefix DSP_,$(CORE_NUMS))
+XTSC_RUN_BINARY_DEF := $(addprefix --define=,$(join $(addsuffix _BINARY=,$(CORES)), $(XRP_DSP_BINARIES)))
+
 
 .PHONY: all
 all: sysbld lspbld \
-  dspbld xrp-dsp-standalone0 xrp-dsp-standalone1 \
+  dspbld ${XRP_DSP_BINARIES} \
   hostbld xrp-host-standalone
 
 sysbld: ## Build subsystem and DTS
-	cp ${XTENSA_SYSTEM}/../../../../builds/${XTENSA_RELEASE}/${XTENSA_CORE}/xtensa-elf/lib/xocl/subsys.yml .
+	cp ${XTSUBSYS_SRC}/subsys.yml .
 	${XTENSA_TOOLS}/libexec/xt-sysbuilder \
 	  -subsys subsys.yml \
 	  -swtools ${XTENSA_TOOLS} \
@@ -102,7 +104,7 @@ sysbld: ## Build subsystem and DTS
 	cp sysbld/xrp/XRP_Controller.lua sysbld/xtsc-run/TestBenchMaster.vec
 
 lspbld: ## Build LSPs
-	cp ${XTENSA_SYSTEM}/../../../../builds/${XTENSA_RELEASE}/${XTENSA_CORE}/xtensa-elf/lib/xocl/subsys.xld .
+	cp ${XTSUBSYS_SRC}/subsys.xld .
 	${XTENSA_TOOLS}/libexec/xt-mbuild \
 	  -root lspbld \
 	  -syspkg lspbld/package \
@@ -122,12 +124,11 @@ dspbld/xrp_dsp_standalone-dsp_main.o: ${XRP_SRC}/xrp-example/dsp_main.c
 	$(XRP_DSP_CC) -c $(XRP_DSP_CFLAGS) $(XRP_DSP_CPPFLAGS) \
 	  -o $@ $<
 
-xrp-dsp-standalone0: dspbld/xrp_dsp_standalone-dsp_test.o dspbld/xrp_dsp_standalone-dsp_main.o
-	$(XRP_DSP_CC) ${xrp-dsp-standalone0_CFLAGS} \
-	  -o $@ -Wl,--start-group $^ ${XRP_DSP_LIBS} -Wl,--end-group
-
-xrp-dsp-standalone1: dspbld/xrp_dsp_standalone-dsp_test.o dspbld/xrp_dsp_standalone-dsp_main.o
-	$(XRP_DSP_CC) ${xrp-dsp-standalone1_CFLAGS} \
+xrp-dsp-standalone%: dspbld/xrp_dsp_standalone-dsp_test.o dspbld/xrp_dsp_standalone-dsp_main.o
+	$(XRP_DSP_CC) \
+	  -mlsp=lspbld/package/cores/DSP_${*}/xtensa-elf/lib/sim-stacklocal \
+	  -Wl,--defsym,_memmap_cacheattr_reset=${CACHE_ATTR} \
+	  -Wl,--defsym,xrp_dsp_comm_base_magic=${DSP_${*}_DEVICE_COMM_BASE_MAGIC} \
 	  -o $@ -Wl,--start-group $^ ${XRP_DSP_LIBS} -Wl,--end-group
 
 hostbld:
@@ -161,7 +162,7 @@ hostbld/xrp_alloc.o: ${XRP_SRC}/xrp-common/xrp_alloc.c
 	$(XRP_HOST_CC) -c $(XRP_HOST_CFLAGS) $(XRP_HOST_CPPFLAGS) \
 	  -o $@ $<
 
-hostbld/xrp.dtb: sysbld/xrp/SubSystem.dts
+hostbld/xrp.dtb: sysbld/xrp/TestSubSys.dts
 	${DTC} -o $@ -O dtb $<
 
 hostbld/xrp_dtb.o: ${XRP_SRC}/xrp-example/xrp_dtb.s hostbld/xrp.dtb
@@ -186,11 +187,11 @@ xrp-host-standalone: \
 
 .PHONY: run
 run:
-	./xrp-host-standalone.sh
+	./xrp-host-standalone.sh ${XTSC_RUN_BINARY_DEF}
 
 
 .PHONY: clean
 clean:
 	rm -rf subsys.* sysbld lspbld
-	rm -rf dspbld xrp-dsp-standalone0 xrp-dsp-standalone1
+	rm -rf dspbld ${XRP_DSP_BINARIES}
 	rm -rf hostbld xrp-host-standalone
