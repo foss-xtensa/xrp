@@ -9,7 +9,8 @@ endif
 
 -include ${XTSUBSYS_SRC}/Makefile.attr
 
-XTENSA_TOOLS := `xt-run --show-config=xttools`
+XTRUN := $(shell [ -x "$$(command -v xt-run)" ] && echo xt-run || echo ${XTENSA_SYSTEM}/../bin/xt-run)
+XTENSA_TOOLS := $(shell ${XTRUN} --show-config=xttools)
 XTCLANG := ${XTENSA_TOOLS}/bin/xt-clang
 
 XTENSA_RELEASE := $(shell basename $(dir $(shell ${XTCLANG} --show-config=xttools)))
