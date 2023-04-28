@@ -16,16 +16,11 @@
 
 ## Building example:
 
-- Set environments `XTENSA_CORE` and `XTENSA_SYSTEM`:
+- Set environments `XTENSA_CORE`, `XTENSA_SYSTEM` and `PATH`:
 ```
 setenv XTENSA_SYSTEM '/path/xtensa/XtDevTools/install/tools/RI-2022.10-linux/XtensaTools/config'
 setenv XTENSA_CORE 'visionp6_ao'
-```
-
-- Set environments `PATH` and `LD_LIBRARY_PATH`:
-```
 setenv PATH "${XTENSA_SYSTEM}/../bin:${PATH}"
-setenv LD_LIBRARY_PATH "${XTENSA_SYSTEM}/../Tools/lib:${LD_LIBRARY_PATH}"
 ```
 
 - Build using:

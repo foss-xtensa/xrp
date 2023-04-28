@@ -95,7 +95,8 @@ xrp-host-standalone: \
   hostbld/xrp_dtb.o hostbld/host_main.o
 	$(XRP_HOST_CC) $(XRP_HOST_CFLAGS) \
 	  -o $@ $^ \
-	  -pthread -L${LIBFDT_PATH}/lib -lfdt -lrt
+	  -L${LIBFDT_PATH}/lib -Wl,-rpath ${LIBFDT_PATH}/lib \
+	  -pthread -lfdt -lrt
 
 
 .PHONY: run
