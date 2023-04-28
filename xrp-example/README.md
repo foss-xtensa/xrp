@@ -38,3 +38,46 @@ make all
 ```
 make run
 ```
+Expected output:
+```
+        SystemC 2.3.2-Accellera --- Nov 30 2022 16:02:58
+        Copyright (c) 1996-2017 by all Contributors,
+        ALL RIGHTS RESERVED
+( kill -STOP ${BASHPID}; exec ./xrp-host-standalone )
+=======================================================
+=======================================================
+f3: sz = 2048
+comparing 0x7fcd700ec000 vs 0x7fcd700ed000
+comparing 0x21b7460 vs 0x7fcd700ec000
+comparing 0x7fcd700ec000 vs 0x21b7460
+comparing 0x21b7460 vs 0x21b7c70
+f3: sz = 4096
+comparing 0x7fcd700ec000 vs 0x7fcd700ed000
+comparing 0x21b7230 vs 0x7fcd700ec000
+comparing 0x7fcd700ec000 vs 0x21b7230
+comparing 0x21b7230 vs 0x21b8570
+f3: sz = 8192
+comparing 0x7fcd700ec000 vs 0x7fcd700ee000
+comparing 0x21b72b0 vs 0x7fcd700ec000
+comparing 0x7fcd700ec000 vs 0x21b72b0
+comparing 0x21b72b0 vs 0x21b92c0
+=======================================================
+=======================================================
+=======================================================
+=======================================================
+=======================================================
+=======================================================
+count[0] = 10
+count[1] = 10
+count[2] = 10
+count[3] = 10
+count[4] = 10
+count[5] = 10
+count[6] = 10
+count[7] = 10
+count[8] = 10
+count[9] = 10
+=======================================================
+f10 doesn't test anything for devid < 2
+=======================================================
+```

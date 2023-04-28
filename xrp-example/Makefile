@@ -6,7 +6,8 @@ all: sysbld lspbld \
   dspbld ${XRP_DSP_BINARIES} \
   hostbld xrp-host-standalone
 
-sysbld: ## Build subsystem and DTS
+## Build subsystem and DTS
+sysbld:
 	cp ${XTSUBSYS_SRC}/subsys.yml .
 	${XTENSA_TOOLS}/libexec/xt-sysbuilder \
 	  -subsys subsys.yml \
@@ -14,7 +15,8 @@ sysbld: ## Build subsystem and DTS
 	  -build sysbld
 	cp sysbld/xrp/XRP_Controller.lua sysbld/xtsc-run/TestBenchMaster.vec
 
-lspbld: ## Build LSPs
+## Build LSPs
+lspbld:
 	cp ${XTSUBSYS_SRC}/subsys.xld .
 	${XTENSA_TOOLS}/libexec/xt-mbuild \
 	  -root lspbld \

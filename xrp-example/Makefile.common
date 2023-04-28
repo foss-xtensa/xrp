@@ -7,17 +7,17 @@ ifndef XTENSA_CORE
   $(error XTENSA_CORE is not defined)
 endif
 
+-include ${XTSUBSYS_SRC}/Makefile.attr
+
+XTENSA_TOOLS := `xt-run --show-config=xttools`
+XTCLANG := ${XTENSA_TOOLS}/bin/xt-clang
+
+XTENSA_RELEASE := $(shell basename $(dir $(shell ${XTCLANG} --show-config=xttools)))
+
 ifndef XTSUBSYS_SRC
 XTSUBSYS_SRC := \
   ${XTENSA_SYSTEM}/../../../../builds/${XTENSA_RELEASE}/${XTENSA_CORE}/examples/MP_Subsystem/xt_sysbuilder_mp/
 endif
-
--include ${XTSUBSYS_SRC}/Makefile.attr
-
-XTENSA_TOOLS := ${XTENSA_SYSTEM}/..
-XTCLANG := ${XTENSA_TOOLS}/bin/xt-clang
-
-XTENSA_RELEASE := $(shell basename $(dir $(shell ${XTCLANG} --show-config=xttools)))
 
 DTC := ${XTENSA_TOOLS}/Tools/bin/dtc
 
