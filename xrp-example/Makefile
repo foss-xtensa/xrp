@@ -10,6 +10,7 @@ all: sysbld lspbld \
 sysbld:
 	cp ${XTSUBSYS_SRC}/subsys.yml .
 	${XTENSA_TOOLS}/libexec/xt-sysbuilder \
+	  -add_xrp_shmem_pid \
 	  -subsys subsys.yml \
 	  -swtools ${XTENSA_TOOLS} \
 	  -build sysbld
