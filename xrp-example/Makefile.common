@@ -37,10 +37,18 @@ ifndef XRP_DSP_HW_PORT
   XRP_DSP_HW_PORT := simple
 endif
 
+ifdef XRP_DSP_USE_SRCS
+XRP_DSP_LIBS_OBJS := \
+  dspbld/xrp_rb_file.o \
+  dspbld/xrp_ns.o \
+  dspbld/xrp_dsp.o \
+  dspbld/xrp_dsp_hw_${XRP_DSP_HW_PORT}.o
+else
 XRP_DSP_LIBS := \
-	-lxrp-common \
-	-lxrp-dsp \
-	-lxrp-dsp-hw-${XRP_DSP_HW_PORT}
+  -lxrp-common \
+  -lxrp-dsp \
+  -lxrp-dsp-hw-${XRP_DSP_HW_PORT}
+endif
 
 ifeq (${XRP_DSP_HW_PORT}, simple)
 else ifeq (${XRP_DSP_HW_PORT}, simple-xos)

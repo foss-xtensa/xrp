@@ -30,6 +30,22 @@ lspbld:
 dspbld:
 	mkdir -p $@
 
+dspbld/xrp_rb_file.o: ${XRP_SRC}/xrp-common/xrp_rb_file.c
+	$(XRP_DSP_CC) -c $(XRP_DSP_CFLAGS) $(XRP_DSP_CPPFLAGS) \
+	  -o $@ $<
+
+dspbld/xrp_ns.o: ${XRP_SRC}/xrp-common/xrp_ns.c
+	$(XRP_DSP_CC) -c $(XRP_DSP_CFLAGS) $(XRP_DSP_CPPFLAGS) \
+	  -o $@ $<
+
+dspbld/xrp_dsp_hw_${XRP_DSP_HW_PORT}.o: ${XRP_SRC}/xrp-dsp/${XRP_DSP_HW_PORT}/xrp_dsp_hw_${XRP_DSP_HW_PORT}.c
+	$(XRP_DSP_CC) -c $(XRP_DSP_CFLAGS) $(XRP_DSP_CPPFLAGS) \
+	  -o $@ $<
+
+dspbld/xrp_dsp.o: ${XRP_SRC}/xrp-dsp/xrp_dsp.c
+	$(XRP_DSP_CC) -c $(XRP_DSP_CFLAGS) $(XRP_DSP_CPPFLAGS) \
+	  -o $@ $<
+
 dspbld/xrp_dsp_standalone-dsp_test.o: ${XRP_SRC}/xrp-example/dsp_test.c
 	$(XRP_DSP_CC) -c $(XRP_DSP_CFLAGS) $(XRP_DSP_CPPFLAGS) \
 	  -o $@ $<
@@ -38,12 +54,12 @@ dspbld/xrp_dsp_standalone-dsp_main.o: ${XRP_SRC}/xrp-example/dsp_main.c
 	$(XRP_DSP_CC) -c $(XRP_DSP_CFLAGS) $(XRP_DSP_CPPFLAGS) \
 	  -o $@ $<
 
-xrp-dsp-standalone%: dspbld/xrp_dsp_standalone-dsp_test.o dspbld/xrp_dsp_standalone-dsp_main.o
+xrp-dsp-standalone%: ${XRP_DSP_LIBS_OBJS} dspbld/xrp_dsp_standalone-dsp_test.o dspbld/xrp_dsp_standalone-dsp_main.o
 	$(XRP_DSP_CC) \
 	  -mlsp=lspbld/package/cores/DSP_${*}/xtensa-elf/lib/sim-stacklocal \
 	  -Wl,--defsym,_memmap_cacheattr_reset=${CACHE_ATTR} \
 	  -Wl,--defsym,xrp_dsp_comm_base_magic=${DSP_${*}_DEVICE_COMM_BASE_MAGIC} \
-	  -o $@ -Wl,--start-group $^ ${XRP_DSP_LIBS} -Wl,--end-group
+	  -o $@ $^ -Wl,--start-group ${XRP_DSP_LIBS} -Wl,--end-group
 
 hostbld:
 	mkdir -p $@

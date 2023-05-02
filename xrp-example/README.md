@@ -7,6 +7,7 @@
     - `XTENSA_CORE`
 - **Optional:**
     - `XTSUBSYS_SRC`: Path to location where to pull yml and xld files.
+    - `XRP_DSP_USE_SRCS`: When defined, use xrp-dsp sources instead of installed prebuilt.
     - `XRP_DSP_HW_PORT`
         - `simple` : default
         - `simple-xos`
