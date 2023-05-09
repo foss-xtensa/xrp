@@ -71,7 +71,7 @@ xrp-dsp-standalone%: ${XRP_DSP_LIBS_OBJS} dspbld/xrp_dsp_standalone-dsp_test.o d
 	  -mlsp=lspbld/package/cores/DSP_${*}/xtensa-elf/lib/sim-stacklocal \
 	  -Wl,--defsym,_memmap_cacheattr_reset=${CACHE_ATTR} \
 	  -Wl,--defsym,xrp_dsp_comm_base_magic=${DSP_${*}_DEVICE_COMM_BASE_MAGIC} \
-	  -o $@ $^ -Wl,--start-group ${XRP_DSP_LIBS} -Wl,--end-group
+	  -o $@ $^ -Wl,--start-group ${XRP_DSP_LDFLAGS} -Wl,--end-group
 
 hostbld:
 	mkdir -p $@

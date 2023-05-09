@@ -39,7 +39,7 @@ ifndef XRP_DSP_HW_PORT
   XRP_DSP_HW_PORT := simple
 endif
 
-XRP_DSP_LIBS := \
+XRP_DSP_LDFLAGS := \
   -lxrp-common \
   -lxrp-dsp \
   -lxrp-dsp-hw-${XRP_DSP_HW_PORT}
@@ -49,9 +49,9 @@ XRP_DSP_LIBS_OBJS := \
   dspbld/libxrp-common.a \
   dspbld/libxrp_dsp.a \
   dspbld/libxrp_dsp_hw_${XRP_DSP_HW_PORT}.a
-XRP_DSP_LIBS := \
+XRP_DSP_LDFLAGS := \
   -Ldspbld \
-  ${XRP_DSP_LIBS}
+  ${XRP_DSP_LDFLAGS}
 endif
 
 ifeq (${XRP_DSP_HW_PORT}, simple)
@@ -62,7 +62,7 @@ else ifeq (${XRP_DSP_HW_PORT}, simple-xos)
     -DHAVE_XTOS_INTERRUPT_ENABLE=1 \
     -DHAVE_XTOS_INTERRUPT_DISABLE=1 \
     -DHAVE_XTOS_SET_EXCEPTION_HANDLER=1
-  XRP_DSP_LIBS += \
+  XRP_DSP_LDFLAGS += \
     -lxos -lxtutil
 else
   $(error XRP_DSP_HW_PORT must be "simple" or "simple-xos")
