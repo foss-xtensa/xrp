@@ -25,6 +25,8 @@ DTC := ${XTENSA_TOOLS}/Tools/bin/dtc
 LIBFDT_PATH := ${XTENSA_TOOLS}/Tools/
 
 XRP_DSP_CC := ${XTCLANG} --xtensa-core=${XTENSA_CORE}
+XRP_DSP_AR := ${XTENSA_TOOLS}/bin/xt-ar
+XRP_DSP_RANLIB := ${XTENSA_TOOLS}/bin/xt-ranlib
 
 XRP_SRC := ..
 
@@ -37,17 +39,19 @@ ifndef XRP_DSP_HW_PORT
   XRP_DSP_HW_PORT := simple
 endif
 
-ifdef XRP_DSP_USE_SRCS
-XRP_DSP_LIBS_OBJS := \
-  dspbld/xrp_rb_file.o \
-  dspbld/xrp_ns.o \
-  dspbld/xrp_dsp.o \
-  dspbld/xrp_dsp_hw_${XRP_DSP_HW_PORT}.o
-else
 XRP_DSP_LIBS := \
   -lxrp-common \
   -lxrp-dsp \
   -lxrp-dsp-hw-${XRP_DSP_HW_PORT}
+
+ifdef XRP_DSP_USE_SRCS
+XRP_DSP_LIBS_OBJS := \
+  dspbld/libxrp-common.a \
+  dspbld/libxrp_dsp.a \
+  dspbld/libxrp_dsp_hw_${XRP_DSP_HW_PORT}.a
+XRP_DSP_LIBS := \
+  -Ldspbld \
+  ${XRP_DSP_LIBS}
 endif
 
 ifeq (${XRP_DSP_HW_PORT}, simple)
