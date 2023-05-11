@@ -8,12 +8,12 @@
 - **Optional:**
     - `XTSUBSYS_SRC`: Path to location where to pull yml and xld files.
     - `XRP_DSP_USE_SRCS`: When defined, use xrp-dsp sources instead of installed prebuilt.
-    - `XRP_DSP_HW_PORT`
-        - `simple` : default
-        - `simple-xos`
-    - `XRP_HOST_QUEUE_TYPE`
-        - `sync` : default
-        - `threaded`
+    - `XRP_DSP_HW_PORT`: Select hardware port to build. Hardware port is a hardware-specific DSP library. In this release there are two ports bundled with the XRP code called `simple` and `simple-xos`.
+        - `simple`: **(default)** XTSC model with MMIO regions for each DSP.
+        - `simple-xos`: Variant of `simple` port that internally uses XOS and supports the multiqueue feature. It has the same hardware requirements as the `simple` port.
+    - `XRP_HOST_QUEUE_TYPE`: Select whether to use HOST thread library for asynchronous processing. Without thread support, asynchronous operations like xrp_enqueue_command() will act synchronously.
+        - `sync`: **(default)** Synchronous processing.
+        - `threaded`: Enable thread support for asynchronous processing.
 
 ## Building example:
 
