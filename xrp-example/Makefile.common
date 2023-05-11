@@ -31,7 +31,8 @@ XRP_DSP_RANLIB := ${XTENSA_TOOLS}/bin/xt-ranlib
 XRP_SRC := ..
 
 XRP_DSP_CPPFLAGS := \
-  -I${XRP_SRC}/xrp-common -I${XRP_SRC}/xrp-dsp
+  -I${XRP_SRC}/xrp-common -I${XRP_SRC}/xrp-dsp \
+  $(if ${XRP_DSP_DEBUG},-DDEBUG=1)
 
 XRP_DSP_CFLAGS := -W -Wall -g -O2
 
@@ -78,7 +79,8 @@ XRP_HOST_CPPFLAGS := \
   -I${LIBFDT_PATH}/include \
   -I${XRP_SRC} -I${XRP_SRC}/xrp-common \
   -I${XRP_SRC}/xrp-host \
-  -I${XRP_SRC}/xrp-host/standalone
+  -I${XRP_SRC}/xrp-host/standalone \
+  $(if ${XRP_HOST_DEBUG},-DDEBUG=1)
 
 XRP_HOST_CFLAGS := -W -Wall -g -O2
 
