@@ -34,7 +34,7 @@
 #include "xrp_types.h"
 #include "xrp_host_common.h"
 #include "xrp_host_impl.h"
-#include "xrp_kernel_defs.h"
+#include "xrp-kernel/xrp_kernel_defs.h"
 
 struct xrp_request {
 	struct xrp_queue_item q;

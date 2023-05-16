@@ -14,6 +14,9 @@
     - `XRP_HOST_QUEUE_TYPE`: Select whether to use HOST thread library for asynchronous processing. Without thread support, asynchronous operations like xrp_enqueue_command() will act synchronously.
         - `sync`: **(default)** Synchronous processing.
         - `threaded`: Enable thread support for asynchronous processing.
+    - `XRP_HOST_MODE`: Select host configuration mode.
+        - `standalone`: **(default)** Standalone Mode.
+        - `hosted`: Hosted Mode. `XRP_HOST_CC` can be adjusted to the host-hosted compiler to use.
     - `XRP_DSP_DEBUG`: When defined, build DSP sources with CPPFLAGS -DDEBUG, which enables debug outputs through pr_debug().
     - `XRP_HOST_DEBUG`: When defined, build HOST sources with CPPFLAGS -DDEBUG, which enables debug outputs through pr_debug().
 

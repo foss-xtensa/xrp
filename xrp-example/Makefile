@@ -4,7 +4,7 @@
 .PHONY: all
 all: sysbld lspbld \
   dspbld ${XRP_DSP_BINARIES} \
-  hostbld xrp-host-standalone
+  hostbld xrp-host-${XRP_HOST_MODE}
 
 ## Build subsystem and DTS
 sysbld:
@@ -127,6 +127,17 @@ xrp-host-standalone: \
 	  -L${LIBFDT_PATH}/lib -Wl,-rpath ${LIBFDT_PATH}/lib \
 	  -pthread -lfdt -lrt
 
+xrp-host-hosted: \
+  ${XRP_SRC}/xrp-common/xrp_rb_file.c \
+  ${XRP_SRC}/xrp-common/xrp_ns.c \
+  ${XRP_SRC}/xrp-host/xrp_host_common.c \
+  ${XRP_SRC}/xrp-host/xrp_${XRP_HOST_QUEUE_TYPE}_queue.c \
+  ${XRP_SRC}/xrp-host/hosted/xrp_hosted.c \
+  ${XRP_SRC}/xrp-example/host_main.c
+	$(XRP_HOST_CC) $(XRP_HOST_CFLAGS) $(XRP_HOST_CPPFLAGS) \
+	  -o $@ $^ \
+	  -pthread -lrt
+
 
 .PHONY: run
 run:
@@ -137,4 +148,4 @@ run:
 clean:
 	rm -rf subsys.* sysbld lspbld
 	rm -rf dspbld ${XRP_DSP_BINARIES}
-	rm -rf hostbld xrp-host-standalone
+	rm -rf hostbld xrp-host-{standalone,hosted}

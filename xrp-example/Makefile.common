@@ -69,17 +69,30 @@ else
   $(error XRP_DSP_HW_PORT must be "simple" or "simple-xos")
 endif
 
-XRP_HOST_CC := gcc
+ifndef XRP_HOST_CC
+  XRP_HOST_CC := gcc
+endif
 
-XRP_HOST_CPPFLAGS := \
+ifndef XRP_HOST_MODE
+  XRP_HOST_MODE := standalone
+endif
+
+ifeq (${XRP_HOST_MODE}, standalone)
+  XRP_HOST_CPPFLAGS += \
+    -DHAVE_LIBFDT=1 \
+    -DHAVE_FDT_GETPROP=1 \
+    -DHAVE_FDT_STRERROR=1 \
+    -I${LIBFDT_PATH}/include
+else ifeq (${XRP_HOST_MODE}, hosted)
+else
+  $(error XRP_HOST_MODE must be "standalone" or "hosted")
+endif
+
+XRP_HOST_CPPFLAGS += \
   -DHAVE_NANOSLEEP=1 \
-  -DHAVE_LIBFDT=1 \
-  -DHAVE_FDT_GETPROP=1 \
-  -DHAVE_FDT_STRERROR=1 \
-  -I${LIBFDT_PATH}/include \
   -I${XRP_SRC} -I${XRP_SRC}/xrp-common \
   -I${XRP_SRC}/xrp-host \
-  -I${XRP_SRC}/xrp-host/standalone \
+  -I${XRP_SRC}/xrp-host/${XRP_HOST_MODE} \
   $(if ${XRP_HOST_DEBUG},-DDEBUG=1)
 
 XRP_HOST_CFLAGS := -W -Wall -g -O2
