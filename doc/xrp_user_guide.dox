@@ -932,7 +932,7 @@ the DSP side. See \ref porting_dsp section for details.
 An example hardware-specific XRP driver, xrp_hw_simple, is provided that may be used
 as a template.
 
-\page building Configuring and Building XRP
+\page building Building XRP
 \idxentry{Building}
 
 XRP sources are installed along with the Xtensa Tools. The sources can be found
@@ -957,237 +957,89 @@ Xtensa are also provided in binary form ready for linking. Linux hosted host
 library, Linux standalone host library, Linux single image library and kernel driver
 must be built for a specific system where they will be used.
 
-\section building_libraries Building XRP Libraries
-\idxentry{Building!Libraries}
+\section building_standalone Building Standalone Mode example
+\idxentry{Building!Standalone}
 
-Userspace and firmware code is built using standard autoconf configure + make
-sequence. Generated makefile supports all standard targets, e.g. 'make install'
-would install generated library and header file into selected directory
-structure.
-
-Normally one build directory is configured per host architecture, so, e.g. to
-build libraries for a hosted (arm64 + xtensa DSP) system two build directories
-are needed: one for the host code (arm64) and one for the DSP code (xtensa).
-
-The following additional switches of the `configure` script control what
-parts of the XRP are built and how:
-
-\latexonly
-\begin{table}[h]
-\caption{Additional configure Script Switches}
-\end{table}
-\endlatexonly
-
-| Switch                    | Description                             | Default  |
-| ------------------------- | --------------------------------------- | -------- |
-| --enable-threads          | Enable thread support.                  | `detect` |
-| --enable-host             | Build host XRP components.              | `yes`    |
-| --enable-dsp              | Build DSP XRP components.               | `detect` |
-| --enable-standalone       | Build standalone library/example.       | `yes`    |
-| --enable-hosted           | Build hosted library/example.           | `detect` |
-| --enable-single           | Build single library/example.           | `yes`    |
-| --enable-example          | Build example application.              | `no`     |
-| --enable-external         | Build example using external libraries. | `no`     |
-| --enable-port[=ARG]       | Enable port ARG.                        | `simple` |
-| --enable-all-simple-ports | Build all simple* ports.                | `no`     |
-| --with-libfdt             | Prefix of libfdt headers/library.       |          |
-
-- Switch `--enable-threads` (detect by default) enables or disables use of
-  thread library for asynchronous processing. Without thread support
-  asynchronous operations, like xrp_enqueue_command() will act synchronously.
-  `detect` enables thread support when POSIX or XOS threads are available
-  for the host system.
-
-- Switches `--enable-host` (on by default) and `--enable-dsp` (on when host
-  triplet specifies xtensa host) enable building of host and DSP libraries and
-  examples respectively.
-
-- Switches `--enable-hosted` (on when host triplet specifies Linux host),
-  `--enable-standalone` (on by default) and `--enable-single` (on by default)
-  enable building of hosted variant of library/example, standalone variant or
-  single image variant respectively.
-
-- Switch `--enable-example` enables building of the example host application
-  and example DSP firmware, when `--enable-host` and `--enable-dsp` are
-  enabled respectively.
-
-- Switch `--enable-external` makes example use system headers and libraries
-  instead of building them from the bundled source. It may be used to build
-  example with XRP headers and libraries supplied with the Xtensa tools.
-
-- Switch `--enable-port` seclects hardware port for building. Hardware port
-  is a hardware-specific DSP library, hardware-specific kernel driver and DSP
-  side build flags. In this release there are three ports bundled with the XRP
-  code called `simple`, `simple-xos` and `hikey960`.
-
-  - `simple` is for the simple XTSC models with MMIO regions for each DSP
-    with mandatory reset and runstall registers and optional IRQ register.
-  - `simple-xos` is a variant of `simple` port that internally uses XOS and
-    supports the multiqueue feature. It has the same hardware requirements
-    as the `simple` port.
-  - `hikey960` is for the HiFi3 DSP in the HiKey960 platform.
-
-- Switch `--enable-all-simple-ports` selects `simple` and `simple-xos` ports
-  in addition to any port enabled with `--enable-port` switch when building
-  DSP libraries. This is used for building XRP as a part of Xtensa tools.
-
-- Switch `--with-libfdt` may be used to specify a path to the libfdt headers
-  and archive when it is installed in a non-standard location.
-
-Xtensa code needs Cadence toolchain for Xtensa as it uses the Xtensa Processor
-Hardware Abstraction Layer, XTOS and XOS.
-Provide the following environment variable to the `configure` or to `make`:
-  - CC: name of the compiler together with the xtensa core specification.
-  Without any other options this will produce all host and DSP XRP libraries
-  for xtensa:
-
+The host and dsp code are built from `xrp-example/Makefile`; ie:
 <pre>
-  $ ./configure --host=xtensa-elf CC=xt-clang
-  $ make
+	$ make all
+</pre>
+The Makefile expects mandatory and optional parameters.
+
+Mandatory parameters are:
+- `XTENSA_SYSTEM`: Path to Xtensa configuration registry.
+- `XTENSA_CORE`: Xtensa configuration to use.
+
+Optional parameters are:
+- `XTSUBSYS_SRC`: Path to location where to pull yml and xld files.
+- `XRP_DSP_USE_SRCS`: When defined, xrp-dsp sources are used instead of installed prebuilts.
+- `XRP_DSP_HW_PORT`: Select DSP hardware port to build. Hardware port is a hardware-specific DSP library.
+	In this release there are two ports bundled with the XRP code called `simple` and `simple-xos`.
+	- `simple`: (default) XTSC model with MMIO regions for each DSP.
+	- `simple-xos`: Variant of `simple` port that internally uses XOS and supports
+		the multiqueue feature. It has the same hardware requirements as the `simple` port.
+- `XRP_HOST_QUEUE_TYPE`: Select whether to use HOST thread library for asynchronous processing.
+	Without thread support, asynchronous operations like xrp_enqueue_command() will act synchronously.
+	- `sync`: (default) synchronous processing.
+	- `threaded`: Enable thread support for asynchronous processing.
+
+DSP libraries are generated as part of the build process under `xrp-example/dspbld` when Makefile parameter `XRP_DSP_USE_SRCS=1`.
+
+it also possible to build just the individual DSP libraries using their make targets; ie:
+<pre>
+	$ make dspbld/libxrp-common.a
+	$ make dspbld/libxrp_dsp.a
+	$ make XRP_DSP_HW_PORT=simple dspbld/libxrp_dsp_hw_simple.a
+	$ make XRP_DSP_HW_PORT=simple-xos dspbld/libxrp_dsp_hw_simple-xos.a
+</pre>
+Once built, running is done using:
+<pre>
+	$ make run
 </pre>
 
-| File                                  | Description               |
-| ------------------------------------- | ------------------------- |
-| xrp-host/libxrp-host-standalone.a     | Standalone host library   |
-| xrp-host/libxrp-host-single.a         | Single image host library |
-| xrp-common/libxrp-common.a            | Common XRP code library   |
-| xrp-dsp/simple/libxrp-dsp-hw-simple.a | Simple hardware DSP port  |
-| xrp-dsp/libxrp-dsp.a                  | DSP library               |
+\section building_hosted Building Hosted Mode example
+\idxentry{Building!Hosted}
 
-- host side code needs a toolchain for the host. Without additional
-  switches the following will produce Linux XRP libraries for hosted,
-  standalone and single-image modes:
-
+The host hosted code is built from `xrp-example/Makefile`; ie:
 <pre>
-  $ ./configure
-  $ make
+	$ make XRP_HOST_MODE=hosted xrp-host-hosted
 </pre>
+The Makefile expects following optional parameter:
+- `XRP_HOST_QUEUE_TYPE`: Select whether to use HOST thread library for asynchronous processing.
+	Without thread support, asynchronous operations like xrp_enqueue_command() will act synchronously.
+	- `sync`: (default) synchronous processing.
+	- `threaded`: Enable thread support for asynchronous processing.
+- `XRP_HOST_CC`: Host-hosted compiler to use. Default to `gcc`
 
-| File                                  | Description               |
-| ------------------------------------- | ------------------------- |
-| xrp-host/libxrp-host-standalone.a     | Standalone host library   |
-| xrp-host/libxrp-host-hosted.a         | Hosted host library       |
-| xrp-host/libxrp-host-single.a         | Single image host library |
-| xrp-common/libxrp-common.a            | Common XRP code library   |
+Once built, host-hosted executable `xrp-host-hosted` is generated.
 
-\section building_examples Building XRP Examples
-\idxentry{Building!Examples}
-
-Example applications may be built in addition to the XRP libraries. The switch
-`--enable-standalone` controls building of the standalone libraries and
-examples. The switch `--enable-hosted` controls building of the hosted
-libraries and examples. The Device Tree Compiler (`dtc`) is required to build
-standalone host example code. `dtc` is usually provided as a part of the
-`device-tree-compiler` package on GNU/Linux operating systems. In order to use
-custom `dtc` binary, the environment variable `DTC` with a path to that `dtc`
-binary may be used with `configure` or `make` command.
-
-- adding switch `--enable-example` to the hosted DSP build configuration will
-  produce example firmware for hosted mode. Provide the following environment
-  variable to the `configure` or `make`:
-  - `DSP_LSP`: path to the LSP to be used.
-  - `DSP_CACHEATTR`: value for the `_memmap_cacheattr_reset` symbol.
-
-<pre>
-  $ ./configure --host=xtensa-elf --disable-host --disable-standalone \
-    --enable-example \
-    DSP_LSP=vp6-mp/package/cores/DSP_0/xtensa-elf/lib/sim-stacklocal \
-    CC='xt-clang --xtensa-core=visionp6_ao'
-  $ make
-</pre>
-
-  The result is xrp-example/xrp-dsp-hosted. In order to be loaded as a firmware
-  it needs to be put to the Linux file system under /lib/modules/firmware and
-  its name need to be specified in the "firmware" parameter inside the xrp
-  device node in the device tree.
-
-- adding switch `--enable-example` to the standalone DSP build configuration
-  will produce example firmware for standalone mode. Provide the following
-  environment variable to the `configure` or `make`:
-  - `DSP_LSP`: path to the LSP to be used.
-  - `DSP_CACHEATTR`: value for the `_memmap_cacheattr_reset` symbol.
-  - `DSP_COMM_BASE`: base address of the DSP communication area.
-
-<pre>
-  $ ./configure --host=xtensa-elf --disable-host --disable-hosted \
-    --enable-standalone --enable-example \
-    DSP_LSP=vp6-mp/package/cores/DSP_0/xtensa-elf/lib/sim-stacklocal \
-    DSP_COMM_BASE=0x10000000 \
-    CC='xt-clang --xtensa-core=visionp6_ao'
-  $ make
-</pre>
-
-  The result is xrp-example/xrp-dsp-standalone. To be loaded as
-  firmware, a path to it must be passed to the XTSC.
-
-- adding switch `--enable-example` to the Linux host build configuration will
-  produce example Linux host applications for hosted, standalone and
-  single-image modes:
-
-<pre>
-  $ ./configure --enable-example
-  $ make
-</pre>
-
-| File                            | Description                         |
-| ------------------------------- | ----------------------------------- |
-| xrp-example/xrp-host-hosted     | Hosted host example application     |
-| xrp-example/xrp-host-single     | Single image example                |
-| xrp-example/xrp-host-standalone | Standalone host example application |
-
-- the following will produce bare-metal examples for standalone and
-  single-image modes. Provide the following environment variable to the
-  `configure` or `make`:
-  - `HOST_LSP`: path to the LSP to be used.
-  - `HOST_CACHEATTR`: value for the `_memmap_cacheattr_reset` symbol.
-
-<pre>
-  $ ./configure --host=xtensa-elf CC=xt-clang --enable-example
-  $ make
-</pre>
-
-| File                            | Description                         |
-| ------------------------------- | ----------------------------------- |
-| xrp-example/xrp-host-single     | Single image example                |
-| xrp-example/xrp-host-standalone | Standalone host example application |
-
-\section building_kernel Building the Kernel Driver
+\section building_kernel Building Linux Kernel Driver
 \idxentry{Building!Kernel}
 
-The kernel driver is built using a typical kernel module build sequence. At
-least the following environment variables/make parameters must be provided by
-the user:
+The host kernel driver is built from `xrp-kernel/Makefile` using a typical kernel module build sequence.
+
+The Makefile expects following mandatory parameters:
 - `ARCH`: target Linux architecture
 - `KSRC`: points to the configured kernel tree
 - `CROSS_COMPILE`: path and prefix name of the cross compiler
 
-xrp-kernel directory is independent from the rest of the XRP build system,
-it is not configured by the `configure` script. The Makefile here invokes
-the Linux kernel build system. xrp-kernel/Makefile supports targets "modules",
-"clean" and all other standard kernel targets. xrp-kernel/Kconfig is not used
-when building kernel modules out-of-tree. The whole xrp-kernel directory may
-be integrated into the drivers subtree of the Linux kernel, in which case
-Makefile of the parent directory shall reference xrp-kernel/Makefile, and
-Kconfig of the parent directory shall include xrp-kernel/Kconfig.
-Example building modules out-of-tree for the Aarch64 Linux:
-
+The Makefile invokes the Linux kernel build system; it supports targets "modules",
+"clean" and all other standard kernel targets.
+xrp-kernel/Kconfig is not used when building kernel modules out-of-tree. The whole xrp-kernel
+directory may be integrated into the drivers subtree of the Linux kernel, in which case Makefile
+of the parent directory shall reference xrp-kernel/Makefile, and Kconfig of the parent directory
+shall include xrp-kernel/Kconfig. Example building modules out-of-tree for the Aarch64 Linux:
 <pre>
-  $ ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- \
-    KSRC=`pwd`/../kernel/build-arm64-3.19 make -C xrp-kernel modules
+	$ ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- \
+	  KSRC=‘pwd‘/../kernel/build-arm64-3.19 \
+	  make -C xrp-kernel modules
 </pre>
-
-The result is kernel object xrp-kernel/xrp.ko loadable into the kernel it was
-built against. To build both xrp.ko and xrp_hw_simple.ko pass
-CONFIG_XRP_HW_SIMPLE=m to the make:
-
+The result is kernel object xrp-kernel/xrp.ko loadable into the kernel it was built against.
+To build both xrp.ko and xrp_hw_simple.ko pass CONFIG_XRP_HW_SIMPLE=m to make; ie:
 <pre>
-  $ ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- \
-    KSRC=`pwd`/../kernel/build-arm64-3.19 \
-    make -C xrp-kernel CONFIG_XRP_HW_SIMPLE=m modules
+	$ ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- \
+	  KSRC=‘pwd‘/../kernel/build-arm64-3.19 \
+	  make -C xrp-kernel CONFIG_XRP_HW_SIMPLE=m modules
 </pre>
-
-The following XRP kernel module features have additional requirements for the
-kernel configuration:
-- CMA binding needs CONFIG_CMA and CONFIG_DMA_CMA enabled.
 
 */
