@@ -70,7 +70,7 @@ else
 endif
 
 ifndef XRP_HOST_CC
-  XRP_HOST_CC := gcc
+  XRP_HOST_CC := $(if ${CC},${CC},gcc)
 endif
 
 ifndef XRP_HOST_MODE
