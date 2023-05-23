@@ -100,7 +100,7 @@ hostbld/xrp_linux.o: ${XRP_SRC}/xrp-host/standalone/xrp_linux.c
 	$(XRP_HOST_CC) -c $(XRP_HOST_CFLAGS) $(XRP_HOST_CPPFLAGS) \
 	  -o $@ $<
 
-hostbld/xrp_alloc.o: ${XRP_SRC}/xrp-common/xrp_alloc.c
+hostbld/xrp_alloc.o: ${XRP_SRC}/xrp-kernel/xrp_alloc.c
 	$(XRP_HOST_CC) -c $(XRP_HOST_CFLAGS) $(XRP_HOST_CPPFLAGS) \
 	  -o $@ $<
 

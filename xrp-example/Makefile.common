@@ -31,6 +31,7 @@ XRP_DSP_RANLIB := ${XTENSA_TOOLS}/bin/xt-ranlib
 XRP_SRC := ..
 
 XRP_DSP_CPPFLAGS := \
+  -I${XRP_SRC}/xrp-kernel \
   -I${XRP_SRC}/xrp-common -I${XRP_SRC}/xrp-dsp \
   $(if ${XRP_DSP_DEBUG},-DDEBUG=1)
 
@@ -90,7 +91,8 @@ endif
 
 XRP_HOST_CPPFLAGS += \
   -DHAVE_NANOSLEEP=1 \
-  -I${XRP_SRC} -I${XRP_SRC}/xrp-common \
+  -I${XRP_SRC} -I${XRP_SRC}/xrp-kernel \
+  -I${XRP_SRC}/xrp-common \
   -I${XRP_SRC}/xrp-host \
   -I${XRP_SRC}/xrp-host/${XRP_HOST_MODE} \
   $(if ${XRP_HOST_DEBUG},-DDEBUG=1)
