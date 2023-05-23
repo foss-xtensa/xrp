@@ -27,8 +27,8 @@
  * the GNU General Public License version 2 or later.
  */
 
-#ifndef _XRP_HW_DSP_INTERFACE
-#define _XRP_HW_DSP_INTERFACE
+#ifndef _XRP_KERNEL_SIMPLE_HW_DSP_INTERFACE
+#define _XRP_KERNEL_SIMPLE_HW_DSP_INTERFACE
 
 enum {
 	XRP_DSP_SYNC_IRQ_MODE_NONE = 0x0,

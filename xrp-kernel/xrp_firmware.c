@@ -38,7 +38,7 @@
 #include "xrp_hw.h"
 #include "xrp_internal.h"
 #include "xrp_firmware.h"
-#include "xrp_dsp_interface.h"
+#include "xrp_kernel_dsp_interface.h"
 
 #ifndef OF_BAD_ADDR
 #define OF_BAD_ADDR (-1ul)
