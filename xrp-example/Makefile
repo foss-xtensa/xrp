@@ -2,9 +2,13 @@
 -include Makefile.common
 
 .PHONY: all
-all: sysbld lspbld \
-  dspbld ${XRP_DSP_BINARIES} \
-  hostbld xrp-host-${XRP_HOST_MODE}
+all: xrpdsp xrphost
+
+.PHONY: xrpdsp
+xrpdsp: lspbld dspbld ${XRP_DSP_BINARIES}
+
+.PHONY: xrphost
+xrphost: sysbld hostbld xrp-host-${XRP_HOST_MODE}
 
 ## Build subsystem and DTS
 sysbld:
