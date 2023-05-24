@@ -965,13 +965,16 @@ The host and dsp code are built from `xrp-example/Makefile`; ie:
 	$ make all
 </pre>
 The Makefile expects mandatory and optional parameters.
+Mandatory parameters are usually set in the environment; and if a shell is launched from Xplorer
+then the environment is set up for the user.
 
 Mandatory parameters are:
 - `XTENSA_SYSTEM`: Path to Xtensa configuration registry.
 - `XTENSA_CORE`: Xtensa configuration to use.
 
 Optional parameters are:
-- `XTSUBSYS_SRC`: Path to location where to pull yml and xld files.
+- `XT_SUBSYS_SRC`: Path to location where to pull yml and xld files. Its default value is set to
+	`${XTENSA_SYSTEM}/../../../../builds/${XTENSA_RELEASE}/${XTENSA_CORE}/examples/MP_Subsystem/xt_sysbuilder_mp/`.
 - `XRP_DSP_USE_SRCS`: When defined, xrp-dsp sources are used instead of installed prebuilts.
 - `XRP_DSP_HW_PORT`: Select DSP hardware port to build. Hardware port is a hardware-specific DSP library.
 	In this release there are two ports bundled with the XRP code called `simple` and `simple-xos`.
@@ -996,6 +999,7 @@ Once built, running is done using:
 <pre>
 	$ make run
 </pre>
+`make clean` removes all generated artifacts; ie: host binaries as well as dsp binaries and libraries.
 
 \section building_hosted Building Hosted Mode example
 \idxentry{Building!Hosted}
@@ -1012,6 +1016,8 @@ The Makefile expects following optional parameter:
 - `XRP_HOST_CC`: Host-hosted compiler to use. Default to `gcc`
 
 Once built, host-hosted executable `xrp-host-hosted` is generated.
+
+`make clean` removes all generated artifacts; ie: host binaries.
 
 \section building_kernel Building Linux Kernel Driver
 \idxentry{Building!Kernel}
