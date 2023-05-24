@@ -17,6 +17,9 @@ ifndef XT_SUBSYS_SRC
 XT_SUBSYS_SRC := \
   ${XTENSA_SYSTEM}/../../../../builds/${XTENSA_RELEASE}/${XTENSA_CORE}/examples/MP_Subsystem/xt_sysbuilder_mp/
 endif
+ifeq (,$(wildcard ${XT_SUBSYS_SRC}))
+  $(error XT_SUBSYS_SRC set to a path that does not exist)
+endif
 
 -include ${XT_SUBSYS_SRC}/Makefile.attr
 
