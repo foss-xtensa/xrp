@@ -12,7 +12,7 @@ xrphost: sysbld hostbld xrp-host-${XRP_HOST_MODE}
 
 ## Build subsystem and DTS
 sysbld:
-	cp ${XTSUBSYS_SRC}/subsys.yml .
+	cp ${XT_SUBSYS_SRC}/subsys.yml .
 	${XTENSA_TOOLS}/libexec/xt-sysbuilder \
 	  -add_xrp_shmem_pid \
 	  -subsys subsys.yml \
@@ -22,7 +22,7 @@ sysbld:
 
 ## Build LSPs
 lspbld:
-	cp ${XTSUBSYS_SRC}/subsys.xld .
+	cp ${XT_SUBSYS_SRC}/subsys.xld .
 	${XTENSA_TOOLS}/libexec/xt-mbuild \
 	  -root lspbld \
 	  -syspkg lspbld/package \
