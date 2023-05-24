@@ -1006,7 +1006,7 @@ Once built, running is done using:
 
 The host hosted code is built from `xrp-example/Makefile`; ie:
 <pre>
-	$ make XRP_HOST_MODE=hosted xrp-host-hosted
+	$ make xrphosted
 </pre>
 The Makefile expects following optional parameter:
 - `XRP_HOST_QUEUE_TYPE`: Select whether to use HOST thread library for asynchronous processing.

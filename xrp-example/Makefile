@@ -10,6 +10,10 @@ xrpdsp: lspbld dspbld ${XRP_DSP_BINARIES}
 .PHONY: xrphost
 xrphost: sysbld hostbld xrp-host-${XRP_HOST_MODE}
 
+.PHONY: xrphosted
+xrphosted:
+	make XRP_HOST_MODE=hosted xrp-host-hosted
+
 ## Build subsystem and DTS
 sysbld:
 	cp ${XT_SUBSYS_SRC}/subsys.yml .
