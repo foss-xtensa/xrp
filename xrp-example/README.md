@@ -7,7 +7,7 @@
     - `XTENSA_CORE`
 - **Optional:**
     - `XT_SUBSYS_SRC`: Path to location where to pull yml and xld files. Its default value is set to `${XTENSA_SYSTEM}/../../../../builds/${XTENSA_RELEASE}/${XTENSA_CORE}/examples/MP_Subsystem/xt_sysbuilder_mp/`
-    - `XRP_DSP_USE_SRCS`: When defined, use xrp-dsp sources instead of installed prebuilt.
+    - `XRP_DSP_USE_SRCS`: When defined, use xrp-dsp sources instead of installed prebuilt xrp-dsp libraries.
     - `XRP_DSP_HW_PORT`: Select hardware port to build. Hardware port is a hardware-specific DSP library. In this release there are two ports bundled with the XRP code called `simple` and `simple-xos`.
         - `simple`: **(default)** XTSC model with MMIO regions for each DSP.
         - `simple-xos`: Variant of `simple` port that internally uses XOS and supports the multiqueue feature. It has the same hardware requirements as the `simple` port.
@@ -24,7 +24,7 @@
 
 - Set environments `XTENSA_CORE`, `XTENSA_SYSTEM` and `PATH`:
 ```
-setenv XTENSA_SYSTEM '/path/xtensa/XtDevTools/install/tools/RI-2022.10-linux/XtensaTools/config'
+setenv XTENSA_SYSTEM '/<YOUR_TOOLS_PATH>/xtensa/XtDevTools/install/tools/RI-2022.10-linux/XtensaTools/config'
 setenv XTENSA_CORE 'visionp6_ao'
 setenv PATH "${XTENSA_SYSTEM}/../bin:${PATH}"
 ```
