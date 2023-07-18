@@ -50,19 +50,19 @@ dspbld/libxrp-common.a: dspbld dspbld/xrp_rb_file.o dspbld/xrp_ns.o
 	$(XRP_DSP_AR) cru $@ $^
 	$(XRP_DSP_RANLIB) $@
 
-dspbld/xrp_dsp_hw_${XRP_DSP_HW_PORT}.o: ${XRP_SRC}/xrp-dsp/${XRP_DSP_HW_PORT}/xrp_dsp_hw_${XRP_DSP_HW_PORT}.c
+dspbld/xrp-dsp-hw-${XRP_DSP_HW_PORT}.o: ${XRP_SRC}/xrp-dsp/${XRP_DSP_HW_PORT}/xrp_dsp_hw_${XRP_DSP_HW_PORT}.c
 	$(XRP_DSP_CC) -c $(XRP_DSP_CFLAGS) $(XRP_DSP_CPPFLAGS) \
 	  -o $@ $<
 
-dspbld/libxrp_dsp_hw_${XRP_DSP_HW_PORT}.a: dspbld dspbld/xrp_dsp_hw_${XRP_DSP_HW_PORT}.o
+dspbld/libxrp-dsp-hw-${XRP_DSP_HW_PORT}.a: dspbld dspbld/xrp-dsp-hw-${XRP_DSP_HW_PORT}.o
 	$(XRP_DSP_AR) cru $@ $^
 	$(XRP_DSP_RANLIB) $@
 
-dspbld/xrp_dsp.o: ${XRP_SRC}/xrp-dsp/xrp_dsp.c
+dspbld/xrp-dsp.o: ${XRP_SRC}/xrp-dsp/xrp_dsp.c
 	$(XRP_DSP_CC) -c $(XRP_DSP_CFLAGS) $(XRP_DSP_CPPFLAGS) \
 	  -o $@ $<
 
-dspbld/libxrp_dsp.a: dspbld dspbld/xrp_dsp.o
+dspbld/libxrp-dsp.a: dspbld dspbld/xrp-dsp.o
 	$(XRP_DSP_AR) cru $@ $^
 	$(XRP_DSP_RANLIB) $@
 

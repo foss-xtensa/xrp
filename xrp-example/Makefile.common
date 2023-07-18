@@ -52,10 +52,10 @@ XRP_DSP_LDFLAGS := \
 ifdef XRP_DSP_USE_SRCS
 XRP_DSP_LIBS_OBJS := \
   dspbld/libxrp-common.a \
-  dspbld/libxrp_dsp.a \
-  dspbld/libxrp_dsp_hw_${XRP_DSP_HW_PORT}.a
+  dspbld/libxrp-dsp.a \
+  dspbld/libxrp-dsp-hw-${XRP_DSP_HW_PORT}.a
 XRP_DSP_LDFLAGS := \
-  -Ldspbld \
+  -Ldspbld/ \
   ${XRP_DSP_LDFLAGS}
 endif
 

@@ -991,9 +991,9 @@ DSP libraries are generated as part of the build process under `xrp-example/dspb
 it also possible to build just the individual DSP libraries using their make targets; ie:
 <pre>
 	$ make dspbld/libxrp-common.a
-	$ make dspbld/libxrp_dsp.a
-	$ make XRP_DSP_HW_PORT=simple dspbld/libxrp_dsp_hw_simple.a
-	$ make XRP_DSP_HW_PORT=simple-xos dspbld/libxrp_dsp_hw_simple-xos.a
+	$ make dspbld/libxrp-dsp.a
+	$ make XRP_DSP_HW_PORT=simple dspbld/libxrp-dsp-hw-simple.a
+	$ make XRP_DSP_HW_PORT=simple-xos dspbld/libxrp-dsp-hw-simple-xos.a
 </pre>
 Once built, running is done using:
 <pre>
