@@ -50,11 +50,19 @@ dspbld/libxrp-common.a: dspbld dspbld/xrp_rb_file.o dspbld/xrp_ns.o
 	$(XRP_DSP_AR) cru $@ $^
 	$(XRP_DSP_RANLIB) $@
 
-dspbld/xrp-dsp-hw-${XRP_DSP_HW_PORT}.o: ${XRP_SRC}/xrp-dsp/${XRP_DSP_HW_PORT}/xrp_dsp_hw_${XRP_DSP_HW_PORT}.c
+dspbld/xrp-dsp-hw-simple.o: ${XRP_SRC}/xrp-dsp/simple/xrp_dsp_hw_simple.c
 	$(XRP_DSP_CC) -c $(XRP_DSP_CFLAGS) $(XRP_DSP_CPPFLAGS) \
 	  -o $@ $<
 
-dspbld/libxrp-dsp-hw-${XRP_DSP_HW_PORT}.a: dspbld dspbld/xrp-dsp-hw-${XRP_DSP_HW_PORT}.o
+dspbld/libxrp-dsp-hw-simple.a: dspbld dspbld/xrp-dsp-hw-simple.o
+	$(XRP_DSP_AR) cru $@ $^
+	$(XRP_DSP_RANLIB) $@
+
+dspbld/xrp-dsp-hw-simple-xos.o: ${XRP_SRC}/xrp-dsp/simple-xos/xrp_dsp_hw_simple-xos.c
+	$(XRP_DSP_CC) -c $(XRP_DSP_CFLAGS) $(XRP_DSP_CPPFLAGS) \
+	  -o $@ $<
+
+dspbld/libxrp-dsp-hw-simple-xos.a: dspbld dspbld/xrp-dsp-hw-simple-xos.o
 	$(XRP_DSP_AR) cru $@ $^
 	$(XRP_DSP_RANLIB) $@
 
