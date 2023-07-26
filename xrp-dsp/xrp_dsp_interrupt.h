@@ -29,45 +29,22 @@
 #include <xtensa/tie/xt_interrupt.h>
 #include <xtensa/xtruntime.h>
 
-#ifdef HAVE_XTOS_SET_INTERRUPT_HANDLER
 static inline int32_t xrp_set_interrupt_handler(uint32_t intnum,
 						void (*fn)(void))
 {
 	return xtos_set_interrupt_handler(intnum, (void (*)(void *))fn,
 					  NULL, NULL);
 }
-#else
-static inline int32_t xrp_set_interrupt_handler(uint32_t intnum,
-						void (*fn)(void))
-{
-	_xtos_set_interrupt_handler(intnum, fn);
-	return 0;
-}
-#endif
 
-#ifdef HAVE_XTOS_INTERRUPT_ENABLE
 static inline void xrp_interrupt_enable(uint32_t intnum)
 {
 	xtos_interrupt_enable(intnum);
 }
-#else
-static inline void xrp_interrupt_enable(uint32_t intnum)
-{
-	_xtos_interrupt_enable(intnum);
-}
-#endif
 
-#ifdef HAVE_XTOS_INTERRUPT_DISABLE
 static inline void xrp_interrupt_disable(uint32_t intnum)
 {
 	xtos_interrupt_disable(intnum);
 }
-#else
-static inline void xrp_interrupt_disable(uint32_t intnum)
-{
-	_xtos_interrupt_disable(intnum);
-}
-#endif
 
 #endif
 

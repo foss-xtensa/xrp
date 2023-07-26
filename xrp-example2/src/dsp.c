@@ -1,35 +1,9 @@
-/*
- * Copyright (c) 2016 - 2017 Cadence Design Systems Inc.
- *
- * Permission is hereby granted, free of charge, to any person obtaining
- * a copy of this software and associated documentation files (the
- * "Software"), to deal in the Software without restriction, including
- * without limitation the rights to use, copy, modify, merge, publish,
- * distribute, sublicense, and/or sell copies of the Software, and to
- * permit persons to whom the Software is furnished to do so, subject to
- * the following conditions:
- *
- * The above copyright notice and this permission notice shall be included
- * in all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
- * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
- * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
- * IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
- * CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
- * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
- * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
- */
-
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <xtensa/corebits.h>
 #include <xtensa/xtruntime.h>
-#if HAVE_THREADS_XOS
-#include <xtensa/xos.h>
-#endif
 #include "xrp_api.h"
 #include "xrp_dsp_hw.h"
 #include "xrp_dsp_user.h"
@@ -48,17 +22,6 @@ void abort(void)
 }
 
 
-#if HAVE_THREADS_XOS
-static void xos_exception(XosExcFrame *frame)
-{
-	fprintf(stderr, "%s: EXCCAUSE = %ld/0x%lx, EXCVADDR = 0x%08lx, PS = 0x%08lx, EPC1 = 0x%08lx\n",
-		__func__,
-		(unsigned long)frame->exccause, (unsigned long)frame->exccause,
-		(unsigned long)frame->excvaddr,
-		(unsigned long)frame->ps, (unsigned long)frame->pc);
-	hang();
-}
-#else
 static void xtos_exception(void *arg)
 {
 #if XCHAL_HAVE_XEA3
@@ -74,15 +37,10 @@ static void xtos_exception(void *arg)
 		(unsigned long)frame->ps, (unsigned long)frame->pc);
 	hang();
 }
-#endif
 
 static void register_exception_handler(uint32_t cause)
 {
-#if HAVE_THREADS_XOS
-	xos_register_exception_handler(cause, xos_exception);
-#else
 	xtos_set_exception_handler(cause, xtos_exception, NULL);
-#endif
 }
 
 #if XCHAL_HAVE_XEA3
@@ -134,21 +92,26 @@ static void register_exception_handlers(void)
 }
 #endif
 
+void xrp_run_command(const void *in_data, size_t in_data_size,
+         void *out_data, size_t out_data_size,
+         struct xrp_buffer_group *buffer_group,
+         enum xrp_status *status)
+{
+  (void)in_data;
+  (void)in_data_size;
+  (void)out_data;
+  (void)out_data_size;
+  (void)buffer_group;
+
+  *(int *)out_data = *(int *)in_data;
+
+  if (status)
+    *status = XRP_STATUS_SUCCESS;
+}
+
 int main(void)
 {
 	enum xrp_status status;
-#if HAVE_THREADS_XOS
-	static uint32_t main_priority[] = {0};
-
-	register_exception_handlers();
-	xrp_hw_init();
-	status = xrp_user_create_queues(1, main_priority);
-	if (status != XRP_STATUS_SUCCESS) {
-		fprintf(stderr, "Initial xrp_user_create_queue failed\n");
-		abort();
-	}
-	xos_start(0);
-#else
 	struct xrp_device *device;
 
 	register_exception_handlers();
@@ -164,6 +127,6 @@ int main(void)
 		if (status == XRP_STATUS_PENDING)
 			xrp_hw_wait_device_irq();
 	}
-#endif
+
 	return 0;
 }

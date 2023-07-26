@@ -80,7 +80,7 @@ struct xrp_device_description {
 	int sync;
 };
 
-static struct xrp_device_description xrp_device_description[4];
+static struct xrp_device_description *xrp_device_description;
 static int xrp_device_count;
 
 struct xrp_request {
@@ -590,6 +590,11 @@ static void initialize(void)
 
 	xrp_initialize_shmem();
 
+	int num_allocated_xrp_devices = 4;
+	xrp_device_description = (struct xrp_device_description *)
+				 malloc(sizeof(struct xrp_device_description) * 
+					num_allocated_xrp_devices);
+
 	for (;;) {
 		int ret;
 		offset = fdt_node_offset_by_compatible(fdt,
@@ -602,6 +607,19 @@ static void initialize(void)
 			continue;
 		}
 
+		if (xrp_device_count == num_allocated_xrp_devices) {
+			int n = num_allocated_xrp_devices * 2;
+			struct xrp_device_description *p =
+			(struct xrp_device_description *)
+			malloc(sizeof(struct xrp_device_description) * n);
+			memcpy(p, xrp_device_description, 
+			       sizeof(struct xrp_device_description) * 
+			       num_allocated_xrp_devices);
+			free(xrp_device_description);
+			xrp_device_description = p;
+			num_allocated_xrp_devices = n;
+		}
+                                         
 		ret = match->init(fdt, offset,
 				  xrp_device_description + xrp_device_count);
 		if (ret == 0)
