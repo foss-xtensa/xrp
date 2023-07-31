@@ -988,12 +988,9 @@ Optional parameters are:
 
 DSP libraries are generated as part of the build process under `xrp-example/dspbld` when Makefile parameter `XRP_DSP_USE_SRCS=1`.
 
-it also possible to build just the individual DSP libraries using their make targets; ie:
+it also possible to build just the DSP libraries using the make target `dsplibs`; ie:
 <pre>
-	$ make dspbld/libxrp-common.a
-	$ make dspbld/libxrp-dsp.a
-	$ make dspbld/libxrp-dsp-hw-simple.a
-	$ make dspbld/libxrp-dsp-hw-simple-xos.a
+	$ make dsplibs
 </pre>
 Once built, running is done using:
 <pre>

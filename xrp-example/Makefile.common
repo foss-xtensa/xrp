@@ -33,6 +33,19 @@ XRP_DSP_RANLIB := ${XTENSA_TOOLS}/bin/xt-ranlib
 
 XRP_SRC := ..
 
+ifdef BUILD_DIR
+ifeq (,$(wildcard ${BUILD_DIR}))
+  $(error BUILD_DIR set to a path that does not exist)
+endif
+endif
+
+BLDDIR := $(if ${BUILD_DIR},${BUILD_DIR},.)
+
+LSPBLD := ${BLDDIR}/lspbld
+DSPBLD := ${BLDDIR}/dspbld
+SYSBLD := ${BLDDIR}/sysbld
+HOSTBLD := ${BLDDIR}/hostbld
+
 XRP_DSP_CPPFLAGS := \
   -I${XRP_SRC}/xrp-kernel \
   -I${XRP_SRC}/xrp-common -I${XRP_SRC}/xrp-dsp \
@@ -114,6 +127,6 @@ else
 endif
 
 CORE_NUMS := 0 $(shell seq `expr $(NUM_CORES) - 1`)
-XRP_DSP_BINARIES := $(addprefix xrp-dsp-standalone,$(CORE_NUMS))
+XRP_DSP_BINARIES := $(addprefix ${BLDDIR}/xrp-dsp-standalone,$(CORE_NUMS))
 CORES = $(addprefix DSP_,$(CORE_NUMS))
 XTSC_RUN_BINARY_DEF := $(addprefix --define=,$(join $(addsuffix _BINARY=,$(CORES)), $(XRP_DSP_BINARIES)))

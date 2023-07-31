@@ -19,6 +19,7 @@
         - `hosted`: Hosted Mode. `XRP_HOST_CC` can be adjusted to the host-hosted compiler to use.
     - `XRP_DSP_DEBUG`: When defined, build DSP sources with CPPFLAGS -DDEBUG, which enables debug outputs through pr_debug().
     - `XRP_HOST_DEBUG`: When defined, build HOST sources with CPPFLAGS -DDEBUG, which enables debug outputs through pr_debug().
+    - `BUILD_DIR`: When defined, it is the path where build outputs are generated.
 
 ## Building example:
 
