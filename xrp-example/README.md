@@ -6,7 +6,7 @@
     - `XTENSA_SYSTEM`
     - `XTENSA_CORE`
 - **Optional:**
-    - `XT_SUBSYS_SRC`: Path to location where to pull yml and xld files. Its default value is set to `${XTENSA_SYSTEM}/../../../../builds/${XTENSA_RELEASE}/${XTENSA_CORE}/examples/MP_Subsystem/xt_sysbuilder_mp/`
+    - `XT_SUBSYS_SRC`: Path to location where to pull yml and xld files. Its default value is set to `$(shell xt-clang --show-config=config)/examples/MP_Subsystem/xt_sysbuilder_mp/`
     - `XRP_DSP_USE_SRCS`: When defined, use xrp-dsp sources instead of installed prebuilt xrp-dsp libraries.
     - `XRP_DSP_HW_PORT`: Select hardware port to build. Hardware port is a hardware-specific DSP library. In this release there are two ports bundled with the XRP code called `simple` and `simple-xos`.
         - `simple`: **(default)** XTSC model with MMIO regions for each DSP.

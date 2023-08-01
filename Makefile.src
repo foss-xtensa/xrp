@@ -1,0 +1,41 @@
+
+# Makefile -- rules and commands to build the xrp libraries.
+
+# XTTOOLS and PREFIX will be defined for internal builds.
+
+ifeq ($(XTTOOLS),)
+TOOLSDIR = $(shell xt-clang --show-config=xttools)
+else
+TOOLSDIR = $(XTTOOLS)
+endif
+
+ifeq ($(PREFIX),)
+CONFIGDIR = $(shell xt-clang --show-config=config)
+else
+CONFIGDIR = $(PREFIX)
+endif
+
+# Include platform-specific commands
+include $(CONFIGDIR)/misc/hostenv.mk
+
+ROOTDIR       ?= $(CURDIR)
+BUILD_DIR     ?= $(ROOTDIR)$(S)build
+INSTALL_DIR   ?= $(CONFIGDIR)$(S)xtensa-elf$(S)lib
+XRP_SRC       ?= $(TOOLSDIR)$(S)xtensa-elf$(S)src$(S)xrp
+XT_SUBSYS_SRC ?= $(CONFIGDIR)$(S)examples$(S)MP_Subsystem$(S)xt_sysbuilder_mp
+
+
+.PHONY: all clean install
+
+all:
+	$(MKPATH) $(BUILD_DIR)
+	$(MAKE) -C $(XRP_SRC)$(S)xrp-example -f Makefile dsplibs \
+	BUILD_DIR=$(BUILD_DIR) XRP_SRC=$(XRP_SRC) XT_SUBSYS_SRC=$(XT_SUBSYS_SRC)
+
+install: all
+	$(MKPATH) $(INSTALL_DIR)
+	$(CP) $(BUILD_DIR)$(S)dspbld$(S)*.a $(INSTALL_DIR)
+
+clean:
+	-$(RM_R) $(BUILD_DIR)
+

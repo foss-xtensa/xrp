@@ -11,18 +11,6 @@ XTRUN := $(shell [ -x "$$(command -v xt-run)" ] && echo xt-run || echo ${XTENSA_
 XTENSA_TOOLS := $(shell ${XTRUN} --show-config=xttools)
 XTCLANG := ${XTENSA_TOOLS}/bin/xt-clang
 
-XTENSA_RELEASE := $(shell basename $(dir $(shell ${XTCLANG} --show-config=xttools)))
-
-ifndef XT_SUBSYS_SRC
-XT_SUBSYS_SRC := \
-  ${XTENSA_SYSTEM}/../../../../builds/${XTENSA_RELEASE}/${XTENSA_CORE}/examples/MP_Subsystem/xt_sysbuilder_mp/
-endif
-ifeq (,$(wildcard ${XT_SUBSYS_SRC}))
-  $(error XT_SUBSYS_SRC set to a path that does not exist)
-endif
-
--include ${XT_SUBSYS_SRC}/Makefile.attr
-
 DTC := ${XTENSA_TOOLS}/Tools/bin/dtc
 
 LIBFDT_PATH := ${XTENSA_TOOLS}/Tools/
@@ -31,7 +19,10 @@ XRP_DSP_CC := ${XTCLANG} --xtensa-core=${XTENSA_CORE}
 XRP_DSP_AR := ${XTENSA_TOOLS}/bin/xt-ar
 XRP_DSP_RANLIB := ${XTENSA_TOOLS}/bin/xt-ranlib
 
-XRP_SRC := ..
+XRP_SRC ?= ..
+ifeq (,$(wildcard ${XRP_SRC}))
+  $(error XRP_SRC set to a path that does not exist)
+endif
 
 ifdef BUILD_DIR
 ifeq (,$(wildcard ${BUILD_DIR}))
@@ -53,9 +44,7 @@ XRP_DSP_CPPFLAGS := \
 
 XRP_DSP_CFLAGS := -W -Wall -g -O2
 
-ifndef XRP_DSP_HW_PORT
-  XRP_DSP_HW_PORT := simple
-endif
+XRP_DSP_HW_PORT ?= simple
 
 XRP_DSP_LDFLAGS := \
   -lxrp-common \
@@ -82,13 +71,9 @@ else
   $(error XRP_DSP_HW_PORT must be "simple" or "simple-xos")
 endif
 
-ifndef XRP_HOST_CC
-  XRP_HOST_CC := $(if ${CC},${CC},gcc)
-endif
+XRP_HOST_CC ?= $(if ${CC},${CC},gcc)
 
-ifndef XRP_HOST_MODE
-  XRP_HOST_MODE := standalone
-endif
+XRP_HOST_MODE ?= standalone
 
 ifeq (${XRP_HOST_MODE}, standalone)
   XRP_HOST_CPPFLAGS += \
@@ -111,9 +96,7 @@ XRP_HOST_CPPFLAGS += \
 
 XRP_HOST_CFLAGS := -W -Wall -g -O2
 
-ifndef XRP_HOST_QUEUE_TYPE
-  XRP_HOST_QUEUE_TYPE := sync
-endif
+XRP_HOST_QUEUE_TYPE ?= sync
 
 ifeq (${XRP_HOST_QUEUE_TYPE}, sync)
   XRP_HOST_CPPFLAGS += \
@@ -126,7 +109,13 @@ else
   $(error XRP_HOST_QUEUE_TYPE must be "sync" or "threaded")
 endif
 
-CORE_NUMS := 0 $(shell seq `expr $(NUM_CORES) - 1`)
-XRP_DSP_BINARIES := $(addprefix ${BLDDIR}/xrp-dsp-standalone,$(CORE_NUMS))
-CORES = $(addprefix DSP_,$(CORE_NUMS))
-XTSC_RUN_BINARY_DEF := $(addprefix --define=,$(join $(addsuffix _BINARY=,$(CORES)), $(XRP_DSP_BINARIES)))
+XT_SUBSYS_SRC ?= $(shell ${XTCLANG} --show-config=config)/examples/MP_Subsystem/xt_sysbuilder_mp/
+ifeq (,$(wildcard ${XT_SUBSYS_SRC}))
+  $(warning XT_SUBSYS_SRC set to a path that does not exist)
+else
+  -include ${XT_SUBSYS_SRC}/Makefile.attr
+  CORE_NUMS := 0 $(shell seq `expr $(NUM_CORES) - 1`)
+  XRP_DSP_BINARIES := $(addprefix ${BLDDIR}/xrp-dsp-standalone,$(CORE_NUMS))
+  CORES = $(addprefix DSP_,$(CORE_NUMS))
+  XTSC_RUN_BINARY_DEF := $(addprefix --define=,$(join $(addsuffix _BINARY=,$(CORES)), $(XRP_DSP_BINARIES)))
+endif

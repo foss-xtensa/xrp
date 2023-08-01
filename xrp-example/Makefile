@@ -19,7 +19,7 @@ xrphosted:
 
 ## Build subsystem and DTS
 ${SYSBLD}:
-	cp ${XT_SUBSYS_SRC}/subsys.yml ${BLDDIR}
+	[ -d "${XT_SUBSYS_SRC}" ] && cp ${XT_SUBSYS_SRC}/subsys.yml ${BLDDIR}
 	${XTENSA_TOOLS}/libexec/xt-sysbuilder \
 	  -add_xrp_shmem_pid \
 	  -subsys ${BLDDIR}/subsys.yml \
@@ -29,7 +29,7 @@ ${SYSBLD}:
 
 ## Build LSPs
 ${LSPBLD}:
-	cp ${XT_SUBSYS_SRC}/subsys.xld ${BLDDIR}
+	[ -d "${XT_SUBSYS_SRC}" ] && cp ${XT_SUBSYS_SRC}/subsys.xld ${BLDDIR}
 	${XTENSA_TOOLS}/libexec/xt-mbuild \
 	  -root ${LSPBLD} \
 	  -syspkg ${LSPBLD}/package \
