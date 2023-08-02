@@ -82,8 +82,9 @@ ifeq (${XRP_HOST_MODE}, standalone)
     -DHAVE_FDT_STRERROR=1 \
     -I${LIBFDT_PATH}/include
 else ifeq (${XRP_HOST_MODE}, hosted)
+else ifeq (${XRP_HOST_MODE}, single)
 else
-  $(error XRP_HOST_MODE must be "standalone" or "hosted")
+  $(error XRP_HOST_MODE must be "standalone" or "hosted" or "single")
 endif
 
 XRP_HOST_CPPFLAGS += \

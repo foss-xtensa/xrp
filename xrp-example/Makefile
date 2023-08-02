@@ -17,6 +17,10 @@ xrphost: ${SYSBLD} ${HOSTBLD} ${BLDDIR}/xrp-host-${XRP_HOST_MODE}
 xrphosted:
 	make XRP_HOST_MODE=hosted ${BLDDIR}/xrp-host-hosted
 
+.PHONY: xrpsingle
+xrpsingle:
+	make XRP_HOST_MODE=single ${BLDDIR}/xrp-host-single
+
 ## Build subsystem and DTS
 ${SYSBLD}:
 	[ -d "${XT_SUBSYS_SRC}" ] && cp ${XT_SUBSYS_SRC}/subsys.yml ${BLDDIR}
@@ -157,6 +161,18 @@ ${BLDDIR}/xrp-host-hosted: \
 	  -o $@ $^ \
 	  -pthread -lrt
 
+${BLDDIR}/xrp-host-single: \
+  ${XRP_SRC}/xrp-common/xrp_rb_file.c \
+  ${XRP_SRC}/xrp-common/xrp_ns.c \
+  ${XRP_SRC}/xrp-host/xrp_host_common.c \
+  ${XRP_SRC}/xrp-host/xrp_${XRP_HOST_QUEUE_TYPE}_queue.c \
+  ${XRP_SRC}/xrp-host/single/xrp_single.c \
+  ${XRP_SRC}/xrp-example/host_main.c \
+  ${XRP_SRC}/xrp-example/dsp_test.c
+	$(XRP_HOST_CC) $(XRP_HOST_CFLAGS) $(XRP_HOST_CPPFLAGS) \
+	  -o $@ $^ \
+	  -pthread -lrt
+
 
 .PHONY: run
 run:
@@ -167,4 +183,4 @@ run:
 clean:
 	rm -rf ${BLDDIR}/subsys.* ${SYSBLD} ${LSPBLD}
 	rm -rf ${DSPBLD} ${XRP_DSP_BINARIES}
-	rm -rf ${HOSTBLD} ${BLDDIR}/xrp-host-{standalone,hosted}
+	rm -rf ${HOSTBLD} ${BLDDIR}/xrp-host-{standalone,hosted,single}
