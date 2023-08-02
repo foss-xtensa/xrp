@@ -144,7 +144,7 @@ ${HOSTBLD}/xrp_alloc.o: ${XRP_SRC}/xrp-kernel/xrp_alloc.c
 	  -o $@ $<
 
 ${HOSTBLD}/xrp.dtb: ${HOSTBLD}/.stmp
-${HOSTBLD}/xrp.dtb: ${SYSBLD}/xrp/TestSubSys.dts
+${HOSTBLD}/xrp.dtb: ${SYSBLD}/xrp/SubSystem.dts
 	${DTC} -o $@ -O dtb $<
 
 ${HOSTBLD}/xrp_dtb.o: ${HOSTBLD}/.stmp
