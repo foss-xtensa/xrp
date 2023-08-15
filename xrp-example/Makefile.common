@@ -75,6 +75,11 @@ XRP_HOST_CC ?= $(if ${CC},${CC},gcc)
 
 XRP_HOST_MODE ?= standalone
 
+ifneq ($(findstring xt-clang,${XRP_HOST_CC}),xt-clang)
+  XRP_HOST_CPPFLAGS += \
+    -DHAVE_NANOSLEEP=1
+endif
+
 ifeq (${XRP_HOST_MODE}, standalone)
   XRP_HOST_CPPFLAGS += \
     -DHAVE_LIBFDT=1 \
@@ -88,7 +93,6 @@ else
 endif
 
 XRP_HOST_CPPFLAGS += \
-  -DHAVE_NANOSLEEP=1 \
   -I${XRP_SRC} -I${XRP_SRC}/xrp-kernel \
   -I${XRP_SRC}/xrp-common \
   -I${XRP_SRC}/xrp-host \

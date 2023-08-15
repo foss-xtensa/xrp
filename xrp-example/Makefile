@@ -164,7 +164,7 @@ ${BLDDIR}/xrp-host-standalone: \
   ${HOSTBLD}/xrp_host_common.o ${HOSTBLD}/xrp_${XRP_HOST_QUEUE_TYPE}_queue.o \
   ${HOSTBLD}/xrp_host.o ${HOSTBLD}/xrp_linux.o ${HOSTBLD}/xrp_alloc.o \
   ${HOSTBLD}/xrp_dtb.o ${HOSTBLD}/host_main.o
-	$(XRP_HOST_CC) $(XRP_HOST_CFLAGS) \
+	$(XRP_HOST_CC) $(XRP_HOST_CFLAGS) $(XRP_HOST_CPPFLAGS) \
 	  -o $@ $^ \
 	  -L${LIBFDT_PATH}/lib -Wl,-rpath ${LIBFDT_PATH}/lib \
 	  -pthread -lfdt -lrt
@@ -189,8 +189,7 @@ ${BLDDIR}/xrp-host-single: \
   ${XRP_SRC}/xrp-example/host_main.c \
   ${XRP_SRC}/xrp-example/dsp_test.c
 	$(XRP_HOST_CC) $(XRP_HOST_CFLAGS) $(XRP_HOST_CPPFLAGS) \
-	  -o $@ $^ \
-	  -pthread -lrt
+	  -o $@ $^
 
 
 .PHONY: run

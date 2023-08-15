@@ -474,6 +474,7 @@ static int init_cdns_xrp(void *fdt, int offset,
 		.shared_base = getprop_u32(reg, 16),
 		.shared_size = getprop_u32(reg, 20),
 	};
+
 	return init_cdns_xrp_common(fdt, offset, description);
 }
 
