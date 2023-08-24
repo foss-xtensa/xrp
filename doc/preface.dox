@@ -35,10 +35,9 @@
 ///  Changes from the Previous Version
 ///  ---------------------------------
 ///  
-///  The following changes were made to this document for the Cadence RI-2021.6
+///  The following changes were made to this document for the Cadence RJ-2023.2
 ///  release of Xtensa processors. Subsequent releases may contain updates for
 ///  features in this release or additional features may be added.
 ///  
-///  * Range of tested and supported linux kernel versions is updated.
-///  * configure script invocation examples are updated to reflect new example
-///    directories layout, subsystem parameters and default compiler choice.
+///  * The "Building XRP" section has been rewritten to reflect the removal
+///    of autoconf configure and the sole use of make commands to build XRP.

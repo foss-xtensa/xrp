@@ -52,7 +52,7 @@ struct xrp_hw_ops {
 	 */
 	int (*enable)(void *hw_arg);
 	/*!
-	 * Diable power/clock.
+	 * Disable power/clock.
 	 *
 	 * \param hw_arg: opaque parameter passed to xrp_init at initialization
 	 *                time
@@ -272,7 +272,7 @@ enum xrp_init_flags {
  * \param pdev: pointer to platform device associated with the XRP device
  *              instance
  * \param flags: initialization flags
- * \param hw: pointer to xrp_hw_ops structeure for this device
+ * \param hw: pointer to xrp_hw_ops structure for this device
  * \param hw_arg: opaque pointer passed back to hw-specific functions
  * \return error code or pointer to struct xvp, use IS_ERR_VALUE and ERR_PTR
  */
@@ -286,7 +286,7 @@ long xrp_init(struct platform_device *pdev, enum xrp_init_flags flags,
  * \param pdev: pointer to platform device associated with the XRP device
  *              instance
  * \param flags: initialization flags
- * \param hw: pointer to xrp_hw_ops structeure for this device
+ * \param hw: pointer to xrp_hw_ops structure for this device
  * \param hw_arg: opaque pointer passed back to hw-specific functions
  * \return error code or pointer to struct xvp, use IS_ERR_VALUE and ERR_PTR
  */
@@ -300,7 +300,7 @@ long xrp_acpi_init_v0(struct platform_device *pdev, enum xrp_init_flags flags,
  * \param pdev: pointer to platform device associated with the XRP device
  *              instance
  * \param flags: initialization flags
- * \param hw: pointer to xrp_hw_ops structeure for this device
+ * \param hw: pointer to xrp_hw_ops structure for this device
  * \param hw_arg: opaque pointer passed back to hw-specific functions
  * \return error code or pointer to struct xvp, use IS_ERR_VALUE and ERR_PTR
  */
@@ -314,7 +314,7 @@ long xrp_init_v1(struct platform_device *pdev, enum xrp_init_flags flags,
  * \param pdev: pointer to platform device associated with the XRP device
  *              instance
  * \param flags: initialization flags
- * \param hw: pointer to xrp_hw_ops structeure for this device
+ * \param hw: pointer to xrp_hw_ops structure for this device
  * \param hw_arg: opaque pointer passed back to hw-specific functions
  * \return error code or pointer to struct xvp, use IS_ERR_VALUE and ERR_PTR
  */

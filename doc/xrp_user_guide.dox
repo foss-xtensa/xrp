@@ -26,8 +26,8 @@
 
 Xtensa Remote Processing (XRP) is a communication interface for Linux-based
 systems containing Xtensa processors. It allows Linux userspace tasks to send
-messages to the firmware running on Xtensa processors. Its implementations
-support master-slave communication model with a single host node sending messages
+messages to the firmware running on Xtensa processors. Its implementations support
+controller-worker communication model with a single host node sending messages
 and one or more DSP nodes executing actions requested in received messages and
 returning the results. Message structure details are not defined by the XRP,
 but it is assumed that the message is a small structure that describes requested
@@ -56,7 +56,7 @@ XRP API uses the following terms:
           in the device specific memory is the most effective way to pass
           bulk data to/from the Xtensa DSP, it is physically contiguous and
           data transfer does not require copying. Buffer in the generic system
-          memory may be physically noncontiguous and tranferring data may
+          memory may be physically noncontiguous and transferring data may
           require copying to/from the intermediate bounce buffer.
 
 - Buffer group: a vector of buffers and associated allowed access flags.
@@ -72,9 +72,9 @@ XRP API uses the following terms:
           to N - 1. There's an API call that opens device by its number.
 
 - Message: a unit of communication between the XRP API users. A message may be
-           sent by the master to a queue synchronously or asynchronously. It
+           sent by the host to a queue synchronously or asynchronously. It
            is processed synchronously by the Xtensa DSP and the reply is
-           delivered back to master. If a message was sent synchronously the
+           delivered back to the host. If a message was sent synchronously the
            sender is unblocked at that point. If a message was sent
            asynchronously the sender gets an event object that can be used to
            wait for the message processing completion.
@@ -974,7 +974,9 @@ Mandatory parameters are:
 
 Optional parameters are:
 - `XT_SUBSYS_SRC`: Path to location where to pull yml and xld files. Its default value is set to
-	`$(shell xt-clang --show-config=config)/examples/MP_Subsystem/xt_sysbuilder_mp/`.
+	`<xtensa_config_root>/examples/MP_Subsystem/xt_sysbuilder_mp/`.
+	where <xtensa_config_root> is the output of `xt-clang --show-config=config` which is
+	the directory the Xtensa configuration to use has been installed.
 - `XRP_DSP_USE_SRCS`: When defined, xrp-dsp sources are used instead of installed prebuilts.
 - `XRP_DSP_HW_PORT`: Select DSP hardware port to build. Hardware port is a hardware-specific DSP library.
 	In this release there are two ports bundled with the XRP code called `simple` and `simple-xos`.
