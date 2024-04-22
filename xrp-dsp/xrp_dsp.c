@@ -25,6 +25,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <xtensa/hal.h>
 #include <xtensa/xtruntime.h>
 
 #include "xrp_api.h"
@@ -116,6 +117,20 @@ static void release_refcounted(struct xrp_refcounted *ref)
 
 struct xrp_device *xrp_open_device(int idx, enum xrp_status *status)
 {
+#if XCHAL_HAVE_MPU
+	int err;
+	err = xthal_mpu_set_region_attribute((void *)xrp_dsp_comm_base,
+	                                     0x4000000,
+	                                     XTHAL_AR_RWrw,
+	                                     XTHAL_MEM_NON_CACHEABLE,
+	                                     XTHAL_CAFLAG_NO_AUTO_WB | XTHAL_CAFLAG_NO_AUTO_INV);
+	if (err != XTHAL_SUCCESS) {
+		pr_debug("Error setting region attribute on [%x,%x], err %d\n",
+		         (void *)xrp_dsp_comm_base, (void *)(xrp_dsp_comm_base+0x4000000), err);
+		exit(-1);
+	}
+#endif
+
 	if (idx == 0) {
 		dsp_device0.dsp_cmd = xrp_dsp_comm_base;
 		set_status(status, XRP_STATUS_SUCCESS);

@@ -8,7 +8,7 @@ all: xrpdsp xrphost
 dsplibs: ${DSPBLD}/.stmp ${DSPBLD}/libxrp-common.a ${DSPBLD}/libxrp-dsp-hw-simple.a ${DSPBLD}/libxrp-dsp-hw-simple-xos.a ${DSPBLD}/libxrp-dsp.a
 
 .PHONY: xrpdsp
-xrpdsp: ${DSPBLD}/.stmp ${LSPBLD} ${XRP_DSP_BINARIES}
+xrpdsp: ${DSPBLD}/.stmp $(if ${SUBSYS_XLD_EXIST},${LSPBLD}) ${XRP_DSP_BINARIES}
 
 .PHONY: xrphost
 xrphost: ${HOSTBLD}/.stmp ${SYSBLD} ${BLDDIR}/xrp-host-${XRP_HOST_MODE}
@@ -99,9 +99,9 @@ ${DSPBLD}/xrp_dsp_standalone-dsp_main.o: ${XRP_SRC}/xrp-example/dsp_main.c
 
 ${BLDDIR}/xrp-dsp-standalone%: ${XRP_DSP_LIBS_OBJS} ${DSPBLD}/xrp_dsp_standalone-dsp_test.o ${DSPBLD}/xrp_dsp_standalone-dsp_main.o
 	$(XRP_DSP_CC) \
-	  -mlsp=${LSPBLD}/package/cores/DSP_${*}/xtensa-elf/lib/sim-stacklocal \
+	  $(if ${SUBSYS_XLD_EXIST},-mlsp=${LSPBLD}/package/cores/${CORE_NAME_PREFIX}${*}/xtensa-elf/lib/sim-stacklocal) \
 	  -Wl,--defsym,_memmap_cacheattr_reset=${CACHE_ATTR} \
-	  -Wl,--defsym,xrp_dsp_comm_base_magic=${DSP_${*}_DEVICE_COMM_BASE_MAGIC} \
+	  -Wl,--defsym,xrp_dsp_comm_base_magic=${${CORE_NAME_PREFIX}${*}_DEVICE_COMM_BASE_MAGIC} \
 	  -o $@ $^ -Wl,--start-group ${XRP_DSP_LDFLAGS} -Wl,--end-group
 
 ${HOSTBLD}/.stmp:

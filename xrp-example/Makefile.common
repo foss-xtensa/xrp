@@ -114,13 +114,15 @@ else
   $(error XRP_HOST_QUEUE_TYPE must be "sync" or "threaded")
 endif
 
-XT_SUBSYS_SRC ?= $(shell ${XTCLANG} --show-config=config)/examples/MP_Subsystem/xt_sysbuilder_mp/
+XT_SUBSYS_SRC ?= $(wildcard $(shell ${XTCLANG} --show-config=config)/examples/MP_Subsystem/xt_sysbuilder_*/)
 ifeq (,$(wildcard ${XT_SUBSYS_SRC}))
   $(warning XT_SUBSYS_SRC set to a path that does not exist)
 else
   -include ${XT_SUBSYS_SRC}/Makefile.attr
   CORE_NUMS := 0 $(shell seq `expr $(NUM_CORES) - 1`)
   XRP_DSP_BINARIES := $(addprefix ${BLDDIR}/xrp-dsp-standalone,$(CORE_NUMS))
-  CORES = $(addprefix DSP_,$(CORE_NUMS))
+  CORES = $(addprefix ${CORE_NAME_PREFIX},$(CORE_NUMS))
   XTSC_RUN_BINARY_DEF := $(addprefix --define=,$(join $(addsuffix _BINARY=,$(CORES)), $(XRP_DSP_BINARIES)))
 endif
+
+SUBSYS_XLD_EXIST := $(wildcard ${XT_SUBSYS_SRC}/subsys.xld)

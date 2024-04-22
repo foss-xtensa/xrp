@@ -13,6 +13,7 @@ xtsc-run \
 --define=Host_BINARY= \
 --define=Host_BINARY_ARGS= \
 ${@} \
+--define=SHARED_RAM_L_HOST_SHARED=true \
 --define=SHARED_RAM_L_NAME=SharedRAM_L.${XRP_HOST_STANDALONE_PID} \
 --include=${BUILD_DIR}/sysbld/xtsc-run/SubSystem.inc & XTSC_RUN_PID=$!
 
