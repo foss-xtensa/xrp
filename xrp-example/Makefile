@@ -25,6 +25,7 @@ xrpsingle:
 ${SYSBLD}:
 	[ -d "${XT_SUBSYS_SRC}" ] && cp ${XT_SUBSYS_SRC}/subsys.yml ${BLDDIR}
 	${XTENSA_TOOLS}/libexec/xt-sysbuilder \
+	  -xtensa-system ${XTENSA_SYSTEM} \
 	  -add_xrp_shmem_pid \
 	  -subsys ${BLDDIR}/subsys.yml \
 	  -swtools ${XTENSA_TOOLS} \
