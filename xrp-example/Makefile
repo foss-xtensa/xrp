@@ -37,6 +37,7 @@ ${LSPBLD}:
 	[ -d "${XT_SUBSYS_SRC}" ] && cp ${XT_SUBSYS_SRC}/subsys.xld ${BLDDIR}
 	${XTENSA_TOOLS}/libexec/xt-mbuild \
 	  -root ${LSPBLD} \
+	  -tctools ${TCTOOLS} \
 	  -syspkg ${LSPBLD}/package \
 	  -socfile ${BLDDIR}/subsys.xld \
 	  -preclean \
