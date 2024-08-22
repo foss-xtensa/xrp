@@ -34,12 +34,12 @@
 #if XCHAL_HAVE_RELEASE_SYNC
 static inline uint32_t xrp_l32ai(volatile void *p)
 {
-	return XT_L32AI(p, 0);
+	return XT_L32AI((const volatile unsigned *)p, 0);
 }
 
 static inline void xrp_s32ri(uint32_t v, volatile void *p)
 {
-	XT_S32RI(v, p, 0);
+	XT_S32RI(v, (volatile unsigned *)p, 0);
 }
 #else
 static inline uint32_t xrp_l32ai(volatile void *p)
