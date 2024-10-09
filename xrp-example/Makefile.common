@@ -7,10 +7,14 @@ ifndef XTENSA_CORE
   $(error XTENSA_CORE is not defined)
 endif
 
-XTRUN := $(shell [ -x "$$(command -v xt-run)" ] && echo xt-run || echo ${XTENSA_SYSTEM}/../bin/xt-run)
+ifeq (,$(shell which xt-run))
+  $(error "Xtensa Tools binaries missing from PATH")
+endif
+
+XTRUN := xt-run
 XTENSA_TOOLS := $(shell ${XTRUN} --show-config=xttools)
 TCTOOLS := $(shell ${XTRUN} --show-config=tctools)
-XTCLANG := ${XTENSA_TOOLS}/bin/xt-clang
+XTCLANG := xt-clang
 
 DTC := ${XTENSA_TOOLS}/Tools/bin/dtc
 
