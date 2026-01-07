@@ -43,6 +43,7 @@ ${LSPBLD}:
 	  -preclean \
 	  -build sw \
 	  -lsps sim,sim-stacklocal
+	rm -rf ${LSPBLD}/package/cores/*/xtensa-elf/lib/*/libmpu.a
 
 ${DSPBLD}/.stmp:
 	mkdir -p $(shell dirname $@)
