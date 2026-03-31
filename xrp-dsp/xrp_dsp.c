@@ -389,7 +389,7 @@ static void process_sync_data(struct xrp_device *device,
 				 __func__, data->type, data->length);
 			continue;
 		}
-		dcache_region_writeback(data, sizeof(data) + data->length);
+		dcache_region_writeback(data, sizeof(*data) + data->length);
 	}
 }
 
