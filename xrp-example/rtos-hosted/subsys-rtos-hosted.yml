@@ -1,0 +1,88 @@
+// Copyright (c) 2026 by Cadence Design Systems, Inc.  ALL RIGHTS RESERVED.
+// These coded instructions, statements, and computer programs are the
+// copyrighted works and confidential proprietary information of
+// Cadence Design Systems, Inc.  They may be adapted and modified by bona fide
+// purchasers for internal use, but neither the original nor any adapted
+// or modified version may be disclosed or distributed to third parties
+// in any manner, medium, or form, in whole or in part, without the prior
+// written consent of Cadence Design Systems, Inc.
+
+
+
+---
+SubSystemName: SubSystem
+
+Metadata:
+  Version: 2
+
+Processors:
+  - Name              : DSP
+    Config            : Vision_P6_AO
+    Pipeline          : LX
+    ProcId            : 0
+    Master            : true
+    StaticVectorSel   : 0
+    DataRamFetchWidth : 64b
+    PifWidth          : 16b
+    IDMA              : {Shared: false, Width: 16b}
+    DataRam0:
+      {LocalAddr: 0x3ffe0000, GlobalAddr: 0xa0400000, Size: 128Kb, NumBanks : 2, NumSubBanks: 8}
+    DataRam1:
+      {LocalAddr: 0x3ffc0000, GlobalAddr: 0xa0800000, Size: 128Kb, NumBanks: 2, NumSubBanks: 8}
+
+  - Name              : Host
+    Config            : sample_controller
+    Pipeline          : LX
+    Host              : true
+    ProcId            : 1
+    StaticVectorSel   : 1
+    InstRamFetchWidth : 4b
+    DataRamFetchWidth : 4b
+    PifWidth          : 4b
+    InstRam0:
+      {LocalAddr: 0x40000000, GlobalAddr: 0xa1000000, Size: 128Kb}
+    DataRam0:
+      {LocalAddr: 0x3ffe0000, GlobalAddr: 0xa1400000, Size: 128Kb, NumBanks : 1, NumSubBanks: 1}
+    DataRam1:
+      {LocalAddr: 0x3ffc0000, GlobalAddr: 0xa1800000, Size: 128Kb, NumBanks: 1, NumSubBanks: 1}
+
+
+SubSystemMMIO:
+  - Name: SubSystemMMIO
+    InterruptRegisters:
+      - {GlobalAddr  : 0xa0c00000,
+         InterruptMap: [
+           {BitOffset: 0, BInterrupt: 12, ProcInterrupt: 16, Proc: DSP, xipcNotify : true},
+           {BitOffset: 1, BInterrupt: 13, ProcInterrupt: 17, Proc: DSP, xrpNotify: true},
+         ]}
+      - {GlobalAddr  : 0xa1c00000,
+         InterruptMap: [
+           {BitOffset: 0, BInterrupt: 10, ProcInterrupt: 15, Proc: Host, xipcNotify : true},
+           {BitOffset: 1, BInterrupt: 11, ProcInterrupt: 16, Proc: Host, xrpNotify: true},
+         ]}
+
+
+SystemRAM:
+  Size             : 48Mb
+  GlobalAddr       : 0x60000000
+  ReadDelay        : 1
+  ReadRepeat       : 1
+  WriteDelay       : 1
+  WriteRepeat      : 1
+  RequestFIFODepth : 255
+
+SystemROM:
+  {Size: 16384Kb, GlobalAddr: 0x50000000}
+
+DeviceMemories:
+  - {Name: XRPMem, Size: 16Mb, GlobalAddr: 0x63000000}
+
+SubSystemInterconnect:
+  - {Src: CommonBus,   Dests: [DSP, Host]}
+
+
+SubSystemSoftware:
+  XRPDeviceTreeSpec:
+     XRPSharedMem: XRPMem
+     Queues:
+       - {Proc: DSP, Priorities: [0, 1, 2]}

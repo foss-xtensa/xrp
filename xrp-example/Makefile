@@ -1,14 +1,18 @@
 
+ifneq (${OVERRIDE_MAKEFILE_COMM},1)
 -include Makefile.common
+endif
 
 .PHONY: all
 all: xrpdsp xrphost
 
+ifneq (${OVERRIDE_MAKEFILE_COMM},1)
 .PHONY: dsplibs
 dsplibs: ${DSPBLD}/.stmp ${DSPBLD}/libxrp-common.a ${DSPBLD}/libxrp-dsp-hw-simple.a ${DSPBLD}/libxrp-dsp-hw-simple-xos.a ${DSPBLD}/libxrp-dsp.a
 
 .PHONY: xrpdsp
 xrpdsp: ${DSPBLD}/.stmp $(if ${SUBSYS_XLD_EXIST},${LSPBLD}) ${XRP_DSP_BINARIES}
+endif
 
 .PHONY: xrphost
 xrphost: ${HOSTBLD}/.stmp ${SYSBLD} ${BLDDIR}/xrp-host-${XRP_HOST_MODE}
@@ -21,6 +25,7 @@ xrphosted:
 xrpsingle:
 	make XRP_HOST_MODE=single ${BLDDIR}/xrp-host-single
 
+ifneq (${OVERRIDE_MAKEFILE_COMM},1)
 ## Build subsystem and DTS
 ${SYSBLD}:
 	[ -d "${XT_SUBSYS_SRC}" ] && cp ${XT_SUBSYS_SRC}/subsys.yml ${BLDDIR}
@@ -44,6 +49,7 @@ ${LSPBLD}:
 	  -build sw \
 	  -lsps sim,sim-stacklocal
 	rm -rf ${LSPBLD}/package/cores/*/xtensa-elf/lib/*/libmpu.a
+endif
 
 ${DSPBLD}/.stmp:
 	mkdir -p $(shell dirname $@)
@@ -122,6 +128,9 @@ ${HOSTBLD}/xrp_ns.o: ${XRP_SRC}/xrp-common/xrp_ns.c
 	  -o $@ $<
 
 ${HOSTBLD}/xrp_host_common.o: ${HOSTBLD}/.stmp
+ifneq (${FREERTOS_XTENSA},)
+${HOSTBLD}/xrp_host_common.o: ${HOSTBLD}/freertos/libfreertos.a
+endif
 ${HOSTBLD}/xrp_host_common.o: ${XRP_SRC}/xrp-host/xrp_host_common.c
 	$(XRP_HOST_CC) -c $(XRP_HOST_CFLAGS) $(XRP_HOST_CPPFLAGS) \
 	  -o $@ $<
@@ -152,7 +161,7 @@ ${HOSTBLD}/xrp.dtb: ${SYSBLD}/xrp/SubSystem.dts
 
 ${HOSTBLD}/xrp_dtb.o: ${HOSTBLD}/.stmp
 ${HOSTBLD}/xrp_dtb.o: ${XRP_SRC}/xrp-example/xrp_dtb.s ${HOSTBLD}/xrp.dtb
-	$(XRP_HOST_CC) -c $(XRP_HOST_CFLAGS) \
+	$(XRP_HOST_CC) -c $(XRP_HOST_AFLAGS) \
 	  -I${HOSTBLD} \
 	  -o $@ $<
 
@@ -195,6 +204,7 @@ ${BLDDIR}/xrp-host-single: \
 	  -o $@ $^
 
 
+ifneq (${OVERRIDE_MAKEFILE_COMM},1)
 .PHONY: run
 run:
 	BUILD_DIR=${BLDDIR} ./xrp-host-standalone.sh ${XTSC_RUN_BINARY_DEF}
@@ -205,3 +215,4 @@ clean:
 	rm -rf ${BLDDIR}/subsys.* ${SYSBLD} ${LSPBLD}
 	rm -rf ${DSPBLD} ${XRP_DSP_BINARIES}
 	rm -rf ${HOSTBLD} ${BLDDIR}/xrp-host-{standalone,hosted,single}
+endif

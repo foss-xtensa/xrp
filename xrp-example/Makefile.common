@@ -69,7 +69,7 @@ endif
 ifeq (${XRP_DSP_HW_PORT}, simple)
 else ifeq (${XRP_DSP_HW_PORT}, simple-xos)
   XRP_DSP_CPPFLAGS += \
-    -DHAVE_THREADS_XOS=1
+    -DHAVE_THREADS_XOS=1 -DHAVE_THREADS=1
   XRP_DSP_LDFLAGS += \
     -lxos -lxtutil
 else
@@ -79,13 +79,14 @@ endif
 XRP_HOST_CC ?= $(if ${CC},${CC},gcc)
 
 XRP_HOST_MODE ?= standalone
+XRP_STANDALONE_HOST_MODES = standalone rtos-hosted
 
 ifneq ($(findstring xt-clang,${XRP_HOST_CC}),xt-clang)
   XRP_HOST_CPPFLAGS += \
     -DHAVE_NANOSLEEP=1
 endif
 
-ifeq (${XRP_HOST_MODE}, standalone)
+ifneq ($(filter ${XRP_HOST_MODE},${XRP_STANDALONE_HOST_MODES}),)
   XRP_HOST_CPPFLAGS += \
     -DHAVE_LIBFDT=1 \
     -DHAVE_FDT_GETPROP=1 \
@@ -94,17 +95,18 @@ ifeq (${XRP_HOST_MODE}, standalone)
 else ifeq (${XRP_HOST_MODE}, hosted)
 else ifeq (${XRP_HOST_MODE}, single)
 else
-  $(error XRP_HOST_MODE must be "standalone" or "hosted" or "single")
+  $(error XRP_HOST_MODE must be "standalone" or "hosted" or "rtos-hosted" or "single")
 endif
 
 XRP_HOST_CPPFLAGS += \
   -I${XRP_SRC} -I${XRP_SRC}/xrp-kernel \
   -I${XRP_SRC}/xrp-common \
   -I${XRP_SRC}/xrp-host \
-  -I${XRP_SRC}/xrp-host/${XRP_HOST_MODE} \
+  -I${XRP_SRC}/xrp-host/$(subst rtos-hosted,standalone,${XRP_HOST_MODE}) \
   $(if ${XRP_HOST_DEBUG},-DDEBUG=1)
 
 XRP_HOST_CFLAGS := -W -Wall -g -O2
+XRP_HOST_AFLAGS := -g -O2
 
 XRP_HOST_QUEUE_TYPE ?= sync
 
@@ -112,9 +114,17 @@ ifeq (${XRP_HOST_QUEUE_TYPE}, sync)
   XRP_HOST_CPPFLAGS += \
     -I${XRP_SRC}/xrp-host/thread-single/
 else ifeq (${XRP_HOST_QUEUE_TYPE}, threaded)
+ifeq (${XRP_HOST_MODE}, rtos-hosted)
   XRP_HOST_CPPFLAGS += \
-    -DHAVE_THREADS_POSIX=1 \
+    -DHAVE_THREADS=1 \
+    -I${XRP_SRC}/xrp-host/thread-freertos \
+    -I${FREERTOS_SOURCE}/include -I${FREERTOS_XTENSA} \
+    -I${XRP_SRC}/xrp-example/rtos-hosted -I${HOSTBLD}/freertos/${XRP_HOST_CORE}
+else
+  XRP_HOST_CPPFLAGS += \
+    -DHAVE_THREADS_POSIX=1 -DHAVE_THREADS=1 \
     -I${XRP_SRC}/xrp-host/thread-pthread
+endif
 else
   $(error XRP_HOST_QUEUE_TYPE must be "sync" or "threaded")
 endif
