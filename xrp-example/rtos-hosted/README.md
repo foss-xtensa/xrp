@@ -45,6 +45,8 @@ servicing multiple queues at different priorities (multiqueues).
 - **Mandatory:**
     - `FREERTOS_SOURCE`: Path to the FreeRTOS-Kernel to build into this example
         - e.g. cloned git client from https://github.com/foss-xtensa/FreeRTOS-Kernel
+        - Note: Ensure the git submodule instantiated in
+          <FreeRTOS-Kernel>/portable/ThirdParty/Partner-Supported-Ports/ is included.
 
 - **Optional:**
     - See xrp-example/README.md
@@ -67,7 +69,7 @@ setenv PATH "${XTENSA_SYSTEM}/../bin:${PATH}"
 
 - Build using:
 ```
-make FREERTOS_SOURCE=/<YOUR_FREERTOS_PATH>/FreeRTOS/FreeRTOS/Source all
+make FREERTOS_SOURCE=<YOUR_FREERTOS_PATH> all
 ```
 
 
